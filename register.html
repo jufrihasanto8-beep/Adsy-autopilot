@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daftar — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #2563EB; --primary-dark: #1D4ED8;
+      --gray-1: #F8FAFC; --gray-2: #F1F5F9; --gray-3: #E2E8F0;
+      --gray-5: #94A3B8; --gray-6: #64748B;
+      --text: #1A1A2E; --danger: #EF4444; --success: #10B981;
+      --radius: 16px; --radius-sm: 10px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--gray-1);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-bg {
+      position: fixed; inset: 0;
+      background: linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 50%, #F0FDF4 100%);
+      z-index: -1;
+    }
+    .blob { position: fixed; border-radius: 50%; filter: blur(60px); opacity: 0.4; }
+    .blob-1 { width: 400px; height: 400px; background: #BFDBFE; top: -100px; left: -100px; }
+    .blob-2 { width: 300px; height: 300px; background: #DDD6FE; bottom: -80px; right: -80px; }
+
+    .card {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 440px;
+      padding: 40px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 32px;
+    }
+    .logo-icon {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, #2563EB, #7C3AED);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .logo-text strong { display: block; font-size: 18px; font-weight: 800; color: var(--text); }
+    .logo-text span { font-size: 12px; color: var(--gray-6); }
+
+    /* STEPS */
+    .steps {
+      display: flex; align-items: center; gap: 0;
+      margin-bottom: 32px;
+    }
+    .step {
+      display: flex; flex-direction: column; align-items: center;
+      flex: 1;
+    }
+    .step-dot {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      border: 2px solid var(--gray-3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700;
+      color: var(--gray-5);
+      background: white;
+      transition: all 0.3s;
+      margin-bottom: 6px;
+    }
+    .step-dot.active { border-color: var(--primary); background: var(--primary); color: white; }
+    .step-dot.done { border-color: var(--success); background: var(--success); color: white; }
+    .step-label { font-size: 10px; color: var(--gray-5); font-weight: 500; text-align: center; }
+    .step-label.active { color: var(--primary); font-weight: 600; }
+    .step-line { flex: 1; height: 2px; background: var(--gray-3); margin-top: -18px; transition: all 0.3s; }
+    .step-line.done { background: var(--success); }
+
+    h1 { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+    p.sub { font-size: 13px; color: var(--gray-6); margin-bottom: 24px; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 7px; }
+    .form-label span { color: var(--danger); margin-left: 3px; }
+    .form-input {
+      width: 100%; padding: 11px 14px;
+      border: 1.5px solid var(--gray-3);
+      border-radius: var(--radius-sm);
+      font-size: 13px; color: var(--text);
+      background: white; transition: all 0.2s;
+      outline: none; font-family: inherit;
+    }
+    .form-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .form-input::placeholder { color: var(--gray-5); }
+    .form-hint { font-size: 11px; color: var(--gray-5); margin-top: 5px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .password-wrap { position: relative; }
+    .password-toggle {
+      position: absolute; right: 12px; top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer; color: var(--gray-5); font-size: 15px;
+      background: none; border: none;
+    }
+
+    .strength-bar { display: flex; gap: 4px; margin-top: 8px; }
+    .strength-seg { flex: 1; height: 3px; border-radius: 10px; background: var(--gray-3); transition: all 0.3s; }
+    .strength-seg.weak { background: var(--danger); }
+    .strength-seg.medium { background: #F59E0B; }
+    .strength-seg.strong { background: var(--success); }
+    .strength-text { font-size: 11px; margin-top: 4px; color: var(--gray-5); }
+
+    .btn {
+      width: 100%; padding: 13px;
+      border: none; border-radius: var(--radius-sm);
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+      font-family: inherit;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--primary), #7C3AED); color: white; margin-top: 8px; }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .btn-outline {
+      background: transparent; color: var(--text);
+      border: 1.5px solid var(--gray-3); margin-top: 8px;
+    }
+    .btn-outline:hover { background: var(--gray-2); }
+
+    .error-msg {
+      background: #FEF2F2; color: var(--danger);
+      border-radius: 8px; padding: 11px 14px;
+      font-size: 13px; margin-top: 12px; display: none;
+    }
+    .success-msg {
+      background: #ECFDF5; color: var(--success);
+      border-radius: 8px; padding: 11px 14px;
+      font-size: 13px; margin-top: 12px; display: none;
+    }
+
+    .loading-spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .footer-link {
+      text-align: center; margin-top: 20px;
+      font-size: 13px; color: var(--gray-6);
+    }
+    .footer-link a { color: var(--primary); font-weight: 600; text-decoration: none; }
+
+    /* Role cards */
+    .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+    .role-card {
+      border: 1.5px solid var(--gray-3);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .role-card:hover { border-color: var(--primary); }
+    .role-card.selected { border-color: var(--primary); background: #EFF6FF; }
+    .role-card .role-icon { font-size: 24px; margin-bottom: 6px; }
+    .role-card strong { display: block; font-size: 13px; font-weight: 700; }
+    .role-card span { font-size: 11px; color: var(--gray-5); }
+
+    /* Success screen */
+    .success-screen { text-align: center; display: none; }
+    .success-screen .big-icon { font-size: 64px; margin-bottom: 16px; }
+    .success-screen h1 { margin-bottom: 12px; }
+    .success-screen p { color: var(--gray-6); font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+
+    /* Divider */
+    .or-divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 16px 0; color: var(--gray-5); font-size: 12px;
+    }
+    .or-divider::before, .or-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--gray-3);
+    }
+  </style>
+</head>
+<body>
+  <div class="login-bg"></div>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon">🚀</div>
+      <div class="logo-text">
+        <strong>Adsy Autopilot</strong>
+        <span>Meta Ads Automation</span>
+      </div>
+    </div>
+
+    <!-- STEPS INDICATOR -->
+    <div class="steps" id="steps-indicator">
+      <div class="step">
+        <div class="step-dot active" id="dot-1">1</div>
+        <div class="step-label active" id="label-1">Akun</div>
+      </div>
+      <div class="step-line" id="line-1"></div>
+      <div class="step">
+        <div class="step-dot" id="dot-2">2</div>
+        <div class="step-label" id="label-2">Profil</div>
+      </div>
+      <div class="step-line" id="line-2"></div>
+      <div class="step">
+        <div class="step-dot" id="dot-3">3</div>
+        <div class="step-label" id="label-3">Selesai</div>
+      </div>
+    </div>
+
+    <!-- STEP 1: EMAIL & PASSWORD -->
+    <div id="step-1">
+      <h1>Buat Akun</h1>
+      <p class="sub">Daftarkan akun untuk mulai pakai Adsy Autopilot.</p>
+
+      <div class="form-group">
+        <label class="form-label">Email <span>*</span></label>
+        <input type="email" id="s1-email" class="form-input" placeholder="nama@email.com" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Password <span>*</span></label>
+        <div class="password-wrap">
+          <input type="password" id="s1-pass" class="form-input" placeholder="Min. 8 karakter" />
+          <button type="button" class="password-toggle" onclick="togglePass('s1-pass')">👁</button>
+        </div>
+        <div class="strength-bar">
+          <div class="strength-seg" id="seg-1"></div>
+          <div class="strength-seg" id="seg-2"></div>
+          <div class="strength-seg" id="seg-3"></div>
+          <div class="strength-seg" id="seg-4"></div>
+        </div>
+        <div class="strength-text" id="strength-text">Minimal 8 karakter</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Konfirmasi Password <span>*</span></label>
+        <div class="password-wrap">
+          <input type="password" id="s1-pass2" class="form-input" placeholder="Ulangi password" />
+          <button type="button" class="password-toggle" onclick="togglePass('s1-pass2')">👁</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btn-step1">Lanjut →</button>
+      <div class="error-msg" id="err-1"></div>
+
+      <div class="footer-link">Sudah punya akun? <a href="index.html">Masuk</a></div>
+    </div>
+
+    <!-- STEP 2: PROFIL -->
+    <div id="step-2" style="display:none;">
+      <h1>Lengkapi Profil</h1>
+      <p class="sub">Siapa kamu di tim Adsy?</p>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nama Depan <span>*</span></label>
+          <input type="text" id="s2-fname" class="form-input" placeholder="Nama depan" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nama Belakang</label>
+          <input type="text" id="s2-lname" class="form-input" placeholder="Nama belakang" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Nomor WhatsApp</label>
+        <input type="text" id="s2-wa" class="form-input" placeholder="6281234567890" />
+        <div class="form-hint">Untuk menerima notifikasi autopilot</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Role / Jabatan <span>*</span></label>
+        <div class="role-grid">
+          <div class="role-card selected" data-role="advertiser" onclick="selectRole('advertiser')">
+            <div class="role-icon">📣</div>
+            <strong>Advertiser</strong>
+            <span>Kelola iklan</span>
+          </div>
+          <div class="role-card" data-role="admin" onclick="selectRole('admin')">
+            <div class="role-icon">⚙️</div>
+            <strong>Admin</strong>
+            <span>Kelola semua</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-outline" onclick="goStep(1)" style="flex:1; margin-top:8px;">← Kembali</button>
+        <button class="btn btn-primary" id="btn-step2" style="flex:2;">Buat Akun →</button>
+      </div>
+      <div class="error-msg" id="err-2"></div>
+    </div>
+
+    <!-- STEP 3: SUKSES -->
+    <div id="step-3" style="display:none;">
+      <div class="success-screen" style="display:block;">
+        <div class="big-icon">🎉</div>
+        <h1>Akun Berhasil Dibuat!</h1>
+        <p>Selamat datang di Adsy Autopilot.<br>Kamu sudah bisa mulai pakai dashboard.</p>
+        <button class="btn btn-primary" onclick="window.location.href='dashboard.html'">
+          Ke Dashboard →
+        </button>
+        <div class="or-divider">atau</div>
+        <button class="btn btn-outline" onclick="window.location.href='settings.html'">
+          Setup API Keys dulu
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+    const { createClient } = supabase;
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let selectedRole = 'advertiser';
+    let currentStep = 1;
+
+    // Check if already logged in
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session) window.location.href = '/dashboard.html';
+    });
+
+    // Password toggle
+    function togglePass(id) {
+      const el = document.getElementById(id);
+      el.type = el.type === 'password' ? 'text' : 'password';
+    }
+
+    // Role select
+    function selectRole(role) {
+      selectedRole = role;
+      document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+      document.querySelector(`[data-role="${role}"]`).classList.add('selected');
+    }
+
+    // Password strength
+    document.getElementById('s1-pass').addEventListener('input', function() {
+      const val = this.value;
+      const segs = [document.getElementById('seg-1'), document.getElementById('seg-2'),
+                    document.getElementById('seg-3'), document.getElementById('seg-4')];
+      const text = document.getElementById('strength-text');
+
+      segs.forEach(s => { s.className = 'strength-seg'; });
+
+      if (val.length === 0) { text.textContent = 'Minimal 8 karakter'; return; }
+
+      let score = 0;
+      if (val.length >= 8) score++;
+      if (/[A-Z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+
+      const cls = score <= 1 ? 'weak' : score <= 2 ? 'medium' : 'strong';
+      const labels = { weak: 'Lemah', medium: 'Cukup', strong: 'Kuat' };
+
+      for (let i = 0; i < score; i++) segs[i].classList.add(cls);
+      text.textContent = `Kekuatan password: ${labels[cls]}`;
+      text.style.color = cls === 'weak' ? '#EF4444' : cls === 'medium' ? '#F59E0B' : '#10B981';
+    });
+
+    // Step navigation
+    function goStep(n) {
+      document.getElementById(`step-${currentStep}`).style.display = 'none';
+      document.getElementById(`step-${n}`).style.display = '';
+
+      // Update dots
+      for (let i = 1; i <= 3; i++) {
+        const dot = document.getElementById(`dot-${i}`);
+        const label = document.getElementById(`label-${i}`);
+        dot.className = 'step-dot';
+        label.className = 'step-label';
+        if (i < n) { dot.classList.add('done'); dot.textContent = '✓'; }
+        else if (i === n) { dot.classList.add('active'); label.classList.add('active'); }
+        else { dot.textContent = i; }
+      }
+      for (let i = 1; i <= 2; i++) {
+        const line = document.getElementById(`line-${i}`);
+        line.className = 'step-line' + (i < n ? ' done' : '');
+      }
+
+      currentStep = n;
+    }
+
+    // STEP 1 — Validasi & lanjut
+    document.getElementById('btn-step1').addEventListener('click', async () => {
+      const email = document.getElementById('s1-email').value.trim();
+      const pass = document.getElementById('s1-pass').value;
+      const pass2 = document.getElementById('s1-pass2').value;
+      const errEl = document.getElementById('err-1');
+
+      errEl.style.display = 'none';
+
+      if (!email) return showErr('err-1', 'Email wajib diisi');
+      if (!email.includes('@')) return showErr('err-1', 'Format email tidak valid');
+      if (pass.length < 8) return showErr('err-1', 'Password minimal 8 karakter');
+      if (pass !== pass2) return showErr('err-1', 'Password tidak cocok');
+
+      goStep(2);
+    });
+
+    // STEP 2 — Buat akun
+    document.getElementById('btn-step2').addEventListener('click', async () => {
+      const fname = document.getElementById('s2-fname').value.trim();
+      const lname = document.getElementById('s2-lname').value.trim();
+      const wa = document.getElementById('s2-wa').value.trim();
+
+      if (!fname) return showErr('err-2', 'Nama depan wajib diisi');
+
+      const email = document.getElementById('s1-email').value.trim();
+      const pass = document.getElementById('s1-pass').value;
+      const fullName = `${fname} ${lname}`.trim();
+
+      const btn = document.getElementById('btn-step2');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="loading-spinner"></div> Membuat akun...';
+
+      try {
+        // Sign up
+        const { data, error } = await sb.auth.signUp({ email, password: pass });
+        if (error) throw error;
+
+        // Update profile
+        await sb.from('profiles').upsert({
+          id: data.user.id,
+          name: fullName,
+          email,
+          role: selectedRole,
+          wa_number: wa || null
+        }, { onConflict: 'id' });
+
+        goStep(3);
+        document.getElementById('steps-indicator').style.display = 'none';
+      } catch (err) {
+        showErr('err-2', err.message === 'User already registered'
+          ? 'Email sudah terdaftar. Coba login.'
+          : err.message);
+        btn.disabled = false;
+        btn.innerHTML = 'Buat Akun →';
+      }
+    });
+
+    function showErr(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
