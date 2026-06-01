@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Copywriting AI — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🚀</div>
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item active" data-page="copywriting.html"><span class="nav-icon">✍️</span> Copywriting AI</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-section-label" data-admin-only>Admin</div>
+      <div class="nav-item" data-page="settings.html" data-admin-only><span class="nav-icon">⚙️</span> Pengaturan</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>Copywriting AI</h2>
+        <p>Generate & A/B test copy iklan otomatis dengan Claude AI</p>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <div class="grid-6-4">
+        <!-- FORM GENERATE -->
+        <div>
+          <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header">
+              <div>
+                <div class="card-title">✍️ Generate Copy Baru</div>
+                <div class="card-sub">AI akan buat 3 variasi copy untuk iklan kamu</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Nama Produk / Layanan <span>*</span></label>
+              <input type="text" class="form-input" id="g-product" placeholder="Misal: Hijab Syari Premium" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Target Audience</label>
+              <input type="text" class="form-input" id="g-audience" placeholder="Misal: Wanita muslimah 25-40 tahun, ibu rumah tangga" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Key Benefit / Keunggulan <span>*</span></label>
+              <textarea class="form-input form-textarea" id="g-benefit" placeholder="Misal: Bahan adem, harga terjangkau, pengiriman same day, bisa COD..."></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Tone</label>
+                <select class="form-input form-select" id="g-tone">
+                  <option value="santai">😊 Santai & Friendly</option>
+                  <option value="profesional">💼 Profesional</option>
+                  <option value="hype">🔥 Hype & Urgent</option>
+                  <option value="emosional">💝 Emosional</option>
+                  <option value="informatif">📋 Informatif</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Objective Iklan</label>
+                <select class="form-input form-select" id="g-objective">
+                  <option value="traffic">Traffic ke website</option>
+                  <option value="leads">Kumpulkan leads/WA</option>
+                  <option value="sales">Direct sales</option>
+                  <option value="awareness">Brand awareness</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">CTA (Call to Action)</label>
+              <select class="form-input form-select" id="g-cta">
+                <option value="Hubungi Sekarang">Hubungi Sekarang</option>
+                <option value="Pesan Sekarang">Pesan Sekarang</option>
+                <option value="Pelajari Lebih">Pelajari Lebih</option>
+                <option value="Beli Sekarang">Beli Sekarang</option>
+                <option value="Daftar Gratis">Daftar Gratis</option>
+                <option value="Klaim Promo">Klaim Promo</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Promo / Penawaran Khusus</label>
+              <input type="text" class="form-input" id="g-promo" placeholder="Misal: Diskon 30%, gratis ongkir, beli 2 gratis 1..." />
+            </div>
+
+            <button class="btn btn-primary" id="btn-generate" style="width:100%;">
+              ✨ Generate 3 Variasi Copy
+            </button>
+          </div>
+
+          <!-- A/B TEST ACTIVE -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">🧪 A/B Test Berjalan</div>
+                <div class="card-sub">Variasi copy yang sedang diuji di Meta</div>
+              </div>
+            </div>
+            <div id="ab-list">
+              <div class="empty-state" style="padding: 30px;">
+                <div class="empty-icon">🧪</div>
+                <h3>Belum ada A/B Test aktif</h3>
+                <p>Generate copy dan kirim ke A/B test untuk mulai.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- HASIL GENERATE -->
+        <div>
+          <div class="card" style="position: sticky; top: 86px;">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Hasil Generate</div>
+                <div class="card-sub" id="gen-sub">Isi form dan klik generate</div>
+              </div>
+            </div>
+            <div id="copy-results">
+              <div class="empty-state" style="padding: 40px 20px;">
+                <div class="empty-icon" style="font-size:36px;">✍️</div>
+                <p>Hasil copy AI akan muncul di sini</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast, initModals, timeAgo } from './js/sidebar.js';
+  import { sb } from './js/supabase.js';
+
+  let currentProfile = null;
+  let generatedCopies = [];
+  let selectedCopyIdx = null;
+
+  async function init() {
+    const session = await requireAuth();
+    if (!session) return;
+    currentProfile = await renderUserInfo();
+    initSidebar();
+    initModals();
+
+    document.getElementById('btn-generate').addEventListener('click', generateCopy);
+    await loadABTests();
+  }
+
+  async function generateCopy() {
+    const product = document.getElementById('g-product').value.trim();
+    const benefit = document.getElementById('g-benefit').value.trim();
+    if (!product || !benefit) return showToast('Nama produk dan benefit wajib diisi', 'warning');
+
+    const btn = document.getElementById('btn-generate');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="loading-spinner"></div> Generating...';
+
+    const resultsEl = document.getElementById('copy-results');
+    resultsEl.innerHTML = `<div style="text-align:center; padding:40px;">
+      <div class="loading-spinner" style="border-color:var(--gray-3); border-top-color:var(--primary); width:28px; height:28px; border-width:3px; margin: 0 auto 12px;"></div>
+      <p style="color:var(--gray-5); font-size:13px;">Claude AI sedang menulis...</p>
+    </div>`;
+
+    try {
+      const res = await fetch('/api/ai-copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product,
+          audience: document.getElementById('g-audience').value,
+          benefit,
+          tone: document.getElementById('g-tone').value,
+          objective: document.getElementById('g-objective').value,
+          cta: document.getElementById('g-cta').value,
+          promo: document.getElementById('g-promo').value
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal generate');
+
+      generatedCopies = data.copies;
+      document.getElementById('gen-sub').textContent = `${generatedCopies.length} variasi berhasil dibuat`;
+      renderCopies(generatedCopies);
+    } catch (err) {
+      showToast(err.message, 'error');
+      resultsEl.innerHTML = `<div class="empty-state" style="padding:40px 20px;"><p style="color:var(--danger);">Gagal generate: ${err.message}</p></div>`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '✨ Generate 3 Variasi Copy';
+    }
+  }
+
+  function renderCopies(copies) {
+    const el = document.getElementById('copy-results');
+    el.innerHTML = copies.map((c, i) => `
+      <div class="copy-card ${selectedCopyIdx === i ? 'selected' : ''}" id="copy-${i}" onclick="selectCopy(${i})">
+        <div class="copy-card-header">
+          <span class="copy-variant-label">Variasi ${i + 1}</span>
+          <span class="badge badge-primary" style="font-size:10px;">${c.tone || 'AI'}</span>
+        </div>
+        <div class="copy-headline">${c.headline}</div>
+        <div class="copy-body">${c.primary_text}</div>
+        ${c.description ? `<div style="margin-top:8px; font-size:12px; color:var(--gray-5);">${c.description}</div>` : ''}
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--gray-2); display:flex; gap:10px; align-items:center;">
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); sendToABTest(${i})">
+            🧪 A/B Test
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); copyCopy(${i})">
+            📋 Copy
+          </button>
+        </div>
+      </div>
+      <div style="margin-bottom:12px;"></div>`).join('');
+  }
+
+  window.selectCopy = function(idx) {
+    selectedCopyIdx = idx;
+    document.querySelectorAll('.copy-card').forEach((el, i) => {
+      el.classList.toggle('selected', i === idx);
+    });
+  };
+
+  window.copyCopy = function(idx) {
+    const c = generatedCopies[idx];
+    const text = `${c.headline}\n\n${c.primary_text}${c.description ? '\n\n' + c.description : ''}`;
+    navigator.clipboard.writeText(text).then(() => showToast('Copy disalin!', 'success'));
+  };
+
+  window.sendToABTest = async function(idx) {
+    const c = generatedCopies[idx];
+
+    // Load campaigns for selection
+    let q = sb.from('campaigns').select('id, name').eq('status', 'ACTIVE');
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data: camps } = await q;
+
+    if (!camps || camps.length === 0) {
+      return showToast('Tidak ada kampanye aktif. Buat kampanye dulu.', 'warning');
+    }
+
+    const campId = camps[0].id; // Auto-pick first for now
+
+    const { error } = await sb.from('ad_copies').insert({
+      campaign_id: campId,
+      user_id: currentProfile.id,
+      headline: c.headline,
+      primary_text: c.primary_text,
+      description: c.description || '',
+      status: 'testing',
+      ab_test: true
+    });
+
+    if (error) return showToast('Gagal kirim ke A/B test: ' + error.message, 'error');
+
+    showToast('Variasi berhasil masuk ke A/B test!', 'success');
+    await loadABTests();
+  };
+
+  async function loadABTests() {
+    let q = sb.from('ad_copies').select('*, campaigns(name)').eq('ab_test', true)
+      .order('created_at', { ascending: false }).limit(10);
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+
+    const el = document.getElementById('ab-list');
+    if (!data || data.length === 0) {
+      el.innerHTML = `<div class="empty-state" style="padding: 30px;">
+        <div class="empty-icon">🧪</div><h3>Belum ada A/B Test aktif</h3>
+        <p>Generate copy dan kirim ke A/B test untuk mulai.</p></div>`;
+      return;
+    }
+
+    const statusBadge = { testing: 'badge-warning', winner: 'badge-success', paused: 'badge-gray' };
+
+    el.innerHTML = data.map(c => `
+      <div style="padding: 14px 0; border-bottom: 1px solid var(--gray-2);">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:6px;">
+          <strong style="font-size:13px;">${c.headline}</strong>
+          <span class="badge ${statusBadge[c.status] || 'badge-gray'}" style="font-size:10px; margin-left:8px; flex-shrink:0;">
+            ${c.status === 'testing' ? '🧪 Testing' : c.status === 'winner' ? '🏆 Winner' : '⏸ Paused'}
+          </span>
+        </div>
+        <div style="font-size:12px; color:var(--gray-5);">${c.campaigns?.name || 'No campaign'}</div>
+        ${c.ctr ? `
+        <div style="display:flex; gap:16px; margin-top:8px;">
+          <span style="font-size:11px; color:var(--text-sub);">CTR: <strong>${c.ctr?.toFixed(2)}%</strong></span>
+          <span style="font-size:11px; color:var(--text-sub);">CPR: <strong>${c.cpr ? 'Rp ' + c.cpr.toLocaleString('id-ID') : '-'}</strong></span>
+        </div>` : ''}
+      </div>`).join('');
+  }
+
+  init();
+</script>
+</body>
+</html>

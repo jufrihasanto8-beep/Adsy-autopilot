@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pengaturan — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🚀</div>
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="copywriting.html"><span class="nav-icon">✍️</span> Copywriting AI</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-section-label">Admin</div>
+      <div class="nav-item active" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>Pengaturan</h2>
+        <p>Konfigurasi akun, tim, dan integrasi API</p>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <div class="tabs">
+        <div class="tab active" data-tab="account">Akun & API</div>
+        <div class="tab" data-tab="team">Tim & User</div>
+        <div class="tab" data-tab="notif">Notifikasi</div>
+      </div>
+
+      <!-- TAB: AKUN & API -->
+      <div id="tab-account">
+        <div class="grid-2">
+          <!-- META API -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">🔵 Meta (Facebook) API</div>
+                <div class="card-sub">Konfigurasi akses Meta Marketing API</div>
+              </div>
+              <span class="badge badge-success" id="meta-status-badge">-</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Meta Access Token</label>
+              <div style="position:relative;">
+                <input type="password" class="form-input" id="meta-token" placeholder="EAA..." />
+              </div>
+              <div class="form-hint">Long-lived user access token dari Meta Developer</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ad Account ID</label>
+              <input type="text" class="form-input" id="meta-account" placeholder="act_XXXXXXXXXX" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Facebook Page ID</label>
+              <input type="text" class="form-input" id="meta-page" placeholder="123456789" />
+            </div>
+            <div style="display:flex; gap:10px;">
+              <button class="btn btn-outline btn-sm" id="btn-test-meta">Test Koneksi</button>
+              <button class="btn btn-primary btn-sm" id="btn-save-meta">Simpan</button>
+            </div>
+          </div>
+
+          <!-- NOTIF WA -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">💬 WhatsApp (Fonnte)</div>
+                <div class="card-sub">Notifikasi autopilot via WhatsApp</div>
+              </div>
+              <span class="badge badge-gray" id="wa-status-badge">-</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fonnte API Token</label>
+              <input type="password" class="form-input" id="fonnte-token" placeholder="Token dari fonnte.com" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nomor WA Tujuan Notif</label>
+              <input type="text" class="form-input" id="wa-target" placeholder="6281234567890" />
+              <div class="form-hint">Format: 62 + nomor tanpa 0 (misal: 6281234567890)</div>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <button class="btn btn-outline btn-sm" id="btn-test-wa">Test Kirim</button>
+              <button class="btn btn-primary btn-sm" id="btn-save-wa">Simpan</button>
+            </div>
+          </div>
+
+          <!-- CLAUDE AI -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">🤖 Claude AI (Anthropic)</div>
+                <div class="card-sub">Untuk generate copywriting otomatis</div>
+              </div>
+              <span class="badge badge-gray" id="claude-status-badge">-</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Anthropic API Key</label>
+              <input type="password" class="form-input" id="claude-key" placeholder="sk-ant-..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Model</label>
+              <select class="form-input form-select" id="claude-model">
+                <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (Recommended)</option>
+                <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (Faster)</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-save-claude">Simpan</button>
+          </div>
+
+          <!-- GOOGLE DRIVE -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">📁 Google Drive</div>
+                <div class="card-sub">Integrasi library konten dari GDrive</div>
+              </div>
+              <span class="badge badge-gray" id="gdrive-status-badge">-</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Google Service Account JSON</label>
+              <textarea class="form-input form-textarea" id="gdrive-sa" placeholder='{"type":"service_account",...}'></textarea>
+              <div class="form-hint">Atau gunakan link publik tanpa service account</div>
+            </div>
+            <div class="form-group">
+              <div class="switch-wrap">
+                <label class="switch">
+                  <input type="checkbox" id="gdrive-public" checked />
+                  <span class="switch-slider"></span>
+                </label>
+                <span class="switch-label">Gunakan link publik saja (tanpa auth)</span>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-save-gdrive">Simpan</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: TIM -->
+      <div id="tab-team" style="display:none;">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">👥 Manajemen Tim</div>
+              <div class="card-sub">Kelola user & hak akses</div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-invite-user">+ Undang User</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nama</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="user-table">
+                <tr><td colspan="5" style="text-align:center; padding:40px; color:var(--gray-5);">Memuat...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: NOTIFIKASI -->
+      <div id="tab-notif" style="display:none;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🔔 Pengaturan Notifikasi</div>
+            <div class="card-sub">Pilih event yang perlu dikirim notifikasi WA</div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div class="switch-wrap">
+              <label class="switch"><input type="checkbox" id="n-pause" checked /><span class="switch-slider"></span></label>
+              <span class="switch-label">Saat autopilot pause kampanye</span>
+            </div>
+            <div class="switch-wrap">
+              <label class="switch"><input type="checkbox" id="n-scale" checked /><span class="switch-slider"></span></label>
+              <span class="switch-label">Saat autopilot naikkan budget</span>
+            </div>
+            <div class="switch-wrap">
+              <label class="switch"><input type="checkbox" id="n-create" checked /><span class="switch-slider"></span></label>
+              <span class="switch-label">Saat kampanye baru dibuat</span>
+            </div>
+            <div class="switch-wrap">
+              <label class="switch"><input type="checkbox" id="n-winner" checked /><span class="switch-slider"></span></label>
+              <span class="switch-label">Saat A/B test menentukan pemenang</span>
+            </div>
+            <div class="switch-wrap">
+              <label class="switch"><input type="checkbox" id="n-budget" checked /><span class="switch-slider"></span></label>
+              <span class="switch-label">Alert budget hampir habis</span>
+            </div>
+            <div class="switch-wrap">
+              <label class="switch"><input type="checkbox" id="n-daily" /><span class="switch-slider"></span></label>
+              <span class="switch-label">Laporan harian ringkasan performa</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+          <div style="display:flex; justify-content:flex-end;">
+            <button class="btn btn-primary" id="btn-save-notif">Simpan Preferensi Notifikasi</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL INVITE USER -->
+<div class="modal-overlay hidden" id="modal-invite">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Undang User Baru</h3>
+      <div class="modal-close">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nama Lengkap</label>
+        <input type="text" class="form-input" id="inv-name" placeholder="Nama user" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email <span>*</span></label>
+        <input type="email" class="form-input" id="inv-email" placeholder="email@domain.com" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password Sementara <span>*</span></label>
+        <input type="password" class="form-input" id="inv-pass" placeholder="Min. 8 karakter" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-input form-select" id="inv-role">
+          <option value="advertiser">Advertiser</option>
+          <option value="admin">Admin</option>
+          <option value="viewer">Viewer (hanya lihat)</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-outline modal-close">Batal</button>
+        <button class="btn btn-primary" id="btn-create-user">Buat Akun</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast, openModal, closeModal, initModals } from './js/sidebar.js';
+  import { sb } from './js/supabase.js';
+
+  let currentProfile = null;
+
+  async function init() {
+    const session = await requireAuth();
+    if (!session) return;
+    currentProfile = await renderUserInfo();
+    initSidebar();
+    initModals();
+
+    // Tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+        document.getElementById(`tab-${tab.dataset.tab}`).style.display = '';
+      });
+    });
+
+    document.getElementById('btn-invite-user')?.addEventListener('click', () => openModal('modal-invite'));
+    document.getElementById('btn-create-user')?.addEventListener('click', createUser);
+    document.getElementById('btn-save-meta')?.addEventListener('click', () => saveConfig('meta'));
+    document.getElementById('btn-test-meta')?.addEventListener('click', testMeta);
+    document.getElementById('btn-save-wa')?.addEventListener('click', () => saveConfig('wa'));
+    document.getElementById('btn-test-wa')?.addEventListener('click', testWA);
+    document.getElementById('btn-save-claude')?.addEventListener('click', () => saveConfig('claude'));
+    document.getElementById('btn-save-gdrive')?.addEventListener('click', () => saveConfig('gdrive'));
+    document.getElementById('btn-save-notif')?.addEventListener('click', saveNotifSettings);
+
+    await Promise.all([loadConfig(), loadUsers()]);
+  }
+
+  async function loadConfig() {
+    const { data } = await sb.from('app_config').select('*').eq('user_id', currentProfile.id).single();
+    if (!data) return;
+
+    if (data.meta_token) document.getElementById('meta-token').value = data.meta_token;
+    if (data.meta_account) document.getElementById('meta-account').value = data.meta_account;
+    if (data.meta_page) document.getElementById('meta-page').value = data.meta_page;
+    if (data.fonnte_token) document.getElementById('fonnte-token').value = data.fonnte_token;
+    if (data.wa_target) document.getElementById('wa-target').value = data.wa_target;
+    if (data.claude_key) document.getElementById('claude-key').value = data.claude_key;
+
+    document.getElementById('meta-status-badge').textContent = data.meta_token ? 'Terhubung' : 'Belum';
+    document.getElementById('meta-status-badge').className = `badge ${data.meta_token ? 'badge-success' : 'badge-danger'}`;
+    document.getElementById('wa-status-badge').textContent = data.fonnte_token ? 'Terhubung' : 'Belum';
+    document.getElementById('wa-status-badge').className = `badge ${data.fonnte_token ? 'badge-success' : 'badge-gray'}`;
+    document.getElementById('claude-status-badge').textContent = data.claude_key ? 'Terhubung' : 'Belum';
+    document.getElementById('claude-status-badge').className = `badge ${data.claude_key ? 'badge-success' : 'badge-gray'}`;
+  }
+
+  async function saveConfig(type) {
+    let payload = { user_id: currentProfile.id };
+    if (type === 'meta') {
+      payload.meta_token = document.getElementById('meta-token').value.trim();
+      payload.meta_account = document.getElementById('meta-account').value.trim();
+      payload.meta_page = document.getElementById('meta-page').value.trim();
+    } else if (type === 'wa') {
+      payload.fonnte_token = document.getElementById('fonnte-token').value.trim();
+      payload.wa_target = document.getElementById('wa-target').value.trim();
+    } else if (type === 'claude') {
+      payload.claude_key = document.getElementById('claude-key').value.trim();
+      payload.claude_model = document.getElementById('claude-model').value;
+    } else if (type === 'gdrive') {
+      payload.gdrive_sa = document.getElementById('gdrive-sa').value.trim();
+      payload.gdrive_public = document.getElementById('gdrive-public').checked;
+    }
+
+    const { error } = await sb.from('app_config').upsert(payload, { onConflict: 'user_id' });
+    if (error) return showToast('Gagal simpan: ' + error.message, 'error');
+    showToast('Konfigurasi disimpan!', 'success');
+    await loadConfig();
+  }
+
+  async function testMeta() {
+    const token = document.getElementById('meta-token').value.trim();
+    if (!token) return showToast('Masukkan token dulu', 'warning');
+    try {
+      const res = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${token}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      showToast(`Terkoneksi sebagai: ${data.name}`, 'success');
+    } catch (err) {
+      showToast('Koneksi gagal: ' + err.message, 'error');
+    }
+  }
+
+  async function testWA() {
+    const token = document.getElementById('fonnte-token').value.trim();
+    const target = document.getElementById('wa-target').value.trim();
+    if (!token || !target) return showToast('Token dan nomor WA wajib diisi', 'warning');
+    try {
+      const res = await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, target, message: '✅ Test notifikasi Adsy Autopilot berhasil!' })
+      });
+      if (!res.ok) throw new Error('Gagal kirim');
+      showToast('Pesan WA berhasil dikirim!', 'success');
+    } catch (err) {
+      showToast('Gagal kirim WA: ' + err.message, 'error');
+    }
+  }
+
+  async function loadUsers() {
+    const { data } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
+    const tbody = document.getElementById('user-table');
+    if (!data || data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--gray-5);">Belum ada user</td></tr>`;
+      return;
+    }
+
+    const roleBadge = { admin: 'badge-dark', advertiser: 'badge-primary', viewer: 'badge-gray' };
+    tbody.innerHTML = data.map(u => `
+      <tr>
+        <td><strong>${u.name || '-'}</strong></td>
+        <td>${u.email || '-'}</td>
+        <td><span class="badge ${roleBadge[u.role] || 'badge-gray'}">${u.role}</span></td>
+        <td><span class="badge badge-success"><span class="badge-dot"></span> Aktif</span></td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="editRole('${u.id}', '${u.role}')">Edit Role</button>
+          ${u.id !== currentProfile.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="removeUser('${u.id}')">Hapus</button>` : ''}
+        </td>
+      </tr>`).join('');
+  }
+
+  async function createUser() {
+    const name = document.getElementById('inv-name').value.trim();
+    const email = document.getElementById('inv-email').value.trim();
+    const pass = document.getElementById('inv-pass').value;
+    const role = document.getElementById('inv-role').value;
+
+    if (!email || !pass) return showToast('Email dan password wajib diisi', 'warning');
+
+    const btn = document.getElementById('btn-create-user');
+    btn.disabled = true; btn.textContent = 'Membuat...';
+
+    try {
+      const res = await fetch('/api/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password: pass, role })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal');
+
+      showToast('User berhasil dibuat!', 'success');
+      closeModal('modal-invite');
+      await loadUsers();
+    } catch (err) {
+      showToast('Error: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Buat Akun';
+    }
+  }
+
+  window.editRole = async function(id, currentRole) {
+    const newRole = prompt(`Edit role (admin/advertiser/viewer):\nRole sekarang: ${currentRole}`);
+    if (!newRole || !['admin', 'advertiser', 'viewer'].includes(newRole)) return;
+    await sb.from('profiles').update({ role: newRole }).eq('id', id);
+    showToast('Role diperbarui', 'success');
+    await loadUsers();
+  };
+
+  window.removeUser = async function(id) {
+    if (!confirm('Hapus user ini?')) return;
+    await sb.from('profiles').delete().eq('id', id);
+    showToast('User dihapus', 'success');
+    await loadUsers();
+  };
+
+  async function saveNotifSettings() {
+    const settings = {
+      user_id: currentProfile.id,
+      notif_pause: document.getElementById('n-pause').checked,
+      notif_scale: document.getElementById('n-scale').checked,
+      notif_create: document.getElementById('n-create').checked,
+      notif_winner: document.getElementById('n-winner').checked,
+      notif_budget: document.getElementById('n-budget').checked,
+      notif_daily: document.getElementById('n-daily').checked,
+    };
+    await sb.from('notif_settings').upsert(settings, { onConflict: 'user_id' });
+    showToast('Preferensi notifikasi disimpan!', 'success');
+  }
+
+  init();
+</script>
+</body>
+</html>

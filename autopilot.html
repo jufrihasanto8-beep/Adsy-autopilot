@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Autopilot Rules — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🚀</div>
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="copywriting.html"><span class="nav-icon">✍️</span> Copywriting AI</div>
+      <div class="nav-item active" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-section-label" data-admin-only>Admin</div>
+      <div class="nav-item" data-page="settings.html" data-admin-only><span class="nav-icon">⚙️</span> Pengaturan</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>Autopilot Rules</h2>
+        <p>Otak autopilot — atur skema & rules kampanye iklan</p>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-outline" id="btn-run-now">⚡ Jalankan Sekarang</button>
+        <button class="btn btn-primary" id="btn-add-rule">+ Tambah Rule</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <!-- PHASE SCHEME -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">🗺️ Skema Autopilot (Otak)</div>
+            <div class="card-sub">Alur baku yang diikuti setiap kampanye autopilot</div>
+          </div>
+          <button class="btn btn-outline btn-sm" id="btn-edit-scheme">Edit Skema</button>
+        </div>
+
+        <div class="phase-indicator" style="margin-bottom: 24px;">
+          <div class="phase-step">
+            <div class="phase-dot active">1</div>
+            <div style="flex:1; padding: 0 8px;">
+              <div style="font-size:12px; font-weight:600;">Phase 1</div>
+              <div class="phase-text">Testing</div>
+            </div>
+          </div>
+          <div class="phase-line active"></div>
+          <div class="phase-step">
+            <div class="phase-dot active">2</div>
+            <div style="flex:1; padding: 0 8px;">
+              <div style="font-size:12px; font-weight:600;">Phase 2</div>
+              <div class="phase-text">Evaluasi</div>
+            </div>
+          </div>
+          <div class="phase-line"></div>
+          <div class="phase-step">
+            <div class="phase-dot">3</div>
+            <div style="flex:1; padding: 0 8px;">
+              <div style="font-size:12px; font-weight:600;">Phase 3</div>
+              <div class="phase-text">Scale</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div style="background: var(--primary-light); border-radius: var(--radius-sm); padding: 16px; border-left: 3px solid var(--primary);">
+            <div style="font-size: 12px; font-weight: 700; color: var(--primary); margin-bottom: 8px;">PHASE 1 — TESTING</div>
+            <div id="phase1-desc" style="font-size: 13px; color: var(--text);">
+              Loading...
+            </div>
+          </div>
+          <div style="background: var(--warning-light); border-radius: var(--radius-sm); padding: 16px; border-left: 3px solid var(--warning);">
+            <div style="font-size: 12px; font-weight: 700; color: var(--warning); margin-bottom: 8px;">PHASE 2 — EVALUASI</div>
+            <div id="phase2-desc" style="font-size: 13px; color: var(--text);">
+              Loading...
+            </div>
+          </div>
+          <div style="background: var(--success-light); border-radius: var(--radius-sm); padding: 16px; border-left: 3px solid var(--success);">
+            <div style="font-size: 12px; font-weight: 700; color: var(--success); margin-bottom: 8px;">PHASE 3 — SCALE</div>
+            <div id="phase3-desc" style="font-size: 13px; color: var(--text);">
+              Loading...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-6-4">
+        <!-- RULES LIST -->
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Rules Otomatis</div>
+                <div class="card-sub">Kondisi & aksi yang dijalankan autopilot</div>
+              </div>
+            </div>
+            <div id="rules-list">
+              <div style="text-align:center; padding:40px; color:var(--gray-5);">Memuat rules...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOG & SCHEDULE -->
+        <div>
+          <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header">
+              <div class="card-title">⏰ Jadwal Autopilot</div>
+            </div>
+            <div style="font-size: 13px; color: var(--text-sub); margin-bottom: 16px;">
+              Autopilot akan cek & eksekusi rules secara otomatis
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding: 12px 14px; background:var(--gray-1); border-radius:8px;">
+                <span style="font-size:13px; font-weight:500;">Cek performa</span>
+                <span class="badge badge-success">Setiap 4 jam</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding: 12px 14px; background:var(--gray-1); border-radius:8px;">
+                <span style="font-size:13px; font-weight:500;">Laporan harian</span>
+                <span class="badge badge-primary">07:00 WIB</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding: 12px 14px; background:var(--gray-1); border-radius:8px;">
+                <span style="font-size:13px; font-weight:500;">Evaluasi A/B test</span>
+                <span class="badge badge-warning">Setiap 3 hari</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📋 Log Terakhir</div>
+            </div>
+            <div id="ap-log">
+              <div style="text-align:center; padding:20px; color:var(--gray-5); font-size:13px;">Belum ada log</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL TAMBAH RULE -->
+<div class="modal-overlay hidden" id="modal-rule">
+  <div class="modal" style="max-width: 560px;">
+    <div class="modal-header">
+      <h3>Tambah Rule Autopilot</h3>
+      <div class="modal-close">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nama Rule <span>*</span></label>
+        <input type="text" class="form-input" id="r-name" placeholder="Misal: Pause jika CPR terlalu tinggi" />
+      </div>
+
+      <div style="background: var(--gray-1); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 16px;">
+        <div style="font-size: 12px; font-weight: 700; margin-bottom: 12px; color: var(--text-sub);">KONDISI (JIKA...)</div>
+        <div class="form-row">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Metrik</label>
+            <select class="form-input form-select" id="r-metric">
+              <option value="cpr">CPR (Cost per Result)</option>
+              <option value="ctr">CTR (Click-through Rate)</option>
+              <option value="roas">ROAS</option>
+              <option value="spend">Total Spend</option>
+              <option value="days">Hari Berjalan</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Operator</label>
+            <select class="form-input form-select" id="r-operator">
+              <option value="gt">Lebih dari (&gt;)</option>
+              <option value="lt">Kurang dari (&lt;)</option>
+              <option value="gte">Lebih dari / sama (&ge;)</option>
+              <option value="lte">Kurang dari / sama (&le;)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0; margin-top: 12px;">
+          <label class="form-label">Nilai</label>
+          <input type="number" class="form-input" id="r-value" placeholder="Misal: 50000" />
+        </div>
+      </div>
+
+      <div style="background: var(--primary-light); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 16px;">
+        <div style="font-size: 12px; font-weight: 700; margin-bottom: 12px; color: var(--primary);">AKSI (MAKA...)</div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Tipe Aksi</label>
+          <select class="form-input form-select" id="r-action">
+            <option value="pause">⏸ Pause kampanye</option>
+            <option value="resume">▶️ Aktifkan kampanye</option>
+            <option value="increase_budget">📈 Naikkan budget</option>
+            <option value="decrease_budget">📉 Kurangi budget</option>
+            <option value="duplicate">📋 Duplicate kampanye terbaik</option>
+            <option value="replace_content">🔄 Ganti konten dari library</option>
+            <option value="notify">🔔 Kirim notifikasi WA</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;" id="action-value-wrap">
+          <label class="form-label">Nilai (jika berlaku)</label>
+          <input type="text" class="form-input" id="r-action-value" placeholder="Misal: 20 (untuk 20% kenaikan budget)" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Berlaku untuk</label>
+        <select class="form-input form-select" id="r-scope">
+          <option value="all">Semua kampanye autopilot</option>
+          <option value="phase1">Phase 1 saja</option>
+          <option value="phase2">Phase 2 saja</option>
+          <option value="phase3">Phase 3 saja</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <div class="switch-wrap">
+          <label class="switch">
+            <input type="checkbox" id="r-active" checked />
+            <span class="switch-slider"></span>
+          </label>
+          <span class="switch-label">Rule langsung aktif setelah disimpan</span>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-outline modal-close">Batal</button>
+        <button class="btn btn-primary" id="btn-save-rule">Simpan Rule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT SCHEME -->
+<div class="modal-overlay hidden" id="modal-scheme">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-header">
+      <h3>Edit Skema Autopilot</h3>
+      <div class="modal-close">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px; color:var(--text-sub); margin-bottom:20px;">
+        Kamu juga bisa upload file skema — kirim ke tim Adsy untuk dikonfigurasi.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Phase 1 — Testing</label>
+        <textarea class="form-input form-textarea" id="s-phase1" style="min-height:80px;"
+          placeholder="Misal: Budget Rp 50rb/hari, 3 variasi copy, durasi 3 hari. Matikan copy CTR < 1%."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phase 2 — Evaluasi</label>
+        <textarea class="form-input form-textarea" id="s-phase2" style="min-height:80px;"
+          placeholder="Misal: Naikkan budget copy terbaik 50%. Pause yang CPR > target. Durasi 4 hari."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phase 3 — Scale</label>
+        <textarea class="form-input form-textarea" id="s-phase3" style="min-height:80px;"
+          placeholder="Misal: Jika ROAS > 3x, naikkan budget 20%/hari. Jika ROAS < target 2 hari berturut, ganti konten dari library."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target CPR</label>
+        <input type="number" class="form-input" id="s-target-cpr" placeholder="Misal: 30000" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target ROAS</label>
+        <input type="number" class="form-input" id="s-target-roas" placeholder="Misal: 3" step="0.1" />
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-outline modal-close">Batal</button>
+        <button class="btn btn-primary" id="btn-save-scheme">Simpan Skema</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast, openModal, closeModal, initModals, timeAgo } from './js/sidebar.js';
+  import { sb } from './js/supabase.js';
+
+  let currentProfile = null;
+
+  async function init() {
+    const session = await requireAuth();
+    if (!session) return;
+    currentProfile = await renderUserInfo();
+    initSidebar();
+    initModals();
+
+    document.getElementById('btn-add-rule').addEventListener('click', () => openModal('modal-rule'));
+    document.getElementById('btn-edit-scheme').addEventListener('click', () => {
+      loadSchemeToForm();
+      openModal('modal-scheme');
+    });
+    document.getElementById('btn-save-rule').addEventListener('click', saveRule);
+    document.getElementById('btn-save-scheme').addEventListener('click', saveScheme);
+    document.getElementById('btn-run-now').addEventListener('click', runAutopilot);
+
+    await Promise.all([loadScheme(), loadRules(), loadLog()]);
+  }
+
+  async function loadScheme() {
+    const { data } = await sb.from('autopilot_scheme')
+      .select('*').eq('user_id', currentProfile.id).single();
+
+    const defaults = {
+      phase1: 'Budget Rp 50rb/hari · 3 variasi copy · Durasi 3 hari · Matikan copy CTR < 1%',
+      phase2: 'Naikkan budget copy terbaik 50% · Pause copy CPR > target · Durasi 4 hari',
+      phase3: 'Jika ROAS > 3x → naikkan budget 20%/hari · Jika ROAS < target 2 hari → ganti konten dari library'
+    };
+
+    document.getElementById('phase1-desc').textContent = data?.phase1 || defaults.phase1;
+    document.getElementById('phase2-desc').textContent = data?.phase2 || defaults.phase2;
+    document.getElementById('phase3-desc').textContent = data?.phase3 || defaults.phase3;
+  }
+
+  async function loadSchemeToForm() {
+    const { data } = await sb.from('autopilot_scheme')
+      .select('*').eq('user_id', currentProfile.id).single();
+    if (!data) return;
+    document.getElementById('s-phase1').value = data.phase1 || '';
+    document.getElementById('s-phase2').value = data.phase2 || '';
+    document.getElementById('s-phase3').value = data.phase3 || '';
+    document.getElementById('s-target-cpr').value = data.target_cpr || '';
+    document.getElementById('s-target-roas').value = data.target_roas || '';
+  }
+
+  async function saveScheme() {
+    const payload = {
+      user_id: currentProfile.id,
+      phase1: document.getElementById('s-phase1').value,
+      phase2: document.getElementById('s-phase2').value,
+      phase3: document.getElementById('s-phase3').value,
+      target_cpr: parseFloat(document.getElementById('s-target-cpr').value) || null,
+      target_roas: parseFloat(document.getElementById('s-target-roas').value) || null
+    };
+
+    const { error } = await sb.from('autopilot_scheme').upsert(payload, { onConflict: 'user_id' });
+    if (error) return showToast('Gagal simpan: ' + error.message, 'error');
+
+    showToast('Skema berhasil disimpan!', 'success');
+    closeModal('modal-scheme');
+    await loadScheme();
+  }
+
+  async function loadRules() {
+    let q = sb.from('autopilot_rules').select('*').order('created_at', { ascending: false });
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+
+    const el = document.getElementById('rules-list');
+    if (!data || data.length === 0) {
+      el.innerHTML = `<div class="empty-state" style="padding:40px;">
+        <div class="empty-icon">🤖</div>
+        <h3>Belum ada rules</h3>
+        <p>Tambahkan rule untuk mulai otomatisasi iklan kamu.</p></div>`;
+      return;
+    }
+
+    const metricLabel = { cpr: 'CPR', ctr: 'CTR', roas: 'ROAS', spend: 'Spend', days: 'Hari' };
+    const opLabel = { gt: '>', lt: '<', gte: '≥', lte: '≤' };
+    const actionLabel = {
+      pause: '⏸ Pause kampanye',
+      resume: '▶️ Aktifkan kampanye',
+      increase_budget: '📈 Naikkan budget',
+      decrease_budget: '📉 Kurangi budget',
+      duplicate: '📋 Duplicate kampanye',
+      replace_content: '🔄 Ganti konten',
+      notify: '🔔 Kirim notif WA'
+    };
+
+    el.innerHTML = data.map(r => `
+      <div class="rule-card ${r.is_active ? 'active-rule' : ''}">
+        <div class="rule-card-header">
+          <strong>${r.name}</strong>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span class="badge ${r.is_active ? 'badge-success' : 'badge-gray'}">${r.is_active ? 'Aktif' : 'Nonaktif'}</span>
+            <button class="btn btn-ghost btn-sm" onclick="toggleRule('${r.id}', ${r.is_active})">
+              ${r.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+            </button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteRule('${r.id}')">Hapus</button>
+          </div>
+        </div>
+        <div class="rule-condition">
+          Jika <strong>${metricLabel[r.metric] || r.metric}</strong> ${opLabel[r.operator] || r.operator} <strong>${r.value}</strong>
+        </div>
+        <div class="rule-action">→ ${actionLabel[r.action_type] || r.action_type}${r.action_value ? ' (' + r.action_value + '%)' : ''}</div>
+        <div style="margin-top:8px; font-size:11px; color:var(--gray-5);">Berlaku: ${r.scope || 'Semua phase'}</div>
+      </div>`).join('');
+  }
+
+  async function saveRule() {
+    const name = document.getElementById('r-name').value.trim();
+    if (!name) return showToast('Nama rule wajib diisi', 'warning');
+
+    const { error } = await sb.from('autopilot_rules').insert({
+      user_id: currentProfile.id,
+      name,
+      metric: document.getElementById('r-metric').value,
+      operator: document.getElementById('r-operator').value,
+      value: parseFloat(document.getElementById('r-value').value),
+      action_type: document.getElementById('r-action').value,
+      action_value: document.getElementById('r-action-value').value,
+      scope: document.getElementById('r-scope').value,
+      is_active: document.getElementById('r-active').checked
+    });
+
+    if (error) return showToast('Gagal simpan: ' + error.message, 'error');
+    showToast('Rule berhasil ditambahkan!', 'success');
+    closeModal('modal-rule');
+    await loadRules();
+  }
+
+  window.toggleRule = async function(id, isActive) {
+    await sb.from('autopilot_rules').update({ is_active: !isActive }).eq('id', id);
+    showToast(`Rule ${!isActive ? 'diaktifkan' : 'dinonaktifkan'}`, 'success');
+    await loadRules();
+  };
+
+  window.deleteRule = async function(id) {
+    if (!confirm('Hapus rule ini?')) return;
+    await sb.from('autopilot_rules').delete().eq('id', id);
+    showToast('Rule dihapus', 'success');
+    await loadRules();
+  };
+
+  async function loadLog() {
+    let q = sb.from('action_logs').select('*').limit(8).order('created_at', { ascending: false });
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+
+    const el = document.getElementById('ap-log');
+    if (!data || data.length === 0) {
+      el.innerHTML = `<div style="text-align:center; padding:20px; color:var(--gray-5); font-size:13px;">Belum ada log</div>`;
+      return;
+    }
+
+    const icons = { pause: '⏸', scale: '📈', create: '➕', duplicate: '📋', resume: '▶️', notify: '🔔' };
+    el.innerHTML = data.map(log => `
+      <div class="action-log-item">
+        <div class="action-log-icon" style="background:var(--primary-light); font-size:14px;">${icons[log.action_type] || '⚡'}</div>
+        <div class="action-log-body">
+          <strong>${log.description || log.action_type}</strong>
+          <p>${log.campaign_name || '-'} · ${log.reason || ''}</p>
+        </div>
+        <div class="action-log-time">${timeAgo(log.created_at)}</div>
+      </div>`).join('');
+  }
+
+  async function runAutopilot() {
+    const btn = document.getElementById('btn-run-now');
+    btn.disabled = true; btn.textContent = '⚡ Running...';
+
+    try {
+      const res = await fetch('/api/autopilot-run', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal');
+      showToast(`Autopilot selesai! ${data.actions_taken || 0} aksi dijalankan.`, 'success');
+      await loadLog();
+    } catch (err) {
+      showToast('Error: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '⚡ Jalankan Sekarang';
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

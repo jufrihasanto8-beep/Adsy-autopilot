@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kampanye — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🚀</div>
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item active" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="copywriting.html"><span class="nav-icon">✍️</span> Copywriting AI</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-section-label" data-admin-only>Admin</div>
+      <div class="nav-item" data-page="settings.html" data-admin-only><span class="nav-icon">⚙️</span> Pengaturan</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>Kampanye</h2>
+        <p>Monitor & kelola semua kampanye iklan</p>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-outline" id="btn-sync">🔄 Sync Meta</button>
+        <button class="btn btn-primary" id="btn-new-campaign">+ Kampanye Baru</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <!-- STATS -->
+      <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Aktif</div>
+            <div class="stat-value" id="s-active">-</div>
+          </div>
+          <div class="stat-icon green">▶️</div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Phase Testing</div>
+            <div class="stat-value" id="s-testing">-</div>
+          </div>
+          <div class="stat-icon blue">🧪</div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Phase Scale</div>
+            <div class="stat-value" id="s-scale">-</div>
+          </div>
+          <div class="stat-icon yellow">📈</div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Paused</div>
+            <div class="stat-value" id="s-paused">-</div>
+          </div>
+          <div class="stat-icon red">⏸️</div>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="tabs">
+        <div class="tab active" data-tab="all">Semua</div>
+        <div class="tab" data-tab="ACTIVE">Aktif</div>
+        <div class="tab" data-tab="PAUSED">Paused</div>
+        <div class="tab" data-tab="archived">Arsip</div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom: 16px;">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="form-input" id="search-camp" placeholder="Cari kampanye..." />
+          </div>
+          <select class="form-input form-select" id="filter-phase" style="width:auto;">
+            <option value="">Semua Phase</option>
+            <option value="1">Phase 1: Testing</option>
+            <option value="2">Phase 2: Evaluasi</option>
+            <option value="3">Phase 3: Scale</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Kampanye</th>
+                <th>Phase</th>
+                <th>Budget/Hari</th>
+                <th>Spend</th>
+                <th>CPR</th>
+                <th>CTR</th>
+                <th>Status</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="camp-table">
+              <tr><td colspan="8" style="text-align:center; padding:50px; color:var(--gray-5);">
+                Memuat kampanye...
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL KAMPANYE BARU -->
+<div class="modal-overlay hidden" id="modal-campaign">
+  <div class="modal" style="max-width: 580px;">
+    <div class="modal-header">
+      <h3>Buat Kampanye Baru</h3>
+      <div class="modal-close">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nama Kampanye <span>*</span></label>
+        <input type="text" class="form-input" id="c-name" placeholder="Misal: Promo Ramadan 2025" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Objective</label>
+          <select class="form-input form-select" id="c-objective">
+            <option value="OUTCOME_TRAFFIC">Traffic</option>
+            <option value="OUTCOME_SALES">Sales / Conversions</option>
+            <option value="OUTCOME_LEADS">Leads</option>
+            <option value="OUTCOME_AWARENESS">Awareness</option>
+            <option value="OUTCOME_ENGAGEMENT">Engagement</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Budget Harian (Rp)</label>
+          <input type="number" class="form-input" id="c-budget" placeholder="50000" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Target Umur</label>
+          <input type="text" class="form-input" id="c-age" placeholder="18-45" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Gender</label>
+          <select class="form-input form-select" id="c-gender">
+            <option value="ALL">Semua</option>
+            <option value="MALE">Pria</option>
+            <option value="FEMALE">Wanita</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Pilih Konten dari Library <span>*</span></label>
+        <select class="form-input form-select" id="c-content">
+          <option value="">-- Pilih Konten --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Meta Ad Account ID</label>
+        <input type="text" class="form-input" id="c-account" placeholder="act_XXXXXXXXXX" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Facebook Page ID</label>
+        <input type="text" class="form-input" id="c-page" placeholder="123456789" />
+      </div>
+      <div class="form-group">
+        <div class="switch-wrap">
+          <label class="switch">
+            <input type="checkbox" id="c-autopilot" checked />
+            <span class="switch-slider"></span>
+          </label>
+          <span class="switch-label">Aktifkan autopilot untuk kampanye ini</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-outline modal-close">Batal</button>
+        <button class="btn btn-primary" id="btn-create-camp">Buat Kampanye</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast, openModal, closeModal, initModals, formatRupiah, formatDate } from './js/sidebar.js';
+  import { sb } from './js/supabase.js';
+
+  let currentProfile = null;
+  let allCampaigns = [];
+  let currentTab = 'all';
+
+  async function init() {
+    const session = await requireAuth();
+    if (!session) return;
+    currentProfile = await renderUserInfo();
+    initSidebar();
+    initModals();
+
+    document.getElementById('btn-new-campaign').addEventListener('click', () => {
+      loadLibraryOptions();
+      openModal('modal-campaign');
+    });
+    document.getElementById('btn-create-camp').addEventListener('click', createCampaign);
+    document.getElementById('btn-sync').addEventListener('click', syncMeta);
+    document.getElementById('search-camp').addEventListener('input', filterCampaigns);
+    document.getElementById('filter-phase').addEventListener('change', filterCampaigns);
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentTab = tab.dataset.tab;
+        filterCampaigns();
+      });
+    });
+
+    await loadCampaigns();
+  }
+
+  async function loadCampaigns() {
+    let q = sb.from('campaigns').select('*, content_library(name)').order('created_at', { ascending: false });
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+    allCampaigns = data || [];
+    updateStats(allCampaigns);
+    renderCampaigns(allCampaigns);
+  }
+
+  function updateStats(data) {
+    document.getElementById('s-active').textContent = data.filter(c => c.status === 'ACTIVE').length;
+    document.getElementById('s-testing').textContent = data.filter(c => c.current_phase === 1).length;
+    document.getElementById('s-scale').textContent = data.filter(c => c.current_phase === 3).length;
+    document.getElementById('s-paused').textContent = data.filter(c => c.status === 'PAUSED').length;
+  }
+
+  function filterCampaigns() {
+    const search = document.getElementById('search-camp').value.toLowerCase();
+    const phase = document.getElementById('filter-phase').value;
+
+    let filtered = allCampaigns.filter(c => {
+      const matchTab = currentTab === 'all' || c.status === currentTab || (currentTab === 'archived' && c.status === 'ARCHIVED');
+      const matchSearch = !search || c.name.toLowerCase().includes(search);
+      const matchPhase = !phase || String(c.current_phase) === phase;
+      return matchTab && matchSearch && matchPhase;
+    });
+
+    renderCampaigns(filtered);
+  }
+
+  function renderCampaigns(data) {
+    const tbody = document.getElementById('camp-table');
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:50px; color:var(--gray-5);">
+        Tidak ada kampanye ditemukan</td></tr>`;
+      return;
+    }
+
+    const phaseLabel = { 1: 'Testing', 2: 'Evaluasi', 3: 'Scale' };
+    const phaseBadge = { 1: 'badge-warning', 2: 'badge-primary', 3: 'badge-success' };
+
+    tbody.innerHTML = data.map(c => `
+      <tr>
+        <td>
+          <strong>${c.name}</strong>
+          <div style="font-size:11px; color:var(--gray-5); margin-top:2px;">${c.objective || '-'} · ${c.content_library?.name || 'No content'}</div>
+        </td>
+        <td>
+          <span class="badge ${phaseBadge[c.current_phase] || 'badge-gray'}">
+            P${c.current_phase || 1}: ${phaseLabel[c.current_phase] || 'Testing'}
+          </span>
+        </td>
+        <td>${formatRupiah(c.daily_budget)}</td>
+        <td>${formatRupiah(c.spend_today)}</td>
+        <td>${c.cpr ? formatRupiah(c.cpr) : '-'}</td>
+        <td>${c.ctr ? c.ctr.toFixed(2) + '%' : '-'}</td>
+        <td>
+          <span class="badge ${c.status === 'ACTIVE' ? 'badge-success' : c.status === 'PAUSED' ? 'badge-warning' : 'badge-gray'}">
+            <span class="badge-dot"></span>
+            ${c.status === 'ACTIVE' ? 'Aktif' : c.status === 'PAUSED' ? 'Paused' : c.status}
+          </span>
+        </td>
+        <td>
+          <div style="display:flex; gap:6px;">
+            ${c.status === 'ACTIVE'
+              ? `<button class="btn btn-outline btn-sm" onclick="toggleStatus('${c.id}', 'PAUSED')">⏸ Pause</button>`
+              : `<button class="btn btn-success btn-sm" onclick="toggleStatus('${c.id}', 'ACTIVE')">▶ Aktifkan</button>`
+            }
+            <button class="btn btn-outline btn-sm" onclick="viewDetail('${c.id}')">Detail</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  async function loadLibraryOptions() {
+    let q = sb.from('content_library').select('id, name').eq('status', 'ready');
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+    const sel = document.getElementById('c-content');
+    sel.innerHTML = '<option value="">-- Pilih Konten --</option>' +
+      (data || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  }
+
+  async function createCampaign() {
+    const name = document.getElementById('c-name').value.trim();
+    const objective = document.getElementById('c-objective').value;
+    const budget = parseInt(document.getElementById('c-budget').value);
+    const age = document.getElementById('c-age').value.trim();
+    const gender = document.getElementById('c-gender').value;
+    const contentId = document.getElementById('c-content').value;
+    const accountId = document.getElementById('c-account').value.trim();
+    const pageId = document.getElementById('c-page').value.trim();
+    const autopilot = document.getElementById('c-autopilot').checked;
+
+    if (!name || !contentId) return showToast('Nama dan konten wajib diisi', 'warning');
+
+    const btn = document.getElementById('btn-create-camp');
+    btn.disabled = true; btn.textContent = 'Membuat...';
+
+    try {
+      const res = await fetch('/api/meta-campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name, objective, daily_budget: budget,
+          age_range: age, gender,
+          content_id: contentId,
+          ad_account_id: accountId,
+          page_id: pageId,
+          autopilot_enabled: autopilot,
+          user_id: currentProfile.id
+        })
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal membuat kampanye');
+
+      showToast('Kampanye berhasil dibuat!', 'success');
+      closeModal('modal-campaign');
+      await loadCampaigns();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Buat Kampanye';
+    }
+  }
+
+  async function syncMeta() {
+    const btn = document.getElementById('btn-sync');
+    btn.disabled = true; btn.textContent = '🔄 Syncing...';
+    try {
+      const res = await fetch('/api/meta-insights', { method: 'POST' });
+      if (!res.ok) throw new Error('Sync gagal');
+      showToast('Data berhasil disinkronkan dari Meta!', 'success');
+      await loadCampaigns();
+    } catch (err) {
+      showToast('Sync gagal: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '🔄 Sync Meta';
+    }
+  }
+
+  window.toggleStatus = async function(id, status) {
+    await sb.from('campaigns').update({ status }).eq('id', id);
+    showToast(`Kampanye ${status === 'ACTIVE' ? 'diaktifkan' : 'di-pause'}`, 'success');
+    await loadCampaigns();
+  };
+
+  window.viewDetail = function(id) {
+    // Navigate to detail or open modal
+    window.location.href = `campaigns.html?id=${id}`;
+  };
+
+  init();
+</script>
+</body>
+</html>

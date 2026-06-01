@@ -1,0 +1,13 @@
+{
+  "name": "adsy-autopilot",
+  "version": "1.0.0",
+  "description": "Meta Ads Autopilot — Internal Tool by Adsy",
+  "private": true,
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@supabase/supabase-js": "^2.45.4"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laporan — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🚀</div>
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="copywriting.html"><span class="nav-icon">✍️</span> Copywriting AI</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item active" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-section-label" data-admin-only>Admin</div>
+      <div class="nav-item" data-page="settings.html" data-admin-only><span class="nav-icon">⚙️</span> Pengaturan</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>Laporan</h2>
+        <p>Analisis performa kampanye & efektivitas autopilot</p>
+      </div>
+      <div class="topbar-right">
+        <select class="form-input form-select" id="date-range" style="width:auto;">
+          <option value="7">7 hari terakhir</option>
+          <option value="14">14 hari terakhir</option>
+          <option value="30" selected>30 hari terakhir</option>
+          <option value="90">3 bulan terakhir</option>
+        </select>
+        <button class="btn btn-outline" id="btn-export">⬇ Export CSV</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <!-- SUMMARY STATS -->
+      <div class="stats-grid" style="margin-bottom: 24px;">
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Total Spend</div>
+            <div class="stat-value" id="r-spend">-</div>
+            <div class="stat-change" id="r-spend-change">-</div>
+          </div>
+          <div class="stat-icon blue">💰</div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Total Klik</div>
+            <div class="stat-value" id="r-clicks">-</div>
+            <div class="stat-change up" id="r-clicks-change">-</div>
+          </div>
+          <div class="stat-icon green">👆</div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Rata-rata CPR</div>
+            <div class="stat-value" id="r-cpr">-</div>
+            <div class="stat-change" id="r-cpr-change">-</div>
+          </div>
+          <div class="stat-icon yellow">🎯</div>
+        </div>
+        <div class="stat-card dark">
+          <div>
+            <div class="stat-label">Aksi Autopilot</div>
+            <div class="stat-value" id="r-actions">-</div>
+            <div class="stat-change up">Total di periode ini</div>
+          </div>
+          <div class="stat-icon blue">🤖</div>
+        </div>
+      </div>
+
+      <!-- CHARTS ROW -->
+      <div class="grid-2" style="margin-bottom: 24px;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Spend Harian</div>
+          </div>
+          <canvas id="chart-spend" height="180"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">CTR & CPR Trend</div>
+          </div>
+          <canvas id="chart-ctr" height="180"></canvas>
+        </div>
+      </div>
+
+      <!-- CAMPAIGN REPORT TABLE -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Performa per Kampanye</div>
+            <div class="card-sub">Diurutkan berdasarkan spend tertinggi</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Kampanye</th>
+                <th>Phase</th>
+                <th>Spend</th>
+                <th>Klik</th>
+                <th>CTR</th>
+                <th>CPR</th>
+                <th>Hasil</th>
+                <th>Autopilot</th>
+              </tr>
+            </thead>
+            <tbody id="report-table">
+              <tr><td colspan="8" style="text-align:center; padding:40px; color:var(--gray-5);">Memuat data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- AUTOPILOT SUMMARY -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Ringkasan Aksi Autopilot</div>
+            <div class="card-sub">Semua aksi yang dijalankan sistem di periode ini</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Waktu</th>
+                <th>Kampanye</th>
+                <th>Aksi</th>
+                <th>Alasan</th>
+                <th>Hasil</th>
+              </tr>
+            </thead>
+            <tbody id="action-table">
+              <tr><td colspan="5" style="text-align:center; padding:40px; color:var(--gray-5);">Memuat log...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast, formatRupiah, formatNumber, formatDate } from './js/sidebar.js';
+  import { sb } from './js/supabase.js';
+
+  let currentProfile = null;
+  let spendChart, ctrChart;
+
+  async function init() {
+    const session = await requireAuth();
+    if (!session) return;
+    currentProfile = await renderUserInfo();
+    initSidebar();
+
+    document.getElementById('date-range').addEventListener('change', loadAll);
+    document.getElementById('btn-export').addEventListener('click', exportCSV);
+
+    await loadAll();
+  }
+
+  async function loadAll() {
+    const days = parseInt(document.getElementById('date-range').value);
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    await Promise.all([
+      loadStats(since),
+      loadCampaignReport(since),
+      loadActionLog(since),
+      loadCharts(since, days)
+    ]);
+  }
+
+  async function loadStats(since) {
+    let q = sb.from('campaigns').select('spend_total, clicks_total, cpr, current_phase');
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+
+    const totalSpend = (data || []).reduce((s, c) => s + (c.spend_total || 0), 0);
+    const totalClicks = (data || []).reduce((s, c) => s + (c.clicks_total || 0), 0);
+    const avgCPR = data?.length ? (data || []).reduce((s, c) => s + (c.cpr || 0), 0) / data.length : 0;
+
+    document.getElementById('r-spend').textContent = formatRupiah(totalSpend);
+    document.getElementById('r-clicks').textContent = formatNumber(totalClicks);
+    document.getElementById('r-cpr').textContent = formatRupiah(Math.round(avgCPR));
+
+    let aq = sb.from('action_logs').select('*', { count: 'exact', head: true })
+      .gte('created_at', since.toISOString());
+    if (currentProfile.role !== 'admin') aq = aq.eq('user_id', currentProfile.id);
+    const { count } = await aq;
+    document.getElementById('r-actions').textContent = count || 0;
+  }
+
+  async function loadCampaignReport(since) {
+    let q = sb.from('campaigns').select('*').order('spend_total', { ascending: false });
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+
+    const tbody = document.getElementById('report-table');
+    if (!data || data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:40px; color:var(--gray-5);">Belum ada data</td></tr>`;
+      return;
+    }
+
+    const phaseLabel = { 1: 'Testing', 2: 'Evaluasi', 3: 'Scale' };
+    const phaseBadge = { 1: 'badge-warning', 2: 'badge-primary', 3: 'badge-success' };
+
+    tbody.innerHTML = data.map(c => `
+      <tr>
+        <td><strong>${c.name}</strong></td>
+        <td><span class="badge ${phaseBadge[c.current_phase] || 'badge-gray'}">P${c.current_phase || 1}: ${phaseLabel[c.current_phase] || 'Testing'}</span></td>
+        <td>${formatRupiah(c.spend_total)}</td>
+        <td>${formatNumber(c.clicks_total)}</td>
+        <td>${c.ctr ? c.ctr.toFixed(2) + '%' : '-'}</td>
+        <td>${formatRupiah(c.cpr)}</td>
+        <td>${formatNumber(c.results_total)}</td>
+        <td><span class="badge ${c.autopilot_enabled ? 'badge-success' : 'badge-gray'}">${c.autopilot_enabled ? '🤖 Aktif' : 'Manual'}</span></td>
+      </tr>`).join('');
+  }
+
+  async function loadActionLog(since) {
+    let q = sb.from('action_logs').select('*')
+      .gte('created_at', since.toISOString())
+      .order('created_at', { ascending: false }).limit(50);
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+
+    const tbody = document.getElementById('action-table');
+    if (!data || data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--gray-5);">Belum ada aksi di periode ini</td></tr>`;
+      return;
+    }
+
+    const actionBadge = {
+      pause: 'badge-warning', scale: 'badge-success', create: 'badge-primary',
+      duplicate: 'badge-primary', resume: 'badge-success', notify: 'badge-gray'
+    };
+
+    tbody.innerHTML = data.map(log => `
+      <tr>
+        <td style="font-size:12px; color:var(--gray-5);">${formatDate(log.created_at)}</td>
+        <td>${log.campaign_name || '-'}</td>
+        <td><span class="badge ${actionBadge[log.action_type] || 'badge-gray'}">${log.action_type}</span></td>
+        <td style="font-size:12px; color:var(--gray-5);">${log.reason || '-'}</td>
+        <td><span class="badge ${log.status === 'success' ? 'badge-success' : 'badge-danger'}">${log.status || 'success'}</span></td>
+      </tr>`).join('');
+  }
+
+  async function loadCharts(since, days) {
+    // Generate labels
+    const labels = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      labels.push(d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }));
+    }
+
+    // Placeholder data (replace with real DB query)
+    const spendData = labels.map(() => Math.floor(Math.random() * 300000) + 50000);
+    const ctrData = labels.map(() => (Math.random() * 2 + 0.5).toFixed(2));
+
+    // Spend Chart
+    const spendCtx = document.getElementById('chart-spend').getContext('2d');
+    if (spendChart) spendChart.destroy();
+    spendChart = new Chart(spendCtx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Spend (Rp)',
+          data: spendData,
+          backgroundColor: 'rgba(37, 99, 235, 0.15)',
+          borderColor: '#2563EB',
+          borderWidth: 2,
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { ticks: { callback: v => 'Rp ' + (v/1000).toFixed(0) + 'K' }, grid: { color: '#F1F5F9' } },
+          x: { grid: { display: false }, ticks: { maxRotation: 0, maxTicksLimit: 8 } }
+        }
+      }
+    });
+
+    // CTR Chart
+    const ctrCtx = document.getElementById('chart-ctr').getContext('2d');
+    if (ctrChart) ctrChart.destroy();
+    ctrChart = new Chart(ctrCtx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'CTR (%)',
+          data: ctrData,
+          borderColor: '#10B981',
+          backgroundColor: 'rgba(16,185,129,0.08)',
+          tension: 0.4,
+          pointRadius: 3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { ticks: { callback: v => v + '%' }, grid: { color: '#F1F5F9' } },
+          x: { grid: { display: false }, ticks: { maxRotation: 0, maxTicksLimit: 8 } }
+        }
+      }
+    });
+  }
+
+  async function exportCSV() {
+    let q = sb.from('campaigns').select('*');
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+    if (!data || data.length === 0) return showToast('Tidak ada data untuk diekspor', 'warning');
+
+    const headers = ['Nama', 'Objective', 'Phase', 'Spend Total', 'Klik', 'CTR', 'CPR', 'Status', 'Autopilot'];
+    const rows = data.map(c => [
+      c.name, c.objective, c.current_phase,
+      c.spend_total || 0, c.clicks_total || 0,
+      c.ctr ? c.ctr.toFixed(2) + '%' : '-',
+      c.cpr || '-', c.status,
+      c.autopilot_enabled ? 'Ya' : 'Tidak'
+    ]);
+
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `laporan-adsy-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    showToast('CSV berhasil diunduh!', 'success');
+  }
+
+  init();
+</script>
+</body>
+</html>

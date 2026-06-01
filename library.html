@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Library Konten — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🚀</div>
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item active" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="copywriting.html"><span class="nav-icon">✍️</span> Copywriting AI</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-section-label" data-admin-only>Admin</div>
+      <div class="nav-item" data-page="settings.html" data-admin-only><span class="nav-icon">⚙️</span> Pengaturan</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>Library Konten</h2>
+        <p>Kelola aset konten untuk autopilot iklan</p>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-primary" id="btn-add-content">+ Tambah Konten</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <!-- FILTER BAR -->
+      <div class="filter-bar">
+        <div class="search-input-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="form-input" id="search-input" placeholder="Cari konten..." />
+        </div>
+        <select class="form-input form-select" id="filter-status" style="width:auto;">
+          <option value="">Semua Status</option>
+          <option value="ready">Siap</option>
+          <option value="used">Sudah Dipakai</option>
+          <option value="archived">Arsip</option>
+        </select>
+        <select class="form-input form-select" id="filter-type" style="width:auto;">
+          <option value="">Semua Tipe</option>
+          <option value="image">Gambar</option>
+          <option value="video">Video</option>
+        </select>
+        <button class="btn btn-outline btn-sm" id="btn-filter">Filter</button>
+      </div>
+
+      <!-- STATS ROW -->
+      <div class="grid-3" style="margin-bottom: 24px;">
+        <div class="card" style="padding: 18px;">
+          <div style="font-size:11px; color:var(--text-sub); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Total Konten</div>
+          <div style="font-size:28px; font-weight:800; margin-top:4px;" id="lib-total">-</div>
+        </div>
+        <div class="card" style="padding: 18px;">
+          <div style="font-size:11px; color:var(--text-sub); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Siap Dipakai</div>
+          <div style="font-size:28px; font-weight:800; color:var(--success); margin-top:4px;" id="lib-ready">-</div>
+        </div>
+        <div class="card" style="padding: 18px;">
+          <div style="font-size:11px; color:var(--text-sub); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Sudah Dipakai</div>
+          <div style="font-size:28px; font-weight:800; color:var(--primary); margin-top:4px;" id="lib-used">-</div>
+        </div>
+      </div>
+
+      <!-- CONTENT GRID -->
+      <div class="card">
+        <div class="content-grid" id="content-grid">
+          <div style="grid-column:1/-1; text-align:center; padding:60px; color:var(--gray-5);">
+            <div class="loading-spinner" style="border-color: var(--gray-3); border-top-color: var(--primary); margin: 0 auto 14px; width:24px; height:24px; border-width:3px;"></div>
+            Memuat konten...
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL TAMBAH KONTEN -->
+<div class="modal-overlay hidden" id="modal-add">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Tambah Konten dari Google Drive</h3>
+      <div class="modal-close">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nama Konten <span>*</span></label>
+        <input type="text" class="form-input" id="input-name" placeholder="Misal: Promo Lebaran - Banner 1" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Link Google Drive <span>*</span></label>
+        <div class="gdrive-input-wrap">
+          <input type="url" class="form-input" id="input-gdrive" placeholder="https://drive.google.com/file/d/..." />
+          <button class="btn btn-outline btn-sm" id="btn-verify-gdrive">Verify</button>
+        </div>
+        <div class="form-hint">Pastikan file sudah di-share "Anyone with the link"</div>
+        <div class="gdrive-preview" id="gdrive-preview" style="margin-top:10px; display:none;">
+          <span id="gdrive-preview-name">-</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tipe Konten</label>
+          <select class="form-input form-select" id="input-type">
+            <option value="image">🖼️ Gambar</option>
+            <option value="video">🎬 Video</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Kategori / Produk</label>
+          <input type="text" class="form-input" id="input-category" placeholder="Misal: Fashion, Food, dll" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target Audience</label>
+        <input type="text" class="form-input" id="input-audience" placeholder="Misal: Wanita 25-35, Jakarta" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Catatan</label>
+        <textarea class="form-input form-textarea" id="input-notes" placeholder="Catatan atau instruksi khusus untuk konten ini..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-input form-select" id="input-status">
+          <option value="ready">✅ Siap Dipakai</option>
+          <option value="archived">📁 Arsip</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
+        <button class="btn btn-outline modal-close">Batal</button>
+        <button class="btn btn-primary" id="btn-save-content">Simpan Konten</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETAIL KONTEN -->
+<div class="modal-overlay hidden" id="modal-detail">
+  <div class="modal" style="max-width: 480px;">
+    <div class="modal-header">
+      <h3 id="detail-name">Detail Konten</h3>
+      <div class="modal-close">✕</div>
+    </div>
+    <div class="modal-body" id="detail-body">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast, openModal, closeModal, initModals, formatDate } from './js/sidebar.js';
+  import { sb } from './js/supabase.js';
+
+  let currentProfile = null;
+  let allContent = [];
+
+  async function init() {
+    const session = await requireAuth();
+    if (!session) return;
+
+    currentProfile = await renderUserInfo();
+    initSidebar();
+    initModals();
+
+    document.getElementById('btn-add-content').addEventListener('click', () => openModal('modal-add'));
+    document.getElementById('btn-save-content').addEventListener('click', saveContent);
+    document.getElementById('btn-verify-gdrive').addEventListener('click', verifyGDrive);
+    document.getElementById('search-input').addEventListener('input', filterContent);
+    document.getElementById('filter-status').addEventListener('change', filterContent);
+    document.getElementById('filter-type').addEventListener('change', filterContent);
+
+    await loadContent();
+  }
+
+  async function loadContent() {
+    let q = sb.from('content_library').select('*').order('created_at', { ascending: false });
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+
+    const { data, error } = await q;
+    if (error) { showToast('Gagal memuat konten', 'error'); return; }
+
+    allContent = data || [];
+    renderContent(allContent);
+    updateStats(allContent);
+  }
+
+  function updateStats(data) {
+    document.getElementById('lib-total').textContent = data.length;
+    document.getElementById('lib-ready').textContent = data.filter(c => c.status === 'ready').length;
+    document.getElementById('lib-used').textContent = data.filter(c => c.status === 'used').length;
+  }
+
+  function renderContent(data) {
+    const grid = document.getElementById('content-grid');
+    if (!data.length) {
+      grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:60px; color:var(--gray-5);">
+        <div style="font-size:48px; margin-bottom:12px; opacity:0.4">🖼️</div>
+        <h3 style="font-size:16px; font-weight:600; color:var(--text); margin-bottom:6px;">Belum ada konten</h3>
+        <p>Tambahkan konten dari Google Drive untuk mulai ngiklan autopilot</p>
+      </div>`;
+      return;
+    }
+
+    const statusBadge = { ready: 'badge-success', used: 'badge-primary', archived: 'badge-gray' };
+    const statusLabel = { ready: 'Siap', used: 'Terpakai', archived: 'Arsip' };
+
+    grid.innerHTML = data.map(c => `
+      <div class="content-card" onclick="showDetail('${c.id}')">
+        <div class="content-thumb">
+          ${c.thumb_url ? `<img src="${c.thumb_url}" alt="${c.name}" />` : (c.content_type === 'video' ? '🎬' : '🖼️')}
+          <div class="content-thumb-overlay">
+            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); showDetail('${c.id}')">Lihat Detail</button>
+          </div>
+        </div>
+        <div class="content-info">
+          <div class="content-name">${c.name}</div>
+          <div class="content-meta">
+            <span>${c.content_type === 'video' ? '🎬 Video' : '🖼️ Gambar'}</span>
+            <span class="badge ${statusBadge[c.status] || 'badge-gray'}" style="font-size:10px;">${statusLabel[c.status] || c.status}</span>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  function filterContent() {
+    const search = document.getElementById('search-input').value.toLowerCase();
+    const status = document.getElementById('filter-status').value;
+    const type = document.getElementById('filter-type').value;
+
+    const filtered = allContent.filter(c => {
+      const matchSearch = !search || c.name.toLowerCase().includes(search) || (c.category || '').toLowerCase().includes(search);
+      const matchStatus = !status || c.status === status;
+      const matchType = !type || c.content_type === type;
+      return matchSearch && matchStatus && matchType;
+    });
+
+    renderContent(filtered);
+  }
+
+  async function verifyGDrive() {
+    const url = document.getElementById('input-gdrive').value.trim();
+    if (!url) return showToast('Masukkan link Google Drive dulu', 'warning');
+
+    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (!match) return showToast('Format link tidak valid', 'error');
+
+    const fileId = match[1];
+    const preview = document.getElementById('gdrive-preview');
+    const previewName = document.getElementById('gdrive-preview-name');
+
+    preview.style.display = 'block';
+    preview.className = 'gdrive-preview has-file';
+    previewName.textContent = `✅ File ID: ${fileId} — Link valid!`;
+    showToast('Link GDrive valid', 'success');
+  }
+
+  async function saveContent() {
+    const name = document.getElementById('input-name').value.trim();
+    const gdriveUrl = document.getElementById('input-gdrive').value.trim();
+    const type = document.getElementById('input-type').value;
+    const category = document.getElementById('input-category').value.trim();
+    const audience = document.getElementById('input-audience').value.trim();
+    const notes = document.getElementById('input-notes').value.trim();
+    const status = document.getElementById('input-status').value;
+
+    if (!name || !gdriveUrl) return showToast('Nama dan link GDrive wajib diisi', 'warning');
+
+    const match = gdriveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (!match) return showToast('Format link GDrive tidak valid', 'error');
+
+    const btn = document.getElementById('btn-save-content');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    const { error } = await sb.from('content_library').insert({
+      user_id: currentProfile.id,
+      name, gdrive_url: gdriveUrl,
+      gdrive_file_id: match[1],
+      content_type: type,
+      category, audience, notes, status
+    });
+
+    btn.disabled = false; btn.textContent = 'Simpan Konten';
+
+    if (error) return showToast('Gagal menyimpan: ' + error.message, 'error');
+
+    showToast('Konten berhasil ditambahkan!', 'success');
+    closeModal('modal-add');
+    document.getElementById('input-name').value = '';
+    document.getElementById('input-gdrive').value = '';
+    document.getElementById('input-audience').value = '';
+    document.getElementById('input-notes').value = '';
+    document.getElementById('gdrive-preview').style.display = 'none';
+    await loadContent();
+  }
+
+  window.showDetail = function(id) {
+    const c = allContent.find(x => x.id === id);
+    if (!c) return;
+
+    document.getElementById('detail-name').textContent = c.name;
+    document.getElementById('detail-body').innerHTML = `
+      <div style="margin-bottom:16px;">
+        <div style="background:var(--gray-1); border-radius:10px; padding:30px; text-align:center; font-size:48px; margin-bottom:16px;">
+          ${c.content_type === 'video' ? '🎬' : '🖼️'}
+        </div>
+        <a href="${c.gdrive_url}" target="_blank">
+          <button class="btn btn-outline" style="width:100%; margin-bottom:12px;">Buka di Google Drive ↗</button>
+        </a>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+        <div>
+          <div style="font-size:11px; color:var(--text-sub); font-weight:600;">Tipe</div>
+          <div style="font-size:13px; margin-top:4px;">${c.content_type === 'video' ? '🎬 Video' : '🖼️ Gambar'}</div>
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text-sub); font-weight:600;">Status</div>
+          <div style="font-size:13px; margin-top:4px;">${c.status}</div>
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text-sub); font-weight:600;">Kategori</div>
+          <div style="font-size:13px; margin-top:4px;">${c.category || '-'}</div>
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text-sub); font-weight:600;">Target</div>
+          <div style="font-size:13px; margin-top:4px;">${c.audience || '-'}</div>
+        </div>
+      </div>
+      ${c.notes ? `<div class="form-hint" style="background:var(--gray-1); padding:12px; border-radius:8px;">📝 ${c.notes}</div>` : ''}
+      <div class="divider"></div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-danger btn-sm" onclick="deleteContent('${c.id}')">Hapus</button>
+        <button class="btn btn-primary btn-sm" onclick="markStatus('${c.id}', 'ready')">Tandai Siap</button>
+        <button class="btn btn-outline btn-sm" onclick="markStatus('${c.id}', 'archived')">Arsipkan</button>
+      </div>`;
+
+    openModal('modal-detail');
+  };
+
+  window.deleteContent = async function(id) {
+    if (!confirm('Hapus konten ini?')) return;
+    await sb.from('content_library').delete().eq('id', id);
+    showToast('Konten dihapus', 'success');
+    closeModal('modal-detail');
+    await loadContent();
+  };
+
+  window.markStatus = async function(id, status) {
+    await sb.from('content_library').update({ status }).eq('id', id);
+    showToast('Status diperbarui', 'success');
+    closeModal('modal-detail');
+    await loadContent();
+  };
+
+  init();
+</script>
+</body>
+</html>
