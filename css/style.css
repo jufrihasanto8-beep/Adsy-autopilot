@@ -146,6 +146,7 @@ input, select, textarea { font-family: inherit; }
   color: white;
   font-weight: 700;
   font-size: 14px;
+  overflow: hidden;
 }
 
 .topbar-user-info { text-align: left; }
