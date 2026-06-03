@@ -48,8 +48,8 @@ export async function renderUserInfo() {
   if (sidebarRoleEl) sidebarRoleEl.textContent = profile.role === 'admin' ? 'Admin' : 'Advertiser';
   if (sidebarAvatarEl) sidebarAvatarEl.textContent = initials;
 
-  if (profile.role !== 'admin') {
-    document.querySelectorAll('[data-admin-only]').forEach(el => el.remove());
+  if (['admin', 'superadmin'].includes(profile.role)) {
+    document.querySelectorAll('[data-admin-only]').forEach(el => el.style.display = '');
   }
 
   return profile;
