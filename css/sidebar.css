@@ -46,6 +46,9 @@
   color: var(--text-sub);
 }
 
+/* Sembunyikan admin-only items by default, tampilkan via JS kalau admin */
+[data-admin-only] { display: none; }
+
 /* ── NAV ── */
 .sidebar-nav {
   padding: 16px 12px;
