@@ -1,3 +1,6 @@
+/* Hide admin-only elements by default — JS akan show untuk admin */
+[data-admin-only] { display: none; }
+
 /* ── SIDEBAR ── */
 .sidebar {
   width: var(--sidebar-w);
