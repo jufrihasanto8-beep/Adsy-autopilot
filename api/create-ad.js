@@ -92,7 +92,8 @@ export default async function handler(req, res) {
           const thumbRes  = await fetch(`${META_API}/${videoData.id}?fields=thumbnails&access_token=${encodeURIComponent(token)}`);
           const thumbData = await thumbRes.json();
           const thumbs    = thumbData?.thumbnails?.data || [];
-          thumbnailUrl    = thumbs[0]?.uri || null;
+          const midIdx    = Math.floor(thumbs.length / 2);
+          thumbnailUrl    = thumbs[midIdx]?.uri || thumbs[0]?.uri || null;
           if (thumbnailUrl) break;
         } catch (e) {
           console.warn(`Thumbnail attempt ${attempt + 1} gagal:`, e.message);
