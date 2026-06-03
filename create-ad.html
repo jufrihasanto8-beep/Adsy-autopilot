@@ -366,6 +366,18 @@
             </div>
           </div>
 
+          <!-- Toggle aktif -->
+          <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--gray-3); display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <div style="font-size:13px; font-weight:600;">Langsung aktifkan setelah publish</div>
+              <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">Jika off, iklan dibuat dalam status Paused — aktifkan manual di Ads Manager atau via Autopilot</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="pub-auto-activate" />
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+
         </div>
       </div>
     </div>
@@ -799,6 +811,7 @@
         formData.append('bid_strategy', bidStrategy);
         if (bidValue) formData.append('bid_value', bidValue);
         formData.append('campaign_name', campaignNameInput || `${selectedProduct.name} - ${new Date().toLocaleDateString('id-ID')}`);
+        formData.append('auto_activate', document.getElementById('pub-auto-activate').checked ? '1' : '0');
         if (startTime) formData.append('start_time', new Date(startTime).toISOString());
         if (endTime) formData.append('end_time', new Date(endTime).toISOString());
 
