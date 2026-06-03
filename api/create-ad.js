@@ -24,7 +24,8 @@ export default async function handler(req, res) {
     const primaryText = fields.primary_text?.[0];
     const description = fields.description?.[0];
     const productId = fields.product_id?.[0];
-    const accountId = fields.ad_account_id?.[0];
+    const adAccountDbId = fields.ad_account_db_id?.[0];
+    const urlId = fields.url_id?.[0];
     const cta = fields.cta?.[0] || 'LEARN_MORE';
     const userId = fields.user_id?.[0];
 
@@ -32,14 +33,23 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'File, headline, dan primary text wajib ada' });
     }
 
-    // Get user config
-    const { data: config } = await sb.from('app_config')
-      .select('meta_token, meta_page').eq('user_id', userId).single();
+    // Get ad account config
+    const { data: accData } = await sb.from('ad_accounts')
+      .select('account_id, page_id, pixel_id').eq('id', adAccountDbId).single();
+    if (!accData) throw new Error('Ad account tidak ditemukan');
 
-    const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
-    const pageId = config?.meta_page || process.env.META_PAGE_ID;
+    const { data: urlData } = await sb.from('ad_urls').select('url').eq('id', urlId).single();
 
-    if (!token) throw new Error('Meta access token belum dikonfigurasi di Settings');
+    const { data: cfgData } = await sb.from('app_config')
+      .select('meta_token').eq('user_id', userId).single();
+
+    const token = cfgData?.meta_token || process.env.META_ACCESS_TOKEN;
+    const accountId = accData.account_id;
+    const pageId = accData.page_id;
+    const pixelId = accData.pixel_id || null;
+    const destUrl = urlData?.url || 'https://wa.me/';
+
+    if (!token) throw new Error('Meta access token belum dikonfigurasi di Pengaturan');
 
     let creativeId;
 
@@ -72,7 +82,7 @@ export default async function handler(req, res) {
               video_id: videoData.id,
               title: headline,
               message: primaryText,
-              call_to_action: { type: ctaMap(cta), value: { link: 'https://wa.me/' } }
+              call_to_action: { type: ctaMap(cta), value: { link: destUrl } }
             }
           },
           access_token: token
@@ -112,13 +122,14 @@ export default async function handler(req, res) {
             page_id: pageId,
             link_data: {
               image_hash: imageHash,
-              link: 'https://wa.me/',
+              link: destUrl,
               message: primaryText,
               name: headline,
               description: description || '',
               call_to_action: { type: ctaMap(cta) }
             }
           },
+          ...(pixelId ? { pixel_id: pixelId } : {}),
           access_token: token
         })
       });
