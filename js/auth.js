@@ -50,6 +50,8 @@ export async function renderUserInfo() {
 
   if (['admin', 'superadmin'].includes(profile.role)) {
     document.querySelectorAll('[data-admin-only]').forEach(el => el.style.display = '');
+  } else {
+    document.querySelectorAll('[data-admin-only]').forEach(el => el.style.display = 'none');
   }
 
   return profile;
