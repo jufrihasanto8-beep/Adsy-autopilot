@@ -33,6 +33,7 @@ export default async function handler(req, res) {
     const campaignNameInput = fields.campaign_name?.[0];
     const startTime    = fields.start_time?.[0];
     const endTime      = fields.end_time?.[0];
+    const adStatus     = fields.auto_activate?.[0] === '1' ? 'ACTIVE' : 'PAUSED';
 
     // Reuse existing campaign/adset dari item sebelumnya (multi-file)
     const existingMetaCampaignId = fields.meta_campaign_id?.[0];
@@ -146,7 +147,7 @@ export default async function handler(req, res) {
       const campPayloadMeta = {
         name: finalCampaignName,
         objective,
-        status: 'PAUSED',
+        status: adStatus,
         special_ad_categories: [],
         access_token: token
       };
@@ -186,7 +187,7 @@ export default async function handler(req, res) {
           age_min: 18,
           age_max: 65
         },
-        status: 'PAUSED',
+        status: adStatus,
         access_token: token
       };
       // ABO: budget + bid di ad set level
@@ -225,7 +226,7 @@ export default async function handler(req, res) {
         name: `Ad - ${headline}`,
         adset_id: metaAdsetId,
         creative: { creative_id: creativeId },
-        status: 'PAUSED',
+        status: adStatus,
         access_token: token
       })
     });
@@ -241,7 +242,7 @@ export default async function handler(req, res) {
       try {
         const campPayload = {
           user_id: userId, name: finalCampaignName,
-          ad_account_id: accountId, status: 'PAUSED',
+          ad_account_id: accountId, status: adStatus,
           current_phase: 1, autopilot_enabled: true,
           meta_campaign_id: metaCampaignId,
           meta_adset_id: metaAdsetId,
