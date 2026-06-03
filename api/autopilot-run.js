@@ -1,8 +1,15 @@
-// api/autopilot-run.js — Engine autopilot: cek rules & eksekusi aksi
+// api/autopilot-run.js — Engine autopilot berbasis DIMENSI Ads Blueprint 2026
+// Phase 1 (Testing) → Phase 2 (Evaluasi) → Phase 3 (Scale)
+// Gate: 8.000 impressions sebelum ambil keputusan apapun
+// Scale: 3%/hari, max +30%/hari, sesuai CPR vs target produk
+
 import { createClient } from '@supabase/supabase-js';
 
 const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const META_API = 'https://graph.facebook.com/v18.0';
+const IMPRESSIONS_GATE = 8000;
+const SCALE_PCT = 3;       // % naik/turun per hari
+const MAX_SCALE_PCT = 30;  // batas maksimal kenaikan per hari
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -11,160 +18,239 @@ export default async function handler(req, res) {
   const logs = [];
 
   try {
-    // 1. Get all active campaigns with autopilot enabled
+    // Ambil semua kampanye aktif dengan autopilot, join ke products untuk target CPR
     const { data: campaigns } = await sb.from('campaigns')
-      .select('*')
+      .select('*, products(target_cpr, target_roas)')
       .eq('status', 'ACTIVE')
       .eq('autopilot_enabled', true);
 
-    if (!campaigns || campaigns.length === 0) {
+    if (!campaigns?.length) {
       return res.status(200).json({ success: true, actions_taken: 0, message: 'Tidak ada kampanye autopilot aktif' });
     }
 
     for (const camp of campaigns) {
-      // 2. Get user rules
-      const { data: rules } = await sb.from('autopilot_rules')
-        .select('*')
-        .eq('user_id', camp.user_id)
-        .eq('is_active', true);
+      try {
+        const { data: config } = await sb.from('app_config')
+          .select('meta_token').eq('user_id', camp.user_id).single();
+        const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
 
-      // 3. Get user scheme
-      const { data: scheme } = await sb.from('autopilot_scheme')
-        .select('*').eq('user_id', camp.user_id).single();
+        // Sync performa terbaru dari Meta sebelum evaluasi
+        await syncCampaignInsights(camp, token);
 
-      // 4. Get user config
-      const { data: config } = await sb.from('app_config')
-        .select('meta_token, meta_account').eq('user_id', camp.user_id).single();
+        // Re-fetch kampanye setelah sync untuk data terbaru
+        const { data: fresh } = await sb.from('campaigns')
+          .select('*, products(target_cpr, target_roas)')
+          .eq('id', camp.id).single();
+        if (!fresh) continue;
 
-      const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
+        const targetCpr  = fresh.products?.target_cpr || null;
+        const targetRoas = fresh.products?.target_roas || null;
+        const impressions = fresh.impressions || 0;
+        const daysRunning = fresh.days_running || 0;
 
-      // 5. Check phase advancement
-      await checkPhaseAdvancement(camp, scheme, token, logs);
+        // ── Increment hari berjalan ──
+        await sb.from('campaigns').update({ days_running: daysRunning + 1 }).eq('id', fresh.id);
 
-      // 6. Check & execute rules
-      for (const rule of (rules || [])) {
-        const shouldApply = matchesScope(rule.scope, camp.current_phase);
-        if (!shouldApply) continue;
-
-        const metricValue = getMetricValue(camp, rule.metric);
-        const triggered = evaluateCondition(metricValue, rule.operator, rule.value);
-
-        if (triggered) {
-          await executeAction(camp, rule, token, camp.user_id, logs);
-          actionsTaken++;
+        // ── GATE: Jangan ambil keputusan sebelum 8.000 impressions ──
+        if (impressions < IMPRESSIONS_GATE) {
+          logs.push({
+            campaign_name: fresh.name,
+            action_type: 'gate',
+            description: `"${fresh.name}" — gate belum tercapai (${impressions.toLocaleString('id-ID')} / ${IMPRESSIONS_GATE.toLocaleString('id-ID')} impressions)`,
+            status: 'skipped'
+          });
+          continue;
         }
+
+        // ── Phase Advancement ──
+        await checkPhaseAdvancement(fresh, targetCpr, daysRunning, logs);
+
+        // Re-fetch lagi setelah phase advance
+        const { data: latest } = await sb.from('campaigns')
+          .select('*, products(target_cpr, target_roas)')
+          .eq('id', fresh.id).single();
+        if (!latest) continue;
+
+        // ── Blueprint Rules (per phase) ──
+        const acted = await runBlueprintRules(latest, targetCpr, targetRoas, token, logs);
+        if (acted) actionsTaken++;
+
+        // ── User-defined custom rules ──
+        const { data: rules } = await sb.from('autopilot_rules')
+          .select('*').eq('user_id', latest.user_id).eq('is_active', true);
+
+        for (const rule of (rules || [])) {
+          if (!matchesScope(rule.scope, latest.current_phase)) continue;
+          const metricValue = getMetricValue(latest, rule.metric);
+          if (evaluateCondition(metricValue, rule.operator, rule.value)) {
+            await executeAction(latest, rule, token, latest.user_id, logs);
+            actionsTaken++;
+          }
+        }
+
+      } catch (campErr) {
+        console.error(`Error processing campaign ${camp.name}:`, campErr.message);
       }
-
-      // 7. Evaluate A/B test copies
-      await evaluateABTest(camp, scheme, token, logs);
     }
 
-    // Send WA summary if actions taken
-    if (actionsTaken > 0) {
-      await sendWASummary(actionsTaken, logs);
-    }
+    if (actionsTaken > 0) await sendWASummary(actionsTaken, logs);
 
-    return res.status(200).json({
-      success: true,
-      actions_taken: actionsTaken,
-      logs
-    });
+    return res.status(200).json({ success: true, actions_taken: actionsTaken, logs });
+
   } catch (err) {
     console.error('autopilot-run error:', err);
     return res.status(500).json({ error: err.message });
   }
 }
 
-function getMetricValue(camp, metric) {
-  const map = {
-    cpr: camp.cpr,
-    ctr: camp.ctr,
-    roas: camp.roas,
-    spend: camp.spend_today,
-    days: camp.days_running || 0
-  };
-  return map[metric];
-}
+// ── Sync insights dari Meta (impressions, CPR, CTR, spend) ──
+async function syncCampaignInsights(camp, token) {
+  if (!camp.meta_campaign_id || !token) return;
+  try {
+    const fields = 'impressions,spend,clicks,ctr,cost_per_action_type';
+    const res = await fetch(
+      `${META_API}/${camp.meta_campaign_id}/insights?fields=${fields}&date_preset=today&access_token=${encodeURIComponent(token)}`
+    );
+    const data = await res.json();
+    const insight = data?.data?.[0];
+    if (!insight) return;
 
-function evaluateCondition(value, operator, threshold) {
-  if (value === null || value === undefined) return false;
-  const v = parseFloat(value);
-  const t = parseFloat(threshold);
-  switch (operator) {
-    case 'gt': return v > t;
-    case 'lt': return v < t;
-    case 'gte': return v >= t;
-    case 'lte': return v <= t;
-    default: return false;
+    const impressions = parseInt(insight.impressions || 0);
+    const spend       = parseFloat(insight.spend || 0) * 1000; // Meta dalam USD → kalikan 1000 (approx IDR, user pakai IDR)
+    const ctr         = parseFloat(insight.ctr || 0);
+    const cprArr      = insight.cost_per_action_type || [];
+    const cprObj      = cprArr.find(x => x.action_type === 'offsite_conversion.fb_pixel_purchase' || x.action_type === 'link_click');
+    const cpr         = cprObj ? parseFloat(cprObj.value) * 1000 : null;
+
+    await sb.from('campaigns').update({
+      impressions,
+      spend_today: spend,
+      ctr,
+      ...(cpr !== null ? { cpr } : {})
+    }).eq('id', camp.id);
+
+  } catch (err) {
+    console.error('syncInsights error:', err.message);
   }
 }
 
-function matchesScope(scope, currentPhase) {
-  if (!scope || scope === 'all') return true;
-  if (scope === 'phase1') return currentPhase === 1;
-  if (scope === 'phase2') return currentPhase === 2;
-  if (scope === 'phase3') return currentPhase === 3;
-  return true;
-}
+// ── Phase Advancement sesuai DIMENSI blueprint ──
+async function checkPhaseAdvancement(camp, targetCpr, daysRunning, logs) {
+  let newPhase = camp.current_phase;
 
-async function executeAction(camp, rule, token, userId, logs) {
-  const logEntry = {
-    campaign_id: camp.id,
-    campaign_name: camp.name,
-    user_id: userId,
-    action_type: rule.action_type,
-    reason: `Rule: ${rule.name}`,
-    status: 'success'
-  };
+  // Phase 1 → 2: gate tercapai (8k impressions) + min 3 hari
+  if (camp.current_phase === 1 && daysRunning >= 3) {
+    newPhase = 2;
+  }
 
-  try {
-    switch (rule.action_type) {
-      case 'pause':
-        await pauseCampaign(camp, token);
-        logEntry.description = `Kampanye "${camp.name}" di-pause`;
-        break;
+  // Phase 2 → 3: 7 hari + CPR ≤ target (baseline sudah ada, siap scale)
+  if (camp.current_phase === 2 && daysRunning >= 7) {
+    const cprOk = !targetCpr || (camp.cpr && camp.cpr <= targetCpr);
+    if (cprOk) newPhase = 3;
+  }
 
-      case 'resume':
-        await resumeCampaign(camp, token);
-        logEntry.description = `Kampanye "${camp.name}" diaktifkan kembali`;
-        break;
+  if (newPhase !== camp.current_phase) {
+    await sb.from('campaigns').update({
+      current_phase: newPhase,
+      phase_started_at: new Date().toISOString()
+    }).eq('id', camp.id);
 
-      case 'increase_budget': {
-        const pct = parseFloat(rule.action_value) || 20;
-        const newBudget = Math.floor(camp.daily_budget * (1 + pct / 100));
-        await updateBudget(camp, newBudget, token);
-        logEntry.description = `Budget "${camp.name}" dinaikkan ${pct}% → Rp ${newBudget.toLocaleString('id-ID')}`;
-        break;
-      }
-
-      case 'decrease_budget': {
-        const pct = parseFloat(rule.action_value) || 20;
-        const newBudget = Math.floor(camp.daily_budget * (1 - pct / 100));
-        await updateBudget(camp, Math.max(newBudget, 10000), token);
-        logEntry.description = `Budget "${camp.name}" dikurangi ${pct}%`;
-        break;
-      }
-
-      case 'replace_content':
-        await replaceContent(camp, userId);
-        logEntry.description = `Konten "${camp.name}" diganti dari library`;
-        break;
-
-      case 'notify':
-        logEntry.description = `Notifikasi dikirim untuk "${camp.name}"`;
-        break;
-    }
-
+    const label = { 2: 'Evaluasi', 3: 'Scale' };
+    const logEntry = {
+      user_id: camp.user_id,
+      campaign_name: camp.name,
+      action_type: 'phase_advance',
+      description: `"${camp.name}" maju ke Phase ${newPhase} — ${label[newPhase]}`,
+      status: 'success'
+    };
     await sb.from('action_logs').insert(logEntry);
     logs.push(logEntry);
-  } catch (err) {
-    logEntry.status = 'error';
-    logEntry.description = err.message;
-    await sb.from('action_logs').insert(logEntry);
-    console.error(`executeAction error for ${camp.name}:`, err.message);
   }
 }
 
+// ── Blueprint Rules utama ──
+async function runBlueprintRules(camp, targetCpr, targetRoas, token, logs) {
+  if (!targetCpr) return false; // Tidak ada target = skip blueprint rules
+
+  const cpr         = camp.cpr;
+  const budget      = camp.daily_budget || 50000;
+  const currentPhase = camp.current_phase;
+  const today       = new Date().toISOString().slice(0, 10);
+
+  // Cegah multiple budget change dalam satu hari
+  if (camp.last_budget_change_date === today) return false;
+
+  // Phase 3: Scale mode — naik/turun budget 3%/hari
+  if (currentPhase === 3 && cpr !== null && cpr !== undefined) {
+
+    // CPR > 2x target → pause otomatis
+    if (cpr > targetCpr * 2) {
+      await pauseCampaign(camp, token);
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'pause',
+        description: `"${camp.name}" di-pause otomatis — CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} (${Math.round(cpr/targetCpr*100)}% dari target)`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+      return true;
+    }
+
+    // CPR ≤ target → naik budget 3% (max 30%)
+    if (cpr <= targetCpr) {
+      const scalePct  = Math.min(SCALE_PCT, MAX_SCALE_PCT);
+      const newBudget = Math.floor(budget * (1 + scalePct / 100));
+      await updateBudget(camp, newBudget, token);
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'increase_budget',
+        description: `"${camp.name}" budget naik ${scalePct}% → Rp ${newBudget.toLocaleString('id-ID')} (CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} ≤ target)`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+      return true;
+    }
+
+    // CPR > target (tapi < 2x) → turun budget 3%
+    if (cpr > targetCpr) {
+      const newBudget = Math.max(Math.floor(budget * (1 - SCALE_PCT / 100)), 10000);
+      await updateBudget(camp, newBudget, token);
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'decrease_budget',
+        description: `"${camp.name}" budget turun ${SCALE_PCT}% → Rp ${newBudget.toLocaleString('id-ID')} (CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} > target)`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+      return true;
+    }
+  }
+
+  // Phase 2: Evaluasi — pause kalau CPR jauh di atas target
+  if (currentPhase === 2 && cpr !== null && cpr > targetCpr * 1.5) {
+    await pauseCampaign(camp, token);
+    const logEntry = {
+      user_id: camp.user_id,
+      campaign_name: camp.name,
+      action_type: 'pause',
+      description: `"${camp.name}" di-pause di Phase 2 — CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} (${Math.round(cpr/targetCpr*100)}% dari target, terlalu mahal)`,
+      status: 'success'
+    };
+    await sb.from('action_logs').insert(logEntry);
+    logs.push(logEntry);
+    return true;
+  }
+
+  return false;
+}
+
+// ── Helpers ──
 async function pauseCampaign(camp, token) {
   if (camp.meta_campaign_id && token) {
     await fetch(`${META_API}/${camp.meta_campaign_id}`, {
@@ -176,129 +262,90 @@ async function pauseCampaign(camp, token) {
   await sb.from('campaigns').update({ status: 'PAUSED' }).eq('id', camp.id);
 }
 
-async function resumeCampaign(camp, token) {
-  if (camp.meta_campaign_id && token) {
-    await fetch(`${META_API}/${camp.meta_campaign_id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'ACTIVE', access_token: token })
-    });
-  }
-  await sb.from('campaigns').update({ status: 'ACTIVE' }).eq('id', camp.id);
-}
-
 async function updateBudget(camp, newBudget, token) {
   if (camp.meta_adset_id && token) {
     await fetch(`${META_API}/${camp.meta_adset_id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ daily_budget: newBudget * 100, access_token: token })
+      body: JSON.stringify({ daily_budget: newBudget, access_token: token })
     });
   }
-  await sb.from('campaigns').update({ daily_budget: newBudget }).eq('id', camp.id);
-}
-
-async function replaceContent(camp, userId) {
-  // Find next ready content in library
-  const { data: nextContent } = await sb.from('content_library')
-    .select('*').eq('user_id', userId).eq('status', 'ready')
-    .neq('id', camp.content_id).limit(1).single();
-
-  if (!nextContent) return;
-
-  // Mark old content as used
-  await sb.from('content_library').update({ status: 'used' }).eq('id', camp.content_id);
-
-  // Update campaign content
   await sb.from('campaigns').update({
-    content_id: nextContent.id,
-    current_phase: 1 // restart to testing phase
+    daily_budget: newBudget,
+    last_budget_change_date: new Date().toISOString().slice(0, 10)
   }).eq('id', camp.id);
 }
 
-async function checkPhaseAdvancement(camp, scheme, token, logs) {
-  const daysRunning = camp.days_running || 0;
-  const targetCPR = scheme?.target_cpr;
-  const targetROAS = scheme?.target_roas;
-
-  let newPhase = camp.current_phase;
-
-  // Phase 1 → 2: after 3 days
-  if (camp.current_phase === 1 && daysRunning >= 3) {
-    newPhase = 2;
-  }
-
-  // Phase 2 → 3: after 7 days & performance meets target
-  if (camp.current_phase === 2 && daysRunning >= 7) {
-    const performanceGood = !targetCPR || (camp.cpr && camp.cpr <= targetCPR);
-    if (performanceGood) newPhase = 3;
-  }
-
-  if (newPhase !== camp.current_phase) {
-    await sb.from('campaigns').update({
-      current_phase: newPhase,
-      phase_started_at: new Date().toISOString()
-    }).eq('id', camp.id);
-
-    const phaseLabel = { 2: 'Evaluasi', 3: 'Scale' };
-    logs.push({
-      campaign_name: camp.name,
-      action_type: 'phase_advance',
-      description: `Kampanye "${camp.name}" maju ke Phase ${newPhase}: ${phaseLabel[newPhase]}`
-    });
-  }
-
-  // Increment days counter
-  await sb.from('campaigns').update({
-    days_running: daysRunning + 1
-  }).eq('id', camp.id);
+// ── Custom rules engine (user-defined) ──
+function getMetricValue(camp, metric) {
+  return { cpr: camp.cpr, ctr: camp.ctr, roas: camp.roas, spend: camp.spend_today, days: camp.days_running }[metric];
 }
 
-async function evaluateABTest(camp, scheme, token, logs) {
-  const { data: copies } = await sb.from('ad_copies')
-    .select('*').eq('campaign_id', camp.id).eq('ab_test', true).eq('status', 'testing');
+function evaluateCondition(value, operator, threshold) {
+  if (value === null || value === undefined) return false;
+  const v = parseFloat(value), t = parseFloat(threshold);
+  return { gt: v > t, lt: v < t, gte: v >= t, lte: v <= t }[operator] ?? false;
+}
 
-  if (!copies || copies.length < 2) return;
+function matchesScope(scope, currentPhase) {
+  if (!scope || scope === 'all') return true;
+  return scope === `phase${currentPhase}`;
+}
 
-  // Find winner (lowest CPR or highest CTR)
-  const withMetrics = copies.filter(c => c.ctr !== null);
-  if (withMetrics.length < 2) return;
-
-  // Check if running >= 3 days
-  const oldestCopy = copies.reduce((a, b) => new Date(a.created_at) < new Date(b.created_at) ? a : b);
-  const daysSinceStart = (Date.now() - new Date(oldestCopy.created_at).getTime()) / (1000 * 60 * 60 * 24);
-  if (daysSinceStart < 3) return;
-
-  // Pick winner: highest CTR
-  const winner = [...withMetrics].sort((a, b) => (b.ctr || 0) - (a.ctr || 0))[0];
-  const losers = withMetrics.filter(c => c.id !== winner.id);
-
-  // Mark winner
-  await sb.from('ad_copies').update({ status: 'winner' }).eq('id', winner.id);
-
-  // Pause losers
-  for (const loser of losers) {
-    await sb.from('ad_copies').update({ status: 'paused' }).eq('id', loser.id);
+async function executeAction(camp, rule, token, userId, logs) {
+  const logEntry = { campaign_id: camp.id, campaign_name: camp.name, user_id: userId, action_type: rule.action_type, status: 'success' };
+  try {
+    switch (rule.action_type) {
+      case 'pause':
+        await pauseCampaign(camp, token);
+        logEntry.description = `"${camp.name}" di-pause — Rule: ${rule.name}`;
+        break;
+      case 'resume':
+        if (camp.meta_campaign_id && token) {
+          await fetch(`${META_API}/${camp.meta_campaign_id}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'ACTIVE', access_token: token })
+          });
+        }
+        await sb.from('campaigns').update({ status: 'ACTIVE' }).eq('id', camp.id);
+        logEntry.description = `"${camp.name}" diaktifkan — Rule: ${rule.name}`;
+        break;
+      case 'increase_budget': {
+        const pct = Math.min(parseFloat(rule.action_value) || 20, MAX_SCALE_PCT);
+        const nb  = Math.floor(camp.daily_budget * (1 + pct / 100));
+        await updateBudget(camp, nb, token);
+        logEntry.description = `Budget "${camp.name}" naik ${pct}% → Rp ${nb.toLocaleString('id-ID')} — Rule: ${rule.name}`;
+        break;
+      }
+      case 'decrease_budget': {
+        const pct = parseFloat(rule.action_value) || 20;
+        const nb  = Math.max(Math.floor(camp.daily_budget * (1 - pct / 100)), 10000);
+        await updateBudget(camp, nb, token);
+        logEntry.description = `Budget "${camp.name}" turun ${pct}% — Rule: ${rule.name}`;
+        break;
+      }
+      case 'notify':
+        logEntry.description = `Notifikasi untuk "${camp.name}" — Rule: ${rule.name}`;
+        break;
+    }
+    await sb.from('action_logs').insert(logEntry);
+    logs.push(logEntry);
+  } catch (err) {
+    logEntry.status = 'error';
+    logEntry.description = err.message;
+    await sb.from('action_logs').insert(logEntry).catch(() => {});
   }
-
-  logs.push({
-    campaign_name: camp.name,
-    action_type: 'ab_winner',
-    description: `A/B test "${camp.name}" selesai. Pemenang: "${winner.headline}" (CTR: ${winner.ctr?.toFixed(2)}%)`
-  });
 }
 
 async function sendWASummary(count, logs) {
   try {
     const { data: configs } = await sb.from('app_config')
       .select('fonnte_token, wa_target').not('fonnte_token', 'is', null);
-
     for (const config of (configs || [])) {
       if (!config.fonnte_token || !config.wa_target) continue;
-
-      const summary = logs.slice(0, 5).map(l => `• ${l.description || l.action_type}`).join('\n');
-      const message = `🤖 *Adsy Autopilot*\n\n${count} aksi dijalankan:\n${summary}\n\nLihat detail di dashboard.`;
-
+      const summary = logs.filter(l => l.status !== 'skipped').slice(0, 5)
+        .map(l => `• ${l.description}`).join('\n');
+      const message = `🤖 *Adsy Autopilot*\n\n${count} aksi dijalankan:\n${summary}\n\nCek dashboard untuk detail lengkap.`;
       await fetch('https://api.fonnte.com/send', {
         method: 'POST',
         headers: { 'Authorization': config.fonnte_token, 'Content-Type': 'application/json' },
