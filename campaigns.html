@@ -221,13 +221,15 @@
 <script type="module">
   import { requireAuth, renderUserInfo } from './js/auth.js';
   import { initSidebar, showToast, openModal, closeModal, initModals, formatRupiah, formatDate } from './js/sidebar.js';
-  import { sb } from './js/supabase.js';
+  import { getSupabase } from './js/supabase.js';
 
+  let sb;
   let currentProfile = null;
   let allCampaigns = [];
   let currentTab = 'all';
 
   async function init() {
+    sb = await getSupabase();
     const session = await requireAuth();
     if (!session) return;
     currentProfile = await renderUserInfo();

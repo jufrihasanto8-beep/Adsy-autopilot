@@ -173,13 +173,15 @@
 <script type="module">
   import { requireAuth, renderUserInfo } from './js/auth.js';
   import { initSidebar, showToast, initModals, timeAgo } from './js/sidebar.js';
-  import { sb } from './js/supabase.js';
+  import { getSupabase } from './js/supabase.js';
 
+  let sb;
   let currentProfile = null;
   let generatedCopies = [];
   let selectedCopyIdx = null;
 
   async function init() {
+    sb = await getSupabase();
     const session = await requireAuth();
     if (!session) return;
     currentProfile = await renderUserInfo();

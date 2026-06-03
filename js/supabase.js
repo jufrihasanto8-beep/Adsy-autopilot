@@ -1,9 +1,13 @@
-// ── SUPABASE CONFIG ──
-const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+// js/supabase.js — Init Supabase dari env via /api/config
+let _sb = null;
 
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export async function getSupabase() {
+  if (_sb) return _sb;
 
-export default sb;
-export { sb, SUPABASE_URL, SUPABASE_ANON_KEY };
+  const res = await fetch('/api/config');
+  const { supabaseUrl, supabaseKey } = await res.json();
+
+  const { createClient } = supabase;
+  _sb = createClient(supabaseUrl, supabaseKey);
+  return _sb;
+}

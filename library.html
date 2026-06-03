@@ -12,7 +12,6 @@
 <body>
 <div class="app-layout">
 
-  <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-logo">
       <div class="sidebar-logo-icon">🚀</div>
@@ -49,7 +48,6 @@
     </div>
   </aside>
 
-  <!-- MAIN -->
   <main class="main-content">
     <header class="topbar">
       <div class="topbar-left">
@@ -62,7 +60,6 @@
     </header>
 
     <div class="page-content">
-      <!-- FILTER BAR -->
       <div class="filter-bar">
         <div class="search-input-wrap">
           <span class="search-icon">🔍</span>
@@ -79,10 +76,8 @@
           <option value="image">Gambar</option>
           <option value="video">Video</option>
         </select>
-        <button class="btn btn-outline btn-sm" id="btn-filter">Filter</button>
       </div>
 
-      <!-- STATS ROW -->
       <div class="grid-3" style="margin-bottom: 24px;">
         <div class="card" style="padding: 18px;">
           <div style="font-size:11px; color:var(--text-sub); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Total Konten</div>
@@ -98,11 +93,10 @@
         </div>
       </div>
 
-      <!-- CONTENT GRID -->
       <div class="card">
         <div class="content-grid" id="content-grid">
           <div style="grid-column:1/-1; text-align:center; padding:60px; color:var(--gray-5);">
-            <div class="loading-spinner" style="border-color: var(--gray-3); border-top-color: var(--primary); margin: 0 auto 14px; width:24px; height:24px; border-width:3px;"></div>
+            <div class="loading-spinner" style="border-color:var(--gray-3); border-top-color:var(--primary); margin:0 auto 14px; width:24px; height:24px; border-width:3px;"></div>
             Memuat konten...
           </div>
         </div>
@@ -130,9 +124,7 @@
           <button class="btn btn-outline btn-sm" id="btn-verify-gdrive">Verify</button>
         </div>
         <div class="form-hint">Pastikan file sudah di-share "Anyone with the link"</div>
-        <div class="gdrive-preview" id="gdrive-preview" style="margin-top:10px; display:none;">
-          <span id="gdrive-preview-name">-</span>
-        </div>
+        <div class="gdrive-preview" id="gdrive-preview" style="margin-top:10px; display:none;"></div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -153,7 +145,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">Catatan</label>
-        <textarea class="form-input form-textarea" id="input-notes" placeholder="Catatan atau instruksi khusus untuk konten ini..."></textarea>
+        <textarea class="form-input form-textarea" id="input-notes" placeholder="Catatan atau instruksi khusus..."></textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Status</label>
@@ -170,16 +162,14 @@
   </div>
 </div>
 
-<!-- MODAL DETAIL KONTEN -->
+<!-- MODAL DETAIL -->
 <div class="modal-overlay hidden" id="modal-detail">
-  <div class="modal" style="max-width: 480px;">
+  <div class="modal" style="max-width:480px;">
     <div class="modal-header">
       <h3 id="detail-name">Detail Konten</h3>
       <div class="modal-close">✕</div>
     </div>
-    <div class="modal-body" id="detail-body">
-      <!-- filled by JS -->
-    </div>
+    <div class="modal-body" id="detail-body"></div>
   </div>
 </div>
 
@@ -188,16 +178,17 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
   import { requireAuth, renderUserInfo } from './js/auth.js';
-  import { initSidebar, showToast, openModal, closeModal, initModals, formatDate } from './js/sidebar.js';
-  import { sb } from './js/supabase.js';
+  import { initSidebar, showToast, openModal, closeModal, initModals } from './js/sidebar.js';
+  import { getSupabase } from './js/supabase.js';
 
+  let sb;
   let currentProfile = null;
   let allContent = [];
 
   async function init() {
+    sb = await getSupabase();
     const session = await requireAuth();
     if (!session) return;
-
     currentProfile = await renderUserInfo();
     initSidebar();
     initModals();
@@ -215,10 +206,8 @@
   async function loadContent() {
     let q = sb.from('content_library').select('*').order('created_at', { ascending: false });
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
-
     const { data, error } = await q;
     if (error) { showToast('Gagal memuat konten', 'error'); return; }
-
     allContent = data || [];
     renderContent(allContent);
     updateStats(allContent);
@@ -236,20 +225,17 @@
       grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:60px; color:var(--gray-5);">
         <div style="font-size:48px; margin-bottom:12px; opacity:0.4">🖼️</div>
         <h3 style="font-size:16px; font-weight:600; color:var(--text); margin-bottom:6px;">Belum ada konten</h3>
-        <p>Tambahkan konten dari Google Drive untuk mulai ngiklan autopilot</p>
-      </div>`;
+        <p>Tambahkan konten dari Google Drive untuk mulai ngiklan autopilot</p></div>`;
       return;
     }
-
     const statusBadge = { ready: 'badge-success', used: 'badge-primary', archived: 'badge-gray' };
     const statusLabel = { ready: 'Siap', used: 'Terpakai', archived: 'Arsip' };
-
     grid.innerHTML = data.map(c => `
       <div class="content-card" onclick="showDetail('${c.id}')">
         <div class="content-thumb">
           ${c.thumb_url ? `<img src="${c.thumb_url}" alt="${c.name}" />` : (c.content_type === 'video' ? '🎬' : '🖼️')}
           <div class="content-thumb-overlay">
-            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); showDetail('${c.id}')">Lihat Detail</button>
+            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();showDetail('${c.id}')">Lihat Detail</button>
           </div>
         </div>
         <div class="content-info">
@@ -266,45 +252,30 @@
     const search = document.getElementById('search-input').value.toLowerCase();
     const status = document.getElementById('filter-status').value;
     const type = document.getElementById('filter-type').value;
-
     const filtered = allContent.filter(c => {
-      const matchSearch = !search || c.name.toLowerCase().includes(search) || (c.category || '').toLowerCase().includes(search);
-      const matchStatus = !status || c.status === status;
-      const matchType = !type || c.content_type === type;
-      return matchSearch && matchStatus && matchType;
+      return (!search || c.name.toLowerCase().includes(search) || (c.category || '').toLowerCase().includes(search))
+        && (!status || c.status === status)
+        && (!type || c.content_type === type);
     });
-
     renderContent(filtered);
   }
 
-  async function verifyGDrive() {
+  function verifyGDrive() {
     const url = document.getElementById('input-gdrive').value.trim();
     if (!url) return showToast('Masukkan link Google Drive dulu', 'warning');
-
     const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (!match) return showToast('Format link tidak valid', 'error');
-
-    const fileId = match[1];
     const preview = document.getElementById('gdrive-preview');
-    const previewName = document.getElementById('gdrive-preview-name');
-
     preview.style.display = 'block';
     preview.className = 'gdrive-preview has-file';
-    previewName.textContent = `✅ File ID: ${fileId} — Link valid!`;
+    preview.textContent = `✅ File ID: ${match[1]} — Link valid!`;
     showToast('Link GDrive valid', 'success');
   }
 
   async function saveContent() {
     const name = document.getElementById('input-name').value.trim();
     const gdriveUrl = document.getElementById('input-gdrive').value.trim();
-    const type = document.getElementById('input-type').value;
-    const category = document.getElementById('input-category').value.trim();
-    const audience = document.getElementById('input-audience').value.trim();
-    const notes = document.getElementById('input-notes').value.trim();
-    const status = document.getElementById('input-status').value;
-
     if (!name || !gdriveUrl) return showToast('Nama dan link GDrive wajib diisi', 'warning');
-
     const match = gdriveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (!match) return showToast('Format link GDrive tidak valid', 'error');
 
@@ -315,20 +286,19 @@
       user_id: currentProfile.id,
       name, gdrive_url: gdriveUrl,
       gdrive_file_id: match[1],
-      content_type: type,
-      category, audience, notes, status
+      content_type: document.getElementById('input-type').value,
+      category: document.getElementById('input-category').value.trim(),
+      audience: document.getElementById('input-audience').value.trim(),
+      notes: document.getElementById('input-notes').value.trim(),
+      status: document.getElementById('input-status').value
     });
 
     btn.disabled = false; btn.textContent = 'Simpan Konten';
-
     if (error) return showToast('Gagal menyimpan: ' + error.message, 'error');
 
     showToast('Konten berhasil ditambahkan!', 'success');
     closeModal('modal-add');
-    document.getElementById('input-name').value = '';
-    document.getElementById('input-gdrive').value = '';
-    document.getElementById('input-audience').value = '';
-    document.getElementById('input-notes').value = '';
+    ['input-name','input-gdrive','input-audience','input-notes'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('gdrive-preview').style.display = 'none';
     await loadContent();
   }
@@ -336,43 +306,27 @@
   window.showDetail = function(id) {
     const c = allContent.find(x => x.id === id);
     if (!c) return;
-
     document.getElementById('detail-name').textContent = c.name;
     document.getElementById('detail-body').innerHTML = `
-      <div style="margin-bottom:16px;">
-        <div style="background:var(--gray-1); border-radius:10px; padding:30px; text-align:center; font-size:48px; margin-bottom:16px;">
-          ${c.content_type === 'video' ? '🎬' : '🖼️'}
-        </div>
-        <a href="${c.gdrive_url}" target="_blank">
-          <button class="btn btn-outline" style="width:100%; margin-bottom:12px;">Buka di Google Drive ↗</button>
-        </a>
+      <div style="background:var(--gray-1);border-radius:10px;padding:30px;text-align:center;font-size:48px;margin-bottom:16px;">
+        ${c.content_type === 'video' ? '🎬' : '🖼️'}
       </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
-        <div>
-          <div style="font-size:11px; color:var(--text-sub); font-weight:600;">Tipe</div>
-          <div style="font-size:13px; margin-top:4px;">${c.content_type === 'video' ? '🎬 Video' : '🖼️ Gambar'}</div>
-        </div>
-        <div>
-          <div style="font-size:11px; color:var(--text-sub); font-weight:600;">Status</div>
-          <div style="font-size:13px; margin-top:4px;">${c.status}</div>
-        </div>
-        <div>
-          <div style="font-size:11px; color:var(--text-sub); font-weight:600;">Kategori</div>
-          <div style="font-size:13px; margin-top:4px;">${c.category || '-'}</div>
-        </div>
-        <div>
-          <div style="font-size:11px; color:var(--text-sub); font-weight:600;">Target</div>
-          <div style="font-size:13px; margin-top:4px;">${c.audience || '-'}</div>
-        </div>
+      <a href="${c.gdrive_url}" target="_blank">
+        <button class="btn btn-outline" style="width:100%;margin-bottom:12px;">Buka di Google Drive ↗</button>
+      </a>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div><div style="font-size:11px;color:var(--text-sub);font-weight:600;">Tipe</div><div style="font-size:13px;margin-top:4px;">${c.content_type === 'video' ? '🎬 Video' : '🖼️ Gambar'}</div></div>
+        <div><div style="font-size:11px;color:var(--text-sub);font-weight:600;">Status</div><div style="font-size:13px;margin-top:4px;">${c.status}</div></div>
+        <div><div style="font-size:11px;color:var(--text-sub);font-weight:600;">Kategori</div><div style="font-size:13px;margin-top:4px;">${c.category || '-'}</div></div>
+        <div><div style="font-size:11px;color:var(--text-sub);font-weight:600;">Target</div><div style="font-size:13px;margin-top:4px;">${c.audience || '-'}</div></div>
       </div>
-      ${c.notes ? `<div class="form-hint" style="background:var(--gray-1); padding:12px; border-radius:8px;">📝 ${c.notes}</div>` : ''}
+      ${c.notes ? `<div class="form-hint" style="background:var(--gray-1);padding:12px;border-radius:8px;">📝 ${c.notes}</div>` : ''}
       <div class="divider"></div>
-      <div style="display:flex; gap:10px;">
+      <div style="display:flex;gap:10px;">
         <button class="btn btn-danger btn-sm" onclick="deleteContent('${c.id}')">Hapus</button>
-        <button class="btn btn-primary btn-sm" onclick="markStatus('${c.id}', 'ready')">Tandai Siap</button>
-        <button class="btn btn-outline btn-sm" onclick="markStatus('${c.id}', 'archived')">Arsipkan</button>
+        <button class="btn btn-primary btn-sm" onclick="markStatus('${c.id}','ready')">Tandai Siap</button>
+        <button class="btn btn-outline btn-sm" onclick="markStatus('${c.id}','archived')">Arsipkan</button>
       </div>`;
-
     openModal('modal-detail');
   };
 

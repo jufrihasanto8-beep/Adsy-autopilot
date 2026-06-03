@@ -211,15 +211,22 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-    const { createClient } = supabase;
-    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let sb = null;
 
-    // Check if already logged in
-    sb.auth.getSession().then(({ data: { session } }) => {
-      if (session) window.location.href = '/dashboard.html';
-    });
+    async function initSupabase() {
+      try {
+        const res = await fetch('/api/config');
+        const { supabaseUrl, supabaseKey } = await res.json();
+        const { createClient } = supabase;
+        sb = createClient(supabaseUrl, supabaseKey);
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) window.location.href = '/dashboard.html';
+      } catch(e) {
+        console.warn('Gagal init Supabase:', e.message);
+      }
+    }
+
+    initSupabase();
 
     // Password toggle
     document.getElementById('toggle-pass').addEventListener('click', () => {
@@ -240,6 +247,7 @@
       errorEl.style.display = 'none';
 
       try {
+        if (!sb) throw new Error('Supabase belum dikonfigurasi. Hubungi admin.');
         const { data, error } = await sb.auth.signInWithPassword({ email, password });
         if (error) throw error;
         window.location.href = '/dashboard.html';

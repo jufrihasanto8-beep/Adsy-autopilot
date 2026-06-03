@@ -9,6 +9,7 @@ CREATE TABLE profiles (
   name TEXT,
   email TEXT,
   role TEXT DEFAULT 'advertiser' CHECK (role IN ('admin', 'advertiser', 'viewer', 'superadmin')),
+  wa_number TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
