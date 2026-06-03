@@ -1,5 +1,6 @@
-/* Hide admin-only elements by default — JS akan show untuk admin */
+/* Hide admin-only elements by default — JS tambah class is-admin ke body untuk admin */
 [data-admin-only] { display: none; }
+body.is-admin [data-admin-only] { display: revert; }
 
 /* ── SIDEBAR ── */
 .sidebar {
