@@ -57,14 +57,16 @@ export default async function handler(req, res) {
       const videoBlob = new Blob([videoBuffer], { type: file.mimetype });
       const videoForm = new FormData();
       videoForm.append('file', videoBlob, file.originalFilename);
-      videoForm.append('access_token', token);
 
-      const videoRes = await fetch(`${META_API}/${accountId}/advideos`, {
+      const videoRes = await fetch(`${META_API}/${accountId}/advideos?access_token=${encodeURIComponent(token)}`, {
         method: 'POST',
         body: videoForm
       });
       const videoData = await videoRes.json();
-      if (videoData.error) throw new Error(videoData.error.message);
+      if (videoData.error) {
+        const e = videoData.error;
+        throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code}${e.error_subcode ? '/' + e.error_subcode : ''})`);
+      }
 
       // Create video creative
       const creativeRes = await fetch(`${META_API}/${accountId}/adcreatives`, {
@@ -88,7 +90,10 @@ export default async function handler(req, res) {
         })
       });
       const creativeData = await creativeRes.json();
-      if (creativeData.error) throw new Error(creativeData.error.message);
+      if (creativeData.error) {
+        const e = creativeData.error;
+        throw new Error(`Meta creative: ${e.error_user_msg || e.message} (code: ${e.code})`);
+      }
       creativeId = creativeData.id;
 
     } else {
@@ -96,15 +101,17 @@ export default async function handler(req, res) {
       const imgBuffer = fs.readFileSync(file.filepath);
       const imgBlob = new Blob([imgBuffer], { type: file.mimetype });
       const imgForm = new FormData();
-      imgForm.append('filename', imgBlob, file.originalFilename);
-      imgForm.append('access_token', token);
+      imgForm.append(file.originalFilename, imgBlob, file.originalFilename);
 
-      const imgRes = await fetch(`${META_API}/${accountId}/adimages`, {
+      const imgRes = await fetch(`${META_API}/${accountId}/adimages?access_token=${encodeURIComponent(token)}`, {
         method: 'POST',
         body: imgForm
       });
       const imgData = await imgRes.json();
-      if (imgData.error) throw new Error(imgData.error.message);
+      if (imgData.error) {
+        const e = imgData.error;
+        throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code}${e.error_subcode ? '/' + e.error_subcode : ''})`);
+      }
 
       const imageHash = Object.values(imgData.images || {})[0]?.hash;
       if (!imageHash) throw new Error('Gagal upload gambar ke Meta');
@@ -135,7 +142,10 @@ export default async function handler(req, res) {
         })
       });
       const creativeData = await creativeRes.json();
-      if (creativeData.error) throw new Error(creativeData.error.message);
+      if (creativeData.error) {
+        const e = creativeData.error;
+        throw new Error(`Meta creative: ${e.error_user_msg || e.message} (code: ${e.code})`);
+      }
       creativeId = creativeData.id;
     }
 
