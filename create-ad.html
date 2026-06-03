@@ -291,18 +291,38 @@
 
     <!-- PUBLISH BAR -->
     <div class="publish-bar" id="publish-bar" style="display:none;">
-      <div class="publish-info">
-        <strong id="publish-count">0 iklan siap dipublish</strong>
-        Semua akan diupload ke Meta Ads sekaligus
+      <!-- Row 1: Campaign Settings -->
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid var(--gray-3);">
+        <div style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--text-sub); white-space:nowrap;">⚙️ Pengaturan Kampanye</div>
+        <input type="text" class="form-input" id="pub-campaign-name" placeholder="Nama kampanye (opsional)" style="flex:1; min-width:180px; height:36px; font-size:13px;" />
+        <select class="form-input form-select" id="pub-objective" style="width:150px; height:36px; font-size:13px;">
+          <option value="OUTCOME_TRAFFIC">🚦 Traffic</option>
+          <option value="OUTCOME_LEADS">🎯 Leads</option>
+          <option value="OUTCOME_SALES">🛒 Sales</option>
+          <option value="OUTCOME_ENGAGEMENT">💬 Engagement</option>
+          <option value="OUTCOME_AWARENESS">📢 Awareness</option>
+        </select>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <span style="font-size:12px; color:var(--text-sub); white-space:nowrap;">Rp</span>
+          <input type="number" class="form-input" id="pub-budget" placeholder="Budget/hari" min="10000" step="5000" style="width:130px; height:36px; font-size:13px;" />
+        </div>
+        <input type="datetime-local" class="form-input" id="pub-start" style="width:180px; height:36px; font-size:13px;" />
       </div>
-      <div style="display:flex; gap:10px; align-items:center;">
-        <select class="form-input form-select" id="pub-account" style="width:200px;">
-          <option value="">Pilih Ad Account</option>
-        </select>
-        <select class="form-input form-select" id="pub-url" style="width:200px;">
-          <option value="">Pilih URL Tujuan</option>
-        </select>
-        <button class="btn btn-dark" id="btn-publish">🚀 Publish ke Meta</button>
+      <!-- Row 2: Account + Publish -->
+      <div style="display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+        <div class="publish-info" style="margin:0;">
+          <strong id="publish-count">0 iklan siap dipublish</strong>
+          — 1 kampanye, semua konten dalam 1 ad set
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <select class="form-input form-select" id="pub-account" style="width:200px;">
+            <option value="">Pilih Ad Account</option>
+          </select>
+          <select class="form-input form-select" id="pub-url" style="width:180px;">
+            <option value="">Pilih URL Tujuan</option>
+          </select>
+          <button class="btn btn-dark" id="btn-publish">🚀 Publish ke Meta</button>
+        </div>
       </div>
     </div>
   </main>
@@ -681,16 +701,24 @@
 
     const accDbId = document.getElementById('pub-account').value;
     const urlId = document.getElementById('pub-url').value;
+    const budget = document.getElementById('pub-budget').value;
+    const objective = document.getElementById('pub-objective').value;
+    const startTime = document.getElementById('pub-start').value;
+    const campaignNameInput = document.getElementById('pub-campaign-name').value.trim();
+
     if (!accDbId) return showToast('Pilih Ad Account dulu', 'warning');
     if (!urlId) return showToast('Pilih URL tujuan dulu', 'warning');
-    const selectedAcc = userAdAccounts.find(a => a.id === accDbId);
-    if (!selectedAcc) return showToast('Ad account tidak ditemukan', 'error');
+    if (!budget || parseFloat(budget) < 10000) return showToast('Budget minimal Rp 10.000/hari', 'warning');
 
     const btn = document.getElementById('btn-publish');
     btn.disabled = true;
     btn.innerHTML = '<div class="loading-spinner"></div> Publishing...';
 
     let successCount = 0;
+    let metaCampaignId = null;
+    let metaAdsetId = null;
+    let sbCampaignId = null;
+
     for (const item of readyItems) {
       try {
         const formData = new FormData();
@@ -698,16 +726,30 @@
         formData.append('file_type', item.type);
         formData.append('headline', item.headline);
         formData.append('primary_text', item.primaryText);
-        formData.append('description', item.description);
+        formData.append('description', item.description || '');
         formData.append('product_id', selectedProduct.id);
         formData.append('ad_account_db_id', accDbId);
         formData.append('url_id', urlId);
         formData.append('cta', item.cta || selectedProduct.cta || 'LEARN_MORE');
         formData.append('user_id', currentProfile.id);
+        formData.append('objective', objective);
+        formData.append('daily_budget', budget);
+        formData.append('campaign_name', campaignNameInput || `${selectedProduct.name} - ${new Date().toLocaleDateString('id-ID')}`);
+        if (startTime) formData.append('start_time', new Date(startTime).toISOString());
+
+        // Reuse campaign & adset dari item pertama yang sukses
+        if (metaCampaignId) formData.append('meta_campaign_id', metaCampaignId);
+        if (metaAdsetId) formData.append('meta_adset_id', metaAdsetId);
+        if (sbCampaignId) formData.append('sb_campaign_id', sbCampaignId);
 
         const res = await fetch('/api/create-ad', { method: 'POST', body: formData });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+
+        // Simpan ID dari item pertama untuk dipakai item berikutnya
+        if (!metaCampaignId && data.meta_campaign_id) metaCampaignId = data.meta_campaign_id;
+        if (!metaAdsetId && data.meta_adset_id) metaAdsetId = data.meta_adset_id;
+        if (!sbCampaignId && data.campaign_id) sbCampaignId = data.campaign_id;
 
         successCount++;
         item.status = 'published';
