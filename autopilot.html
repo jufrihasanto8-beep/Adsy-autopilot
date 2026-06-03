@@ -343,9 +343,9 @@
       .select('*').eq('user_id', currentProfile.id).single();
 
     const defaults = {
-      phase1: 'Budget Rp 50rb/hari · 3 variasi copy · Durasi 3 hari · Matikan copy CTR < 1%',
-      phase2: 'Naikkan budget copy terbaik 50% · Pause copy CPR > target · Durasi 4 hari',
-      phase3: 'Jika ROAS > 3x → naikkan budget 20%/hari · Jika ROAS < target 2 hari → ganti konten dari library'
+      phase1: 'Durasi min. 3 hari · Gate 8.000 impressions harus tercapai sebelum keputusan diambil · Setelah gate + 3 hari → otomatis maju ke Phase 2',
+      phase2: 'Evaluasi CPR vs target produk · CPR > 1.5× target → pause otomatis · Setelah 7 hari + CPR ≤ target → maju ke Phase 3 (Scale)',
+      phase3: 'CPR ≤ target → budget naik 3%/hari · CPR > target → budget turun 3%/hari · CPR > 2× target → pause otomatis · Max kenaikan 30%/hari'
     };
 
     document.getElementById('phase1-desc').textContent = data?.phase1 || defaults.phase1;
