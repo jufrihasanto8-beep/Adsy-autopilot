@@ -190,9 +190,9 @@
       <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
       <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
       <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-item" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
       <div class="nav-section-label" data-admin-only>Admin</div>
       <div class="nav-item" data-page="products.html" data-admin-only><span class="nav-icon">📦</span> Produk</div>
-      <div class="nav-item" data-page="settings.html" data-admin-only><span class="nav-icon">⚙️</span> Pengaturan</div>
     </nav>
     <div class="autopilot-status">
       <div class="autopilot-status-header">
@@ -298,6 +298,9 @@
       <div style="display:flex; gap:10px; align-items:center;">
         <select class="form-input form-select" id="pub-account" style="width:200px;">
           <option value="">Pilih Ad Account</option>
+        </select>
+        <select class="form-input form-select" id="pub-url" style="width:200px;">
+          <option value="">Pilih URL Tujuan</option>
         </select>
         <button class="btn btn-dark" id="btn-publish">🚀 Publish ke Meta</button>
       </div>
@@ -407,12 +410,28 @@
     loadAdAccounts();
   }
 
+  let userAdAccounts = [];
+
   async function loadAdAccounts() {
-    const { data: config } = await sb.from('app_config').select('meta_token, meta_account').eq('user_id', currentProfile.id).single();
+    const { data } = await sb.from('ad_accounts').select('*, ad_urls(*)').eq('user_id', currentProfile.id).order('created_at');
+    userAdAccounts = data || [];
+
     const sel = document.getElementById('pub-account');
-    if (config?.meta_account) {
-      sel.innerHTML = `<option value="${config.meta_account}">${config.meta_account}</option>`;
+    if (!userAdAccounts.length) {
+      sel.innerHTML = `<option value="">Belum ada ad account — isi di Pengaturan</option>`;
+      return;
     }
+    sel.innerHTML = `<option value="">Pilih Ad Account</option>` +
+      userAdAccounts.map(a => `<option value="${a.id}">${a.label} (${a.account_id})</option>`).join('');
+
+    sel.addEventListener('change', () => {
+      const acc = userAdAccounts.find(a => a.id === sel.value);
+      const urlSel = document.getElementById('pub-url');
+      const urls = acc?.ad_urls || [];
+      urlSel.innerHTML = urls.length
+        ? urls.map(u => `<option value="${u.id}" ${u.is_default ? 'selected' : ''}>${u.label}</option>`).join('')
+        : `<option value="">Belum ada URL — isi di Pengaturan</option>`;
+    });
   }
 
   async function handleFiles(files) {
@@ -660,8 +679,12 @@
     if (!readyItems.length) return showToast('Belum ada iklan yang siap dipublish', 'warning');
     if (!selectedProduct) return showToast('Pilih produk dulu', 'warning');
 
-    const accountId = document.getElementById('pub-account').value;
-    if (!accountId) return showToast('Pilih Ad Account dulu', 'warning');
+    const accDbId = document.getElementById('pub-account').value;
+    const urlId = document.getElementById('pub-url').value;
+    if (!accDbId) return showToast('Pilih Ad Account dulu', 'warning');
+    if (!urlId) return showToast('Pilih URL tujuan dulu', 'warning');
+    const selectedAcc = userAdAccounts.find(a => a.id === accDbId);
+    if (!selectedAcc) return showToast('Ad account tidak ditemukan', 'error');
 
     const btn = document.getElementById('btn-publish');
     btn.disabled = true;
@@ -677,7 +700,8 @@
         formData.append('primary_text', item.primaryText);
         formData.append('description', item.description);
         formData.append('product_id', selectedProduct.id);
-        formData.append('ad_account_id', accountId);
+        formData.append('ad_account_db_id', accDbId);
+        formData.append('url_id', urlId);
         formData.append('cta', item.cta || selectedProduct.cta || 'LEARN_MORE');
         formData.append('user_id', currentProfile.id);
 
