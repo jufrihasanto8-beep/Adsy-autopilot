@@ -70,13 +70,27 @@
           </div>
           <span class="badge badge-gray" id="token-status">Belum diisi</span>
         </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">App ID <span>*</span></label>
+            <input type="text" class="form-input" id="meta-app-id" placeholder="1234567890123456" />
+            <div class="form-hint">Dari developers.facebook.com → app kamu → Settings → Basic</div>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">App Secret <span>*</span></label>
+            <input type="password" class="form-input" id="meta-app-secret" placeholder="••••••••••••••••" />
+            <div class="form-hint">App Secret dari halaman yang sama, klik "Show"</div>
+          </div>
+        </div>
         <div style="display:flex; gap:10px; align-items:flex-end;">
           <div class="form-group" style="flex:1; margin-bottom:0;">
+            <label class="form-label">Access Token <span>*</span></label>
             <input type="password" class="form-input" id="meta-token" placeholder="EAAxxxxxxxx..." />
-            <div class="form-hint">Long-lived user access token dari Meta Developer · <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:var(--primary);">Ambil token →</a></div>
+            <div class="form-hint">Generate dari <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:var(--primary);">Graph API Explorer →</a> pakai app kamu sendiri</div>
           </div>
           <button class="btn btn-primary btn-sm" id="btn-fetch-accounts" style="flex-shrink:0; white-space:nowrap;">⬇ Ambil Akun</button>
           <button class="btn btn-outline btn-sm" id="btn-save-token" style="flex-shrink:0;">Simpan</button>
+          <button class="btn btn-outline btn-sm" id="btn-extend-token" style="flex-shrink:0; white-space:nowrap; border-color:#F59E0B; color:#F59E0B;">⏳ Perpanjang (60 hari)</button>
         </div>
       </div>
 
@@ -295,12 +309,14 @@
 
   // ── TOKEN ──
   async function loadToken() {
-    const { data } = await sb.from('app_config').select('meta_token').eq('user_id', currentProfile.id).single();
+    const { data } = await sb.from('app_config').select('meta_token, meta_app_id, meta_app_secret').eq('user_id', currentProfile.id).single();
     if (data?.meta_token) {
       document.getElementById('meta-token').value = data.meta_token;
       document.getElementById('token-status').textContent = 'Tersimpan';
       document.getElementById('token-status').className = 'badge badge-success';
     }
+    if (data?.meta_app_id) document.getElementById('meta-app-id').value = data.meta_app_id;
+    if (data?.meta_app_secret) document.getElementById('meta-app-secret').value = data.meta_app_secret;
   }
 
   const META = 'https://graph.facebook.com/v18.0';
@@ -310,13 +326,61 @@
   }
 
   async function saveToken() {
-    const token = await getToken();
+    const token    = await getToken();
+    const appId    = document.getElementById('meta-app-id').value.trim();
+    const appSecret= document.getElementById('meta-app-secret').value.trim();
     if (!token) return showToast('Token tidak boleh kosong', 'warning');
-    const { error } = await sb.from('app_config').upsert({ user_id: currentProfile.id, meta_token: token }, { onConflict: 'user_id' });
+
+    const payload = { user_id: currentProfile.id, meta_token: token };
+    if (appId)     payload.meta_app_id     = appId;
+    if (appSecret) payload.meta_app_secret = appSecret;
+
+    const { error } = await sb.from('app_config').upsert(payload, { onConflict: 'user_id' });
     if (error) return showToast('Gagal simpan: ' + error.message, 'error');
     document.getElementById('token-status').textContent = 'Tersimpan';
     document.getElementById('token-status').className = 'badge badge-success';
-    showToast('Token disimpan!', 'success');
+    showToast('Konfigurasi Meta disimpan!', 'success');
+  }
+
+  async function extendToken() {
+    const token     = await getToken();
+    const appId     = document.getElementById('meta-app-id').value.trim();
+    const appSecret = document.getElementById('meta-app-secret').value.trim();
+    if (!token)     return showToast('Masukkan Access Token dulu', 'warning');
+    if (!appId)     return showToast('Masukkan App ID dulu', 'warning');
+    if (!appSecret) return showToast('Masukkan App Secret dulu', 'warning');
+
+    // Simpan dulu sebelum extend
+    await saveToken();
+
+    const btn = document.getElementById('btn-extend-token');
+    btn.disabled = true;
+    btn.textContent = 'Memproses...';
+
+    try {
+      const res = await fetch('/api/meta-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: currentProfile.id })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Gagal perpanjang token');
+
+      // Update input + simpan otomatis
+      document.getElementById('meta-token').value = data.access_token;
+      await saveToken();
+
+      const expiry = data.expires_in
+        ? `Berlaku ~${Math.round(data.expires_in / 86400)} hari`
+        : 'Long-lived token aktif';
+      showToast(`Token diperpanjang! ${expiry}`, 'success');
+      document.getElementById('token-info').style.display = 'none';
+    } catch (err) {
+      showToast('Error: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '⏳ Perpanjang (60 hari)';
+    }
   }
 
   async function fetchAndOpenAccount() {
@@ -563,6 +627,13 @@
     document.getElementById('btn-fetch-accounts').addEventListener('click', fetchAndOpenAccount);
     document.getElementById('btn-save-account').addEventListener('click', saveAccount);
     document.getElementById('btn-save-token').addEventListener('click', saveToken);
+    document.getElementById('btn-extend-token').addEventListener('click', extendToken);
+
+    // Show info banner when token input changes (might be short-lived)
+    document.getElementById('meta-token').addEventListener('input', () => {
+      const v = document.getElementById('meta-token').value.trim();
+      document.getElementById('token-info').style.display = v ? '' : 'none';
+    });
     document.getElementById('btn-save-url').addEventListener('click', saveUrl);
     document.getElementById('btn-invite-user')?.addEventListener('click', () => openModal('modal-invite'));
     document.getElementById('btn-create-user')?.addEventListener('click', createUser);
