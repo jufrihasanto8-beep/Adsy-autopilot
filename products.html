@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <style>[data-admin-only]{display:none}</style>
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Produk — Adsy Autopilot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -57,7 +57,7 @@
         <p>Kelola product knowledge untuk AI generate copy iklan</p>
       </div>
       <div class="topbar-right">
-        <button class="btn btn-primary" id="btn-add-product" data-admin-only>+ Tambah Produk</button>
+        <button class="btn btn-primary" id="btn-add-product" style="display:none;">+ Tambah Produk</button>
       </div>
     </header>
 
@@ -222,6 +222,10 @@
     currentProfile = await renderUserInfo();
     initSidebar();
     initModals();
+
+    if (['admin','superadmin'].includes(currentProfile.role)) {
+      document.getElementById('btn-add-product').style.display = '';
+    }
 
     document.getElementById('btn-add-product').addEventListener('click', () => {
       editingId = null;

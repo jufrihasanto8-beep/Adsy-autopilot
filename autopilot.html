@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <style>[data-admin-only]{display:none}</style>
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Autopilot Rules — Adsy Autopilot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -57,8 +57,8 @@
         <p>Otak autopilot — atur skema & rules kampanye iklan</p>
       </div>
       <div class="topbar-right">
-        <button class="btn btn-outline" id="btn-run-now" data-admin-only>⚡ Jalankan Sekarang</button>
-        <button class="btn btn-primary" id="btn-add-rule" data-admin-only>+ Tambah Rule</button>
+        <button class="btn btn-outline" id="btn-run-now" style="display:none;">⚡ Jalankan Sekarang</button>
+        <button class="btn btn-primary" id="btn-add-rule" style="display:none;">+ Tambah Rule</button>
       </div>
     </header>
 
@@ -70,7 +70,7 @@
             <div class="card-title">🗺️ Skema Autopilot (Otak)</div>
             <div class="card-sub">Alur baku yang diikuti setiap kampanye autopilot</div>
           </div>
-          <button class="btn btn-outline btn-sm" id="btn-edit-scheme" data-admin-only>Edit Skema</button>
+          <button class="btn btn-outline btn-sm" id="btn-edit-scheme" style="display:none;">Edit Skema</button>
         </div>
 
         <div class="phase-indicator" style="margin-bottom: 24px;">
@@ -326,6 +326,12 @@
     currentProfile = await renderUserInfo();
     initSidebar();
     initModals();
+
+    if (['admin','superadmin'].includes(currentProfile.role)) {
+      document.getElementById('btn-run-now').style.display = '';
+      document.getElementById('btn-add-rule').style.display = '';
+      document.getElementById('btn-edit-scheme').style.display = '';
+    }
 
     document.getElementById('btn-add-rule').addEventListener('click', () => openModal('modal-rule'));
     document.getElementById('btn-edit-scheme').addEventListener('click', () => {
