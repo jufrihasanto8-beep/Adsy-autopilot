@@ -54,6 +54,7 @@ export default async function handler(req, res) {
     const token     = cfgData?.meta_token || process.env.META_ACCESS_TOKEN;
     const accountId = accData.account_id;
     const pageId    = accData.page_id;
+    const pixelId   = accData.pixel_id || null;
     const destUrl   = urlData?.url || 'https://wa.me/';
 
     if (!token) throw new Error('Meta access token belum dikonfigurasi di Pengaturan');
