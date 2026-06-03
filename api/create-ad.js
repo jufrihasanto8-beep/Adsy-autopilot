@@ -140,37 +140,56 @@ export default async function handler(req, res) {
 
     // Get product info
     const { data: product } = await sb.from('products').select('name').eq('id', productId).single();
+    const campaignName = `${product?.name || 'Iklan'} - ${headline}`;
 
-    // Save campaign record to Supabase
-    const { data: campaign } = await sb.from('campaigns').insert({
-      user_id: userId,
-      name: `${product?.name || 'Iklan'} - ${headline}`,
-      meta_creative_id: creativeId,
-      ad_account_id: accountId,
-      status: 'ACTIVE',
-      current_phase: 1,
-      autopilot_enabled: true,
-      product_id: productId
-    }).select().single();
+    // Save campaign record — non-critical, don't fail publish if DB write fails
+    let campaignId = null;
+    try {
+      const campaignPayload = {
+        user_id: userId,
+        name: campaignName,
+        ad_account_id: accountId,
+        status: 'ACTIVE',
+        current_phase: 1,
+        autopilot_enabled: true,
+      };
+      // Add optional columns only if they might exist
+      if (productId) campaignPayload.product_id = productId;
+      if (creativeId) campaignPayload.meta_creative_id = creativeId;
+
+      const { data: campaign, error: campErr } = await sb.from('campaigns').insert(campaignPayload).select('id').single();
+      if (campErr) console.error('campaigns insert error (non-fatal):', campErr.message);
+      else campaignId = campaign?.id;
+    } catch (e) {
+      console.error('campaigns insert failed (non-fatal):', e.message);
+    }
 
     // Save ad copy
-    await sb.from('ad_copies').insert({
-      campaign_id: campaign?.id,
-      user_id: userId,
-      headline,
-      primary_text: primaryText,
-      description: description || '',
-      status: 'active'
-    });
+    try {
+      await sb.from('ad_copies').insert({
+        campaign_id: campaignId,
+        user_id: userId,
+        headline,
+        primary_text: primaryText,
+        description: description || '',
+        status: 'testing'
+      });
+    } catch (e) {
+      console.error('ad_copies insert failed (non-fatal):', e.message);
+    }
 
     // Log
-    await sb.from('action_logs').insert({
-      user_id: userId,
-      campaign_name: `${product?.name || 'Iklan'} - ${headline}`,
-      action_type: 'create',
-      description: `Iklan baru berhasil dipublish ke Meta`,
-      status: 'success'
-    });
+    try {
+      await sb.from('action_logs').insert({
+        user_id: userId,
+        campaign_name: campaignName,
+        action_type: 'create',
+        description: `Iklan baru berhasil dipublish ke Meta`,
+        status: 'success'
+      });
+    } catch (e) {
+      console.error('action_logs insert failed (non-fatal):', e.message);
+    }
 
     // Cleanup temp file
     fs.unlink(file.filepath, () => {});
@@ -183,6 +202,13 @@ export default async function handler(req, res) {
 }
 
 function ctaMap(cta) {
+  // Accepted Meta CTA enum values — pass through directly
+  const metaEnums = ['LEARN_MORE','SHOP_NOW','ORDER_NOW','GET_OFFER','CONTACT_US',
+    'SEND_MESSAGE','CALL_NOW','SIGN_UP','SUBSCRIBE','DOWNLOAD','GET_QUOTE',
+    'APPLY_NOW','WATCH_MORE','BOOK_NOW'];
+  if (metaEnums.includes(cta)) return cta;
+
+  // Legacy display name fallback
   const map = {
     'Hubungi Sekarang': 'CONTACT_US',
     'Pesan Sekarang': 'ORDER_NOW',
