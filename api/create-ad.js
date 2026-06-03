@@ -197,6 +197,11 @@ export default async function handler(req, res) {
           else adsetPayload.bid_amount = parseInt(bidValue);
         }
       }
+
+      // promoted_object — wajib untuk beberapa objective
+      const promotedObject = getPromotedObject(objective, pageId, pixelId);
+      if (promotedObject) adsetPayload.promoted_object = promotedObject;
+
       if (startTime) adsetPayload.start_time = startTime;
       if (endTime) adsetPayload.end_time = endTime;
 
@@ -283,6 +288,29 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('create-ad error:', err);
     return res.status(500).json({ error: err.message });
+  }
+}
+
+function getPromotedObject(objective, pageId, pixelId) {
+  switch (objective) {
+    case 'OUTCOME_SALES':
+      // Sales butuh pixel + event purchase
+      if (pixelId) return { pixel_id: pixelId, custom_event_type: 'PURCHASE' };
+      // Fallback ke page jika tidak ada pixel
+      if (pageId) return { page_id: pageId };
+      return null;
+    case 'OUTCOME_LEADS':
+      if (pageId) return { page_id: pageId };
+      return null;
+    case 'OUTCOME_ENGAGEMENT':
+      if (pageId) return { page_id: pageId };
+      return null;
+    case 'OUTCOME_AWARENESS':
+      if (pageId) return { page_id: pageId };
+      return null;
+    case 'OUTCOME_TRAFFIC':
+    default:
+      return null; // Traffic tidak butuh promoted_object
   }
 }
 
