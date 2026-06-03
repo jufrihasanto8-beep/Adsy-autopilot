@@ -147,10 +147,10 @@ export default async function handler(req, res) {
         objective,
         status: 'PAUSED',
         special_ad_categories: [],
-        is_adset_budget_sharing_enabled: budgetType === 'CBO',
         access_token: token
       };
-      // CBO: budget di campaign level
+      // CBO: budget di campaign level, sharing enabled = false (Meta pakai daily_budget di campaign)
+      // ABO: budget di ad set level, jangan set daily_budget di campaign
       if (budgetType === 'CBO') {
         campPayloadMeta.daily_budget = dailyBudget;
         campPayloadMeta.bid_strategy = bidStrategy;
