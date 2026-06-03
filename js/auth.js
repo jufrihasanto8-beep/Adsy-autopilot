@@ -43,7 +43,13 @@ export async function renderUserInfo() {
 
   if (nameEl) nameEl.textContent = profile.name || 'User';
   if (emailEl) emailEl.textContent = profile.email || '';
-  if (avatarEl) avatarEl.textContent = initials;
+  if (avatarEl) {
+    if (profile.avatar_url) {
+      avatarEl.innerHTML = `<img src="${profile.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+    } else {
+      avatarEl.textContent = initials;
+    }
+  }
   if (sidebarNameEl) sidebarNameEl.textContent = profile.name || 'User';
   if (sidebarRoleEl) sidebarRoleEl.textContent = profile.role === 'admin' ? 'Admin' : 'Advertiser';
   if (sidebarAvatarEl) {
