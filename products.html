@@ -24,11 +24,11 @@
       <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
       <div class="nav-item" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
       <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
-      <div class="nav-item" data-page="autopilot.html" data-admin-only><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
       <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
       <div class="nav-item" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
       <div class="nav-section-label" data-admin-only>Admin</div>
-      <div class="nav-item active" data-page="products.html" data-admin-only><span class="nav-icon">📦</span> Produk</div>
+      <div class="nav-item active" data-page="products.html"><span class="nav-icon">📦</span> Produk</div>
     </nav>
     <div class="autopilot-status">
       <div class="autopilot-status-header">
@@ -57,7 +57,7 @@
         <p>Kelola product knowledge untuk AI generate copy iklan</p>
       </div>
       <div class="topbar-right">
-        <button class="btn btn-primary" id="btn-add-product">+ Tambah Produk</button>
+        <button class="btn btn-primary" id="btn-add-product" data-admin-only>+ Tambah Produk</button>
       </div>
     </header>
 
@@ -295,8 +295,9 @@
           <button class="btn btn-primary btn-sm" style="flex:1;" onclick="window.location.href='create-ad.html?product=${p.id}'">
             ➕ Buat Iklan
           </button>
+          ${document.body.classList.contains('is-admin') ? `
           <button class="btn btn-outline btn-sm" onclick="editProduct('${p.id}')">Edit</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteProduct('${p.id}')">Hapus</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteProduct('${p.id}')">Hapus</button>` : ''}
         </div>
       </div>`).join('');
   }
