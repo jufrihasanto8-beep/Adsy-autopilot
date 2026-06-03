@@ -41,10 +41,26 @@
       display: flex;
       align-items: center;
       gap: 16px;
-      padding: 16px;
+      padding: 12px 16px;
       background: var(--gray-1);
       border-bottom: 1px solid var(--gray-3);
+      cursor: pointer;
+      user-select: none;
     }
+    .content-item.collapsed .content-item-header {
+      border-bottom: none;
+    }
+    .content-item.collapsed .content-item-body,
+    .content-item.collapsed .generating-overlay {
+      display: none !important;
+    }
+    .collapse-toggle {
+      font-size: 14px;
+      color: var(--text-sub);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .content-item.collapsed .collapse-toggle { transform: rotate(-90deg); }
     .content-preview {
       width: 80px;
       height: 60px;
@@ -262,9 +278,12 @@
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
           <div>
             <h3 style="font-size:16px; font-weight:700;">3. Generate & Edit Copy</h3>
-            <p style="font-size:13px; color:var(--text-sub); margin-top:2px;">AI sudah generate copy untuk setiap konten — bisa diedit sebelum publish</p>
+            <p style="font-size:13px; color:var(--text-sub); margin-top:2px;">AI sudah generate copy untuk setiap konten — klik item untuk edit</p>
           </div>
-          <button class="btn btn-outline" id="btn-regenerate-all">✨ Generate Ulang Semua</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-ghost btn-sm" id="btn-collapse-all">↕ Collapse Semua</button>
+            <button class="btn btn-outline" id="btn-regenerate-all">✨ Generate Ulang Semua</button>
+          </div>
         </div>
         <div id="ad-items-list"></div>
       </div>
@@ -297,7 +316,24 @@
   let sb;
   let currentProfile = null;
   let selectedProduct = null;
-  let adItems = []; // { file, preview, type, headline, primaryText, description, status }
+  let adItems = []; // { file, preview, type, headline, primaryText, description, cta, status, collapsed }
+
+  const CTA_OPTIONS = [
+    { value: 'LEARN_MORE',    label: 'Pelajari Lebih Lanjut' },
+    { value: 'SHOP_NOW',      label: 'Belanja Sekarang' },
+    { value: 'ORDER_NOW',     label: 'Pesan Sekarang' },
+    { value: 'GET_OFFER',     label: 'Ambil Penawaran' },
+    { value: 'CONTACT_US',    label: 'Hubungi Kami' },
+    { value: 'SEND_MESSAGE',  label: 'Kirim Pesan' },
+    { value: 'CALL_NOW',      label: 'Telepon Sekarang' },
+    { value: 'SIGN_UP',       label: 'Daftar Sekarang' },
+    { value: 'SUBSCRIBE',     label: 'Berlangganan' },
+    { value: 'DOWNLOAD',      label: 'Unduh' },
+    { value: 'GET_QUOTE',     label: 'Minta Penawaran' },
+    { value: 'APPLY_NOW',     label: 'Lamar Sekarang' },
+    { value: 'WATCH_MORE',    label: 'Tonton Selengkapnya' },
+    { value: 'BOOK_NOW',      label: 'Pesan Sekarang (Travel)' },
+  ];
 
   async function init() {
     sb = await getSupabase();
@@ -363,6 +399,11 @@
   function setupEvents() {
     document.getElementById('btn-regenerate-all').addEventListener('click', generateAllCopies);
     document.getElementById('btn-publish').addEventListener('click', publishAll);
+    document.getElementById('btn-collapse-all').addEventListener('click', () => {
+      const allCollapsed = adItems.every(i => i.collapsed);
+      adItems.forEach(i => i.collapsed = !allCollapsed);
+      renderAdItems();
+    });
     loadAdAccounts();
   }
 
@@ -384,12 +425,15 @@
     for (const file of files) {
       const isVideo = file.type.startsWith('video/');
       const previewUrl = URL.createObjectURL(file);
+      const defaultCta = selectedProduct?.cta || 'LEARN_MORE';
       const item = {
         id: crypto.randomUUID(),
         file, previewUrl,
         type: isVideo ? 'video' : 'image',
         headline: '', primaryText: '', description: '',
-        status: 'pending' // pending | generating | ready
+        cta: defaultCta,
+        status: 'pending', // pending | generating | ready
+        collapsed: false
       };
       adItems.push(item);
     }
@@ -412,9 +456,15 @@
     const list = document.getElementById('ad-items-list');
     if (!adItems.length) { list.innerHTML = ''; return; }
 
-    list.innerHTML = adItems.map(item => `
-      <div class="content-item ${item.status}" id="item-${item.id}">
-        <div class="content-item-header">
+    const ctaOptionsHtml = CTA_OPTIONS.map(o =>
+      `<option value="${o.value}">${o.label}</option>`
+    ).join('');
+
+    list.innerHTML = adItems.map(item => {
+      const ctaLabel = CTA_OPTIONS.find(o => o.value === item.cta)?.label || item.cta;
+      return `
+      <div class="content-item ${item.status}${item.collapsed ? ' collapsed' : ''}" id="item-${item.id}">
+        <div class="content-item-header" onclick="toggleCollapse('${item.id}')">
           <div class="content-preview">
             ${item.type === 'video'
               ? `<video src="${item.previewUrl}" style="width:100%;height:100%;object-fit:cover;"></video>`
@@ -422,13 +472,16 @@
           </div>
           <div class="content-item-info">
             <div class="content-item-name">${item.file.name}</div>
-            <div class="content-item-meta">${item.type === 'video' ? '🎬 Video' : '🖼️ Gambar'} · ${formatFileSize(item.file.size)}</div>
+            <div class="content-item-meta">${item.type === 'video' ? '🎬 Video' : '🖼️ Gambar'} · ${formatFileSize(item.file.size)}
+              ${item.collapsed && item.headline ? ` · <em style="color:var(--text);">${escHtml(item.headline)}</em>` : ''}
+            </div>
           </div>
           <div style="display:flex; gap:8px; align-items:center;">
             ${item.status === 'ready' ? '<span class="badge badge-success">✓ Siap</span>' : ''}
             ${item.status === 'generating' ? '<span class="badge badge-warning">✨ Generating...</span>' : ''}
             ${item.status === 'pending' ? '<span class="badge badge-gray">Menunggu</span>' : ''}
-            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeItem('${item.id}')">✕</button>
+            <span class="collapse-toggle">▼</span>
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="event.stopPropagation();removeItem('${item.id}')">✕</button>
           </div>
         </div>
 
@@ -451,11 +504,19 @@
                 oninput="updateField('${item.id}','primaryText',this.value)"
                 placeholder="Body copy iklan...">${escHtml(item.primaryText)}</textarea>
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="font-size:11px;">Deskripsi</label>
-              <input type="text" class="form-input" value="${escHtml(item.description)}"
-                oninput="updateField('${item.id}','description',this.value)"
-                placeholder="Deskripsi singkat..." />
+            <div class="form-row" style="margin-bottom:0;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="font-size:11px;">Deskripsi</label>
+                <input type="text" class="form-input" value="${escHtml(item.description)}"
+                  oninput="updateField('${item.id}','description',this.value)"
+                  placeholder="Deskripsi singkat..." />
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="font-size:11px;">Tombol CTA</label>
+                <select class="form-input form-select" onchange="updateField('${item.id}','cta',this.value)">
+                  ${CTA_OPTIONS.map(o => `<option value="${o.value}"${o.value === item.cta ? ' selected' : ''}>${o.label}</option>`).join('')}
+                </select>
+              </div>
             </div>
           </div>
           <div class="ad-preview-wrap">
@@ -479,12 +540,13 @@
                   <div class="fb-headline">${escHtml(item.headline) || 'Judul iklan...'}</div>
                   <div class="fb-description">${escHtml(item.description) || ''}</div>
                 </div>
-                <button class="fb-cta-btn">${selectedProduct?.cta || 'Selengkapnya'}</button>
+                <button class="fb-cta-btn" id="cta-btn-${item.id}">${ctaLabel}</button>
               </div>
             </div>
           </div>
         </div>`}
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   async function generateAllCopies() {
@@ -524,6 +586,7 @@
         item.primaryText = copy.primary_text || '';
         item.description = copy.description || '';
         item.status = 'ready';
+        item.collapsed = true; // auto-collapse setelah generate
       } catch (err) {
         item.status = 'pending';
         showToast(`Gagal generate copy untuk ${item.file.name}: ${err.message}`, 'error');
@@ -555,6 +618,19 @@
       const el = preview.querySelector('.fb-description');
       if (el) el.textContent = value || '';
     }
+    if (field === 'cta') {
+      const btn = document.getElementById(`cta-btn-${id}`);
+      const label = CTA_OPTIONS.find(o => o.value === value)?.label || value;
+      if (btn) btn.textContent = label;
+    }
+  };
+
+  window.toggleCollapse = function(id) {
+    const item = adItems.find(i => i.id === id);
+    if (!item) return;
+    item.collapsed = !item.collapsed;
+    const el = document.getElementById(`item-${id}`);
+    if (el) el.classList.toggle('collapsed', item.collapsed);
   };
 
   window.removeItem = function(id) {
@@ -602,7 +678,7 @@
         formData.append('description', item.description);
         formData.append('product_id', selectedProduct.id);
         formData.append('ad_account_id', accountId);
-        formData.append('cta', selectedProduct.cta || 'LEARN_MORE');
+        formData.append('cta', item.cta || selectedProduct.cta || 'LEARN_MORE');
         formData.append('user_id', currentProfile.id);
 
         const res = await fetch('/api/create-ad', { method: 'POST', body: formData });
