@@ -707,7 +707,7 @@
 
         const res = await fetch('/api/create-ad', { method: 'POST', body: formData });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
+        if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
 
         successCount++;
         item.status = 'published';
