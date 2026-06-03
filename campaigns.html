@@ -322,10 +322,11 @@
         <td>
           <div style="display:flex; gap:6px;">
             ${c.status === 'ACTIVE'
-              ? `<button class="btn btn-outline btn-sm" onclick="toggleStatus('${c.id}', 'PAUSED')">⏸ Pause</button>`
-              : `<button class="btn btn-success btn-sm" onclick="toggleStatus('${c.id}', 'ACTIVE')">▶ Aktifkan</button>`
+              ? `<button class="btn btn-outline btn-sm" onclick="toggleStatus('${c.id}', '${c.meta_campaign_id}', 'PAUSED')">⏸ Pause</button>`
+              : `<button class="btn btn-success btn-sm" onclick="toggleStatus('${c.id}', '${c.meta_campaign_id}', 'ACTIVE')">▶ Aktifkan</button>`
             }
             <button class="btn btn-outline btn-sm" onclick="viewDetail('${c.id}')">Detail</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteCampaign('${c.id}', '${c.meta_campaign_id}', '${c.name}')">Hapus</button>
           </div>
         </td>
       </tr>`).join('');
@@ -388,9 +389,13 @@
     const btn = document.getElementById('btn-sync');
     btn.disabled = true; btn.textContent = '🔄 Syncing...';
     try {
-      const res = await fetch('/api/meta-insights', { method: 'POST' });
-      if (!res.ok) throw new Error('Sync gagal');
-      showToast('Data berhasil disinkronkan dari Meta!', 'success');
+      // Sync performa (insights)
+      await fetch('/api/meta-insights', { method: 'POST' });
+      // Sync daftar kampanye dari Meta
+      const res = await fetch('/api/meta-campaigns?user_id=' + currentProfile.id);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Sync gagal');
+      showToast(`Sync selesai! ${data.synced || 0} kampanye diperbarui.`, 'success');
       await loadCampaigns();
     } catch (err) {
       showToast('Sync gagal: ' + err.message, 'error');
@@ -399,14 +404,40 @@
     }
   }
 
-  window.toggleStatus = async function(id, status) {
-    await sb.from('campaigns').update({ status }).eq('id', id);
-    showToast(`Kampanye ${status === 'ACTIVE' ? 'diaktifkan' : 'di-pause'}`, 'success');
-    await loadCampaigns();
+  window.toggleStatus = async function(id, metaCampaignId, status) {
+    try {
+      const res = await fetch('/api/meta-campaigns', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, meta_campaign_id: metaCampaignId, status, user_id: currentProfile.id })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal');
+      showToast(`Kampanye ${status === 'ACTIVE' ? 'diaktifkan' : 'di-pause'}`, 'success');
+      await loadCampaigns();
+    } catch (err) {
+      showToast('Gagal: ' + err.message, 'error');
+    }
+  };
+
+  window.deleteCampaign = async function(id, metaCampaignId, name) {
+    if (!confirm(`Hapus kampanye "${name}"?\n\nIni akan menghapus dari Meta Ads Manager dan Adsy Autopilot.`)) return;
+    try {
+      const res = await fetch('/api/meta-campaigns', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, meta_campaign_id: metaCampaignId, user_id: currentProfile.id })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal');
+      showToast('Kampanye berhasil dihapus', 'success');
+      await loadCampaigns();
+    } catch (err) {
+      showToast('Gagal hapus: ' + err.message, 'error');
+    }
   };
 
   window.viewDetail = function(id) {
-    // Navigate to detail or open modal
     window.location.href = `campaigns.html?id=${id}`;
   };
 
