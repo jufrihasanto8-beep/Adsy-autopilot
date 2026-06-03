@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <style>[data-admin-only]{display:none}</style>
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard — Adsy Autopilot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -227,17 +227,27 @@
       </tr>`).join('');
   }
 
-  async function loadActionLog(profile) {
-    let q = sb.from('action_logs').select('*').limit(6).order('created_at', { ascending: false });
+  let logPage = 0;
+  const LOG_LIMIT = 3;
+  let logProfile = null;
+
+  async function loadActionLog(profile, append = false) {
+    logProfile = profile;
+    let q = sb.from('action_logs').select('*')
+      .order('created_at', { ascending: false })
+      .range(logPage * LOG_LIMIT, (logPage + 1) * LOG_LIMIT - 1);
     if (profile.role !== 'admin') q = q.eq('user_id', profile.id);
     const { data } = await q;
+
     const el = document.getElementById('action-log-list');
     if (!data || data.length === 0) {
-      el.innerHTML = `<div style="text-align:center;padding:30px;color:var(--gray-5);font-size:13px;">Belum ada aksi autopilot</div>`;
+      if (!append) el.innerHTML = `<div style="text-align:center;padding:30px;color:var(--gray-5);font-size:13px;">Belum ada aksi autopilot</div>`;
+      document.getElementById('btn-load-more-log')?.remove();
       return;
     }
-    const icons = { pause:'⏸️', scale:'📈', create:'➕', duplicate:'📋', resume:'▶️' };
-    el.innerHTML = data.map(log => `
+
+    const icons = { pause:'⏸️', scale:'📈', create:'➕', duplicate:'📋', resume:'▶️', increase_budget:'📈', decrease_budget:'📉', phase_advance:'🚀' };
+    const html = data.map(log => `
       <div class="action-log-item">
         <div class="action-log-icon" style="background:var(--primary-light)">${icons[log.action_type] || '⚡'}</div>
         <div class="action-log-body">
@@ -246,8 +256,27 @@
         </div>
         <div class="action-log-time">${timeAgo(log.created_at)}</div>
       </div>`).join('');
-    if (data[0]) document.getElementById('stat-last-action').textContent = timeAgo(data[0].created_at);
+
+    if (append) {
+      document.getElementById('btn-load-more-log')?.remove();
+      el.insertAdjacentHTML('beforeend', html);
+    } else {
+      el.innerHTML = html;
+      if (data[0]) document.getElementById('stat-last-action').textContent = timeAgo(data[0].created_at);
+    }
+
+    if (data.length === LOG_LIMIT) {
+      el.insertAdjacentHTML('beforeend', `
+        <div style="text-align:center; padding:10px;">
+          <button id="btn-load-more-log" class="btn btn-outline btn-sm" onclick="loadMoreLog()">Muat Lebih</button>
+        </div>`);
+    }
   }
+
+  window.loadMoreLog = async function() {
+    logPage++;
+    await loadActionLog(logProfile, true);
+  };
 
   async function loadRecentContent(profile) {
     let q = sb.from('content_library').select('*').eq('status', 'ready').limit(6).order('created_at', { ascending: false });

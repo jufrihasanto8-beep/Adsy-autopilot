@@ -471,28 +471,54 @@
     await loadRules();
   };
 
-  async function loadLog() {
-    let q = sb.from('action_logs').select('*').limit(8).order('created_at', { ascending: false });
+  let logPage = 0;
+  const LOG_LIMIT = 3;
+
+  async function loadLog(append = false) {
+    let q = sb.from('action_logs').select('*')
+      .order('created_at', { ascending: false })
+      .range(logPage * LOG_LIMIT, (logPage + 1) * LOG_LIMIT - 1);
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
     const { data } = await q;
 
     const el = document.getElementById('ap-log');
     if (!data || data.length === 0) {
-      el.innerHTML = `<div style="text-align:center; padding:20px; color:var(--gray-5); font-size:13px;">Belum ada log</div>`;
+      if (!append) el.innerHTML = `<div style="text-align:center; padding:20px; color:var(--gray-5); font-size:13px;">Belum ada log</div>`;
+      document.getElementById('btn-load-more-log')?.remove();
       return;
     }
 
-    const icons = { pause: '⏸', scale: '📈', create: '➕', duplicate: '📋', resume: '▶️', notify: '🔔' };
-    el.innerHTML = data.map(log => `
+    const icons = { pause: '⏸', scale: '📈', create: '➕', duplicate: '📋', resume: '▶️', notify: '🔔', increase_budget: '📈', decrease_budget: '📉', phase_advance: '🚀' };
+    const html = data.map(log => `
       <div class="action-log-item">
         <div class="action-log-icon" style="background:var(--primary-light); font-size:14px;">${icons[log.action_type] || '⚡'}</div>
         <div class="action-log-body">
           <strong>${log.description || log.action_type}</strong>
-          <p>${log.campaign_name || '-'} · ${log.reason || ''}</p>
+          <p>${log.campaign_name || '-'}</p>
         </div>
         <div class="action-log-time">${timeAgo(log.created_at)}</div>
       </div>`).join('');
+
+    if (append) {
+      document.getElementById('btn-load-more-log')?.remove();
+      el.insertAdjacentHTML('beforeend', html);
+    } else {
+      el.innerHTML = html;
+    }
+
+    // Tampilkan tombol muat lebih jika data penuh
+    if (data.length === LOG_LIMIT) {
+      el.insertAdjacentHTML('beforeend', `
+        <div style="text-align:center; padding:12px;">
+          <button id="btn-load-more-log" class="btn btn-outline btn-sm" onclick="loadMoreLog()">Muat Lebih</button>
+        </div>`);
+    }
   }
+
+  window.loadMoreLog = async function() {
+    logPage++;
+    await loadLog(true);
+  };
 
   async function runAutopilot() {
     const btn = document.getElementById('btn-run-now');
