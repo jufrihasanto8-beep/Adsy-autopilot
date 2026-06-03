@@ -78,7 +78,10 @@ export default async function handler(req, res) {
               video_id: videoData.id,
               title: headline,
               message: primaryText,
-              call_to_action: { type: ctaMap(cta), value: { link: destUrl } }
+              call_to_action: {
+                type: ctaMap(cta),
+                value: { link: destUrl }
+              }
             }
           },
           access_token: token
@@ -107,6 +110,18 @@ export default async function handler(req, res) {
       if (!imageHash) throw new Error('Gagal upload gambar ke Meta');
 
       // Create image creative
+      const linkData = {
+        image_hash: imageHash,
+        link: destUrl,
+        message: primaryText,
+        name: headline,
+        call_to_action: {
+          type: ctaMap(cta),
+          value: { link: destUrl }
+        }
+      };
+      if (description) linkData.description = description;
+
       const creativeRes = await fetch(`${META_API}/${accountId}/adcreatives`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -114,16 +129,8 @@ export default async function handler(req, res) {
           name: `Creative - ${headline}`,
           object_story_spec: {
             page_id: pageId,
-            link_data: {
-              image_hash: imageHash,
-              link: destUrl,
-              message: primaryText,
-              name: headline,
-              description: description || '',
-              call_to_action: { type: ctaMap(cta) }
-            }
+            link_data: linkData
           },
-          ...(pixelId ? { pixel_id: pixelId } : {}),
           access_token: token
         })
       });
