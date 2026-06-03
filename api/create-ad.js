@@ -27,8 +27,12 @@ export default async function handler(req, res) {
     const userId       = fields.user_id?.[0];
     const objective    = fields.objective?.[0] || 'OUTCOME_TRAFFIC';
     const dailyBudget  = parseInt(fields.daily_budget?.[0] || '50000');
+    const budgetType   = fields.budget_type?.[0] || 'ABO'; // ABO = ad set budget, CBO = campaign budget
+    const bidStrategy  = fields.bid_strategy?.[0] || 'LOWEST_COST_WITHOUT_CAP';
+    const bidValue     = fields.bid_value?.[0];
     const campaignNameInput = fields.campaign_name?.[0];
     const startTime    = fields.start_time?.[0];
+    const endTime      = fields.end_time?.[0];
 
     // Reuse existing campaign/adset dari item sebelumnya (multi-file)
     const existingMetaCampaignId = fields.meta_campaign_id?.[0];
@@ -138,16 +142,27 @@ export default async function handler(req, res) {
     const finalCampaignName = campaignNameInput || `${product?.name || 'Iklan'} - ${new Date().toLocaleDateString('id-ID')}`;
 
     if (!metaCampaignId) {
+      const campPayloadMeta = {
+        name: finalCampaignName,
+        objective,
+        status: 'PAUSED',
+        special_ad_categories: [],
+        is_adset_budget_sharing_enabled: budgetType === 'CBO',
+        access_token: token
+      };
+      // CBO: budget di campaign level
+      if (budgetType === 'CBO') {
+        campPayloadMeta.daily_budget = dailyBudget;
+        campPayloadMeta.bid_strategy = bidStrategy;
+        if (bidValue && bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
+          if (bidStrategy === 'MINIMUM_ROAS') campPayloadMeta.roas_average_floor = parseFloat(bidValue) * 100;
+          else campPayloadMeta.bid_amount = parseInt(bidValue);
+        }
+      }
+
       const campRes  = await fetch(`${META_API}/${accountId}/campaigns`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: finalCampaignName,
-          objective,
-          status: 'PAUSED',
-          special_ad_categories: [],
-          is_adset_budget_sharing_enabled: false,
-          access_token: token
-        })
+        body: JSON.stringify(campPayloadMeta)
       });
       const campData = await campRes.json();
       if (campData.error) {
@@ -163,7 +178,6 @@ export default async function handler(req, res) {
       const adsetPayload = {
         name: `${finalCampaignName} - Ad Set`,
         campaign_id: metaCampaignId,
-        daily_budget: dailyBudget, // Meta IDR: langsung pakai nilai Rp
         billing_event: billingEvent,
         optimization_goal: optimizationGoal,
         targeting: {
@@ -174,7 +188,17 @@ export default async function handler(req, res) {
         status: 'PAUSED',
         access_token: token
       };
+      // ABO: budget + bid di ad set level
+      if (budgetType === 'ABO') {
+        adsetPayload.daily_budget = dailyBudget;
+        adsetPayload.bid_strategy = bidStrategy;
+        if (bidValue && bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
+          if (bidStrategy === 'MINIMUM_ROAS') adsetPayload.roas_average_floor = parseFloat(bidValue) * 100;
+          else adsetPayload.bid_amount = parseInt(bidValue);
+        }
+      }
       if (startTime) adsetPayload.start_time = startTime;
+      if (endTime) adsetPayload.end_time = endTime;
 
       const adsetRes  = await fetch(`${META_API}/${accountId}/adsets`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
