@@ -289,55 +289,62 @@
       </div>
     </div>
 
-    <!-- PUBLISH PANEL -->
+    <!-- PUBLISH PANEL (settings + sticky bar, dipisah) -->
     <div id="publish-bar" style="display:none;">
-      <!-- Pengaturan Kampanye -->
-      <div style="background:var(--gray-1); border-top:1px solid var(--gray-3); padding:20px 32px;">
-        <div style="font-size:12px; font-weight:700; color:var(--text-sub); letter-spacing:.5px; margin-bottom:14px;">⚙️ PENGATURAN KAMPANYE</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-          <div>
-            <label style="font-size:12px; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">Nama Kampanye</label>
-            <input type="text" class="form-input" id="pub-campaign-name" placeholder="Otomatis dari nama produk jika kosong" />
-          </div>
-          <div>
-            <label style="font-size:12px; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">Tujuan Kampanye</label>
-            <select class="form-input form-select" id="pub-objective">
-              <option value="OUTCOME_TRAFFIC">Traffic — Kunjungan ke website</option>
-              <option value="OUTCOME_LEADS">Leads — Formulir / DM</option>
-              <option value="OUTCOME_SALES">Sales — Konversi pembelian</option>
-              <option value="OUTCOME_ENGAGEMENT">Engagement — Like, komentar</option>
-              <option value="OUTCOME_AWARENESS">Awareness — Jangkauan luas</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:12px; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">Budget Harian</label>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:13px; font-weight:600; color:var(--text);">Rp</span>
-              <input type="number" class="form-input" id="pub-budget" placeholder="Misal: 50000" min="10000" step="5000" style="flex:1;" />
+      <!-- Section 4: Pengaturan Kampanye -->
+      <div style="padding:0 32px 24px;">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">4. Pengaturan Kampanye</div>
+              <div class="card-sub">Budget, tujuan, dan jadwal iklan</div>
             </div>
           </div>
-          <div>
-            <label style="font-size:12px; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">Mulai Tayang <span style="font-weight:400;">(opsional, default sekarang)</span></label>
-            <input type="datetime-local" class="form-input" id="pub-start" />
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Nama Kampanye</label>
+              <input type="text" class="form-input" id="pub-campaign-name" placeholder="Otomatis dari nama produk jika kosong" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Tujuan Kampanye</label>
+              <select class="form-input form-select" id="pub-objective">
+                <option value="OUTCOME_TRAFFIC">Traffic — Kunjungan ke website/WA</option>
+                <option value="OUTCOME_LEADS">Leads — Form / DM</option>
+                <option value="OUTCOME_SALES">Sales — Konversi pembelian</option>
+                <option value="OUTCOME_ENGAGEMENT">Engagement — Like, komentar</option>
+                <option value="OUTCOME_AWARENESS">Awareness — Jangkauan luas</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Budget Harian</label>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:13px; font-weight:600;">Rp</span>
+                <input type="number" class="form-input" id="pub-budget" placeholder="Misal: 50000" min="10000" step="5000" />
+              </div>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Mulai Tayang <span style="font-weight:400; color:var(--text-sub);">(opsional)</span></label>
+              <input type="datetime-local" class="form-input" id="pub-start" />
+            </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Publish Bar -->
-      <div class="publish-bar" style="position:sticky; bottom:0; background:white; border-top:1px solid var(--gray-3); padding:14px 32px; display:flex; align-items:center; justify-content:space-between;">
-        <div>
-          <strong id="publish-count" style="font-size:14px;">0 iklan siap dipublish</strong>
-          <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">1 kampanye · semua konten masuk dalam 1 ad set</div>
-        </div>
-        <div style="display:flex; gap:10px; align-items:center;">
-          <select class="form-input form-select" id="pub-account" style="width:200px;">
-            <option value="">Pilih Ad Account</option>
-          </select>
-          <select class="form-input form-select" id="pub-url" style="width:170px;">
-            <option value="">Pilih URL Tujuan</option>
-          </select>
-          <button class="btn btn-dark" id="btn-publish">🚀 Publish ke Meta</button>
-        </div>
+    <!-- STICKY PUBLISH BAR (selalu di bawah) -->
+    <div class="publish-bar" id="sticky-publish-bar" style="display:none;">
+      <div class="publish-info">
+        <strong id="publish-count">0 iklan siap dipublish</strong>
+        1 kampanye · semua konten dalam 1 ad set
+      </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <select class="form-input form-select" id="pub-account" style="width:200px;">
+          <option value="">Pilih Ad Account</option>
+        </select>
+        <select class="form-input form-select" id="pub-url" style="width:170px;">
+          <option value="">Pilih URL Tujuan</option>
+        </select>
+        <button class="btn btn-dark" id="btn-publish">🚀 Publish ke Meta</button>
       </div>
     </div>
   </main>
@@ -699,14 +706,11 @@
   };
 
   function updatePublishBar() {
-    const bar = document.getElementById('publish-bar');
     const readyCount = adItems.filter(i => i.status === 'ready').length;
-    if (readyCount > 0) {
-      bar.style.display = '';
-      document.getElementById('publish-count').textContent = `${readyCount} iklan siap dipublish`;
-    } else {
-      bar.style.display = 'none';
-    }
+    const show = readyCount > 0;
+    document.getElementById('publish-bar').style.display = show ? '' : 'none';
+    document.getElementById('sticky-publish-bar').style.display = show ? '' : 'none';
+    if (show) document.getElementById('publish-count').textContent = `${readyCount} iklan siap dipublish`;
   }
 
   async function publishAll() {
