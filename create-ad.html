@@ -297,36 +297,75 @@
           <div class="card-header">
             <div>
               <div class="card-title">4. Pengaturan Kampanye</div>
-              <div class="card-sub">Budget, tujuan, dan jadwal iklan</div>
+              <div class="card-sub">Objective, budget, bid strategy, dan jadwal</div>
             </div>
           </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+
+          <!-- Row 1: Nama + Objective -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
             <div class="form-group" style="margin:0;">
               <label class="form-label">Nama Kampanye</label>
               <input type="text" class="form-input" id="pub-campaign-name" placeholder="Otomatis dari nama produk jika kosong" />
             </div>
             <div class="form-group" style="margin:0;">
-              <label class="form-label">Tujuan Kampanye</label>
+              <label class="form-label">Tujuan Kampanye (Objective)</label>
               <select class="form-input form-select" id="pub-objective">
-                <option value="OUTCOME_TRAFFIC">Traffic — Kunjungan ke website/WA</option>
+                <option value="OUTCOME_TRAFFIC">Traffic — Kunjungan website / WA</option>
                 <option value="OUTCOME_LEADS">Leads — Form / DM</option>
                 <option value="OUTCOME_SALES">Sales — Konversi pembelian</option>
                 <option value="OUTCOME_ENGAGEMENT">Engagement — Like, komentar</option>
                 <option value="OUTCOME_AWARENESS">Awareness — Jangkauan luas</option>
               </select>
             </div>
+          </div>
+
+          <!-- Row 2: Budget Type + Budget + Bid Strategy + Bid Value -->
+          <div style="display:grid; grid-template-columns:160px 1fr 200px 1fr; gap:16px; margin-bottom:16px; align-items:end;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Tipe Budget</label>
+              <div style="display:flex; border:1.5px solid var(--gray-3); border-radius:8px; overflow:hidden;">
+                <button type="button" class="budget-type-btn active" id="btn-abo" onclick="setBudgetType('ABO')" style="flex:1; padding:8px; font-size:12px; font-weight:600; border:none; cursor:pointer; background:var(--primary); color:white;">ABO</button>
+                <button type="button" class="budget-type-btn" id="btn-cbo" onclick="setBudgetType('CBO')" style="flex:1; padding:8px; font-size:12px; font-weight:600; border:none; cursor:pointer; background:white; color:var(--text-sub);">CBO</button>
+              </div>
+              <div class="form-hint" id="budget-type-hint">Budget per Ad Set</div>
+            </div>
             <div class="form-group" style="margin:0;">
               <label class="form-label">Budget Harian</label>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:13px; font-weight:600;">Rp</span>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:13px; font-weight:600; color:var(--text);">Rp</span>
                 <input type="number" class="form-input" id="pub-budget" placeholder="Misal: 50000" min="10000" step="5000" />
               </div>
             </div>
             <div class="form-group" style="margin:0;">
-              <label class="form-label">Mulai Tayang <span style="font-weight:400; color:var(--text-sub);">(opsional)</span></label>
-              <input type="datetime-local" class="form-input" id="pub-start" />
+              <label class="form-label">Bid Strategy</label>
+              <select class="form-input form-select" id="pub-bid-strategy" onchange="onBidStrategyChange()">
+                <option value="LOWEST_COST_WITHOUT_CAP">Lowest Cost (default)</option>
+                <option value="LOWEST_COST_WITH_BID_CAP">Bid Cap</option>
+                <option value="COST_CAP">Cost Cap</option>
+                <option value="MINIMUM_ROAS">Minimum ROAS</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;" id="bid-value-wrap" style="display:none;">
+              <label class="form-label" id="bid-value-label">Nilai Bid</label>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:13px; font-weight:600; color:var(--text);" id="bid-value-prefix">Rp</span>
+                <input type="number" class="form-input" id="pub-bid-value" placeholder="0" min="0" step="1000" />
+              </div>
             </div>
           </div>
+
+          <!-- Row 3: Jadwal -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Mulai Tayang <span style="font-weight:400; color:var(--text-sub);">(opsional, default sekarang)</span></label>
+              <input type="datetime-local" class="form-input" id="pub-start" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Selesai Tayang <span style="font-weight:400; color:var(--text-sub);">(opsional)</span></label>
+              <input type="datetime-local" class="form-input" id="pub-end" />
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -723,7 +762,10 @@
     const budget = document.getElementById('pub-budget').value;
     const objective = document.getElementById('pub-objective').value;
     const startTime = document.getElementById('pub-start').value;
+    const endTime = document.getElementById('pub-end').value;
     const campaignNameInput = document.getElementById('pub-campaign-name').value.trim();
+    const bidStrategy = document.getElementById('pub-bid-strategy').value;
+    const bidValue = document.getElementById('pub-bid-value').value;
 
     if (!accDbId) return showToast('Pilih Ad Account dulu', 'warning');
     if (!urlId) return showToast('Pilih URL tujuan dulu', 'warning');
@@ -753,8 +795,12 @@
         formData.append('user_id', currentProfile.id);
         formData.append('objective', objective);
         formData.append('daily_budget', budget);
+        formData.append('budget_type', budgetType);
+        formData.append('bid_strategy', bidStrategy);
+        if (bidValue) formData.append('bid_value', bidValue);
         formData.append('campaign_name', campaignNameInput || `${selectedProduct.name} - ${new Date().toLocaleDateString('id-ID')}`);
         if (startTime) formData.append('start_time', new Date(startTime).toISOString());
+        if (endTime) formData.append('end_time', new Date(endTime).toISOString());
 
         // Reuse campaign & adset dari item pertama yang sukses
         if (metaCampaignId) formData.append('meta_campaign_id', metaCampaignId);
@@ -785,6 +831,47 @@
       setTimeout(() => window.location.href = 'campaigns.html', 2000);
     }
   }
+
+  // ── Budget type toggle ──
+  let budgetType = 'ABO';
+  window.setBudgetType = function(type) {
+    budgetType = type;
+    document.getElementById('btn-abo').style.background = type === 'ABO' ? 'var(--primary)' : 'white';
+    document.getElementById('btn-abo').style.color = type === 'ABO' ? 'white' : 'var(--text-sub)';
+    document.getElementById('btn-cbo').style.background = type === 'CBO' ? 'var(--primary)' : 'white';
+    document.getElementById('btn-cbo').style.color = type === 'CBO' ? 'white' : 'var(--text-sub)';
+    document.getElementById('budget-type-hint').textContent = type === 'CBO' ? 'Budget di level Campaign' : 'Budget per Ad Set';
+  };
+
+  // ── Bid strategy conditional input ──
+  window.onBidStrategyChange = function() {
+    const strategy = document.getElementById('pub-bid-strategy').value;
+    const wrap = document.getElementById('bid-value-wrap');
+    const label = document.getElementById('bid-value-label');
+    const prefix = document.getElementById('bid-value-prefix');
+    const input = document.getElementById('pub-bid-value');
+
+    if (strategy === 'LOWEST_COST_WITHOUT_CAP') {
+      wrap.style.display = 'none';
+    } else {
+      wrap.style.display = '';
+      if (strategy === 'LOWEST_COST_WITH_BID_CAP') {
+        label.textContent = 'Bid Cap (per klik/impresi)';
+        prefix.textContent = 'Rp'; input.placeholder = 'Misal: 500';
+      } else if (strategy === 'COST_CAP') {
+        label.textContent = 'Cost Cap (target CPR)';
+        prefix.textContent = 'Rp'; input.placeholder = 'Misal: 30000';
+      } else if (strategy === 'MINIMUM_ROAS') {
+        label.textContent = 'Minimum ROAS';
+        prefix.textContent = '×'; input.placeholder = 'Misal: 3';
+      }
+    }
+  };
+
+  // Init: hide bid value
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('bid-value-wrap').style.display = 'none';
+  });
 
   function formatFileSize(bytes) {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
