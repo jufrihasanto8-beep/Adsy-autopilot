@@ -148,15 +148,21 @@ async function saveProfile() {
     // Update profiles
     await sb.from('profiles').update({ name, avatar_url: avatarUrl }).eq('id', user.id);
 
-    // Update sidebar langsung
+    // Update semua avatar & nama di halaman langsung
     const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+    const avatarImg = avatarUrl
+      ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+      : null;
+
     document.getElementById('sidebar-user-name').textContent = name;
-    const avatarEl = document.getElementById('sidebar-avatar');
-    if (avatarUrl) {
-      avatarEl.innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
-    } else {
-      avatarEl.textContent = initials;
-    }
+    ['sidebar-avatar', 'user-avatar'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (avatarImg) el.innerHTML = avatarImg;
+      else el.textContent = initials;
+    });
+    const nameEl = document.getElementById('user-name');
+    if (nameEl) nameEl.textContent = name;
 
     showToast('Profil berhasil diperbarui!', 'success');
     document.getElementById('modal-profile').classList.add('hidden');
