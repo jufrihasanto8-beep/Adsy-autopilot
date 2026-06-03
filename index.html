@@ -252,7 +252,14 @@
         if (error) throw error;
         window.location.href = '/dashboard.html';
       } catch (err) {
-        errorEl.textContent = 'Email atau password salah. Coba lagi.';
+        const msg = err.message || '';
+        if (msg.includes('Email not confirmed')) {
+          errorEl.textContent = '📧 Email belum dikonfirmasi. Cek inbox kamu, atau hubungi admin untuk aktifasi akun.';
+        } else if (msg.includes('Invalid login credentials')) {
+          errorEl.textContent = 'Email atau password salah. Coba lagi.';
+        } else {
+          errorEl.textContent = err.message || 'Login gagal. Coba lagi.';
+        }
         errorEl.style.display = 'block';
         btn.disabled = false;
         btn.innerHTML = 'Masuk';

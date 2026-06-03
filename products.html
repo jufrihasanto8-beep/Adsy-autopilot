@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Produk — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🚀</div>
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-section-label" data-admin-only>Admin</div>
+      <div class="nav-item active" data-page="products.html" data-admin-only><span class="nav-icon">📦</span> Produk</div>
+      <div class="nav-item" data-page="settings.html" data-admin-only><span class="nav-icon">⚙️</span> Pengaturan</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>Produk</h2>
+        <p>Kelola product knowledge untuk AI generate copy iklan</p>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-primary" id="btn-add-product">+ Tambah Produk</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:16px;">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="form-input" id="search-product" placeholder="Cari produk..." />
+          </div>
+          <select class="form-input form-select" id="filter-active" style="width:auto;">
+            <option value="">Semua</option>
+            <option value="true">Aktif</option>
+            <option value="false">Nonaktif</option>
+          </select>
+        </div>
+
+        <div id="product-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:16px;">
+          <div style="grid-column:1/-1; text-align:center; padding:60px; color:var(--gray-5);">Memuat produk...</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL TAMBAH/EDIT PRODUK -->
+<div class="modal-overlay hidden" id="modal-product">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-header">
+      <h3 id="modal-product-title">Tambah Produk</h3>
+      <div class="modal-close">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nama Produk <span>*</span></label>
+          <input type="text" class="form-input" id="p-name" placeholder="Misal: Teh Noradix Atasi Kista" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tagline</label>
+          <input type="text" class="form-input" id="p-tagline" placeholder="Misal: Solusi herbal terpercaya" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Manfaat / Keunggulan <span>*</span></label>
+        <textarea class="form-input form-textarea" id="p-benefits" style="min-height:100px;"
+          placeholder="Tulis semua manfaat produk, satu per baris:&#10;- Mengatasi kista secara alami&#10;- Bahan herbal tanpa efek samping&#10;- Sudah BPOM&#10;- Bisa COD"></textarea>
+        <div class="form-hint">Ini yang akan dipakai AI untuk nulis copy iklan</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Target Audience</label>
+          <input type="text" class="form-input" id="p-audience" placeholder="Misal: Wanita 25-45, ibu rumah tangga" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tone Komunikasi</label>
+          <select class="form-input form-select" id="p-tone">
+            <option value="santai">😊 Santai & Friendly</option>
+            <option value="emosional">💝 Emosional</option>
+            <option value="hype">🔥 Hype & Urgent</option>
+            <option value="profesional">💼 Profesional</option>
+            <option value="informatif">📋 Informatif</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Harga</label>
+          <input type="text" class="form-input" id="p-price" placeholder="Misal: Rp 159.000 / botol" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">CTA Default</label>
+          <select class="form-input form-select" id="p-cta">
+            <option value="Hubungi Sekarang">Hubungi Sekarang</option>
+            <option value="Pesan Sekarang">Pesan Sekarang</option>
+            <option value="Ambil Promo">Ambil Promo</option>
+            <option value="Beli Sekarang">Beli Sekarang</option>
+            <option value="Daftar Gratis">Daftar Gratis</option>
+            <option value="Pelajari Lebih">Pelajari Lebih</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Promo / Penawaran</label>
+        <input type="text" class="form-input" id="p-promo"
+          placeholder="Misal: Gratis ongkir, Bisa COD, Diskon 30% hari ini" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Yang TIDAK boleh disebutkan di iklan</label>
+        <input type="text" class="form-input" id="p-restrictions"
+          placeholder="Misal: Jangan sebut kata 'sembuh', hindari klaim berlebihan" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Info Tambahan untuk AI</label>
+        <textarea class="form-input form-textarea" id="p-notes"
+          placeholder="Contoh kompetitor, angle yang sudah terbukti, kata-kata yang sering convert, dll..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <div class="switch-wrap">
+          <label class="switch">
+            <input type="checkbox" id="p-active" checked />
+            <span class="switch-slider"></span>
+          </label>
+          <span class="switch-label">Produk aktif (bisa dipilih saat buat iklan)</span>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-outline modal-close">Batal</button>
+        <button class="btn btn-primary" id="btn-save-product">Simpan Produk</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast, openModal, closeModal, initModals } from './js/sidebar.js';
+  import { getSupabase } from './js/supabase.js';
+
+  let sb;
+  let currentProfile = null;
+  let allProducts = [];
+  let editingId = null;
+
+  async function init() {
+    sb = await getSupabase();
+    const session = await requireAuth();
+    if (!session) return;
+    currentProfile = await renderUserInfo();
+    initSidebar();
+    initModals();
+
+    document.getElementById('btn-add-product').addEventListener('click', () => {
+      editingId = null;
+      resetForm();
+      document.getElementById('modal-product-title').textContent = 'Tambah Produk';
+      openModal('modal-product');
+    });
+
+    document.getElementById('btn-save-product').addEventListener('click', saveProduct);
+    document.getElementById('search-product').addEventListener('input', filterProducts);
+    document.getElementById('filter-active').addEventListener('change', filterProducts);
+
+    await loadProducts();
+  }
+
+  async function loadProducts() {
+    const { data, error } = await sb.from('products').select('*').order('created_at', { ascending: false });
+    if (error) { showToast('Gagal memuat produk', 'error'); return; }
+    allProducts = data || [];
+    renderProducts(allProducts);
+  }
+
+  function renderProducts(data) {
+    const grid = document.getElementById('product-grid');
+    if (!data.length) {
+      grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:60px; color:var(--gray-5);">
+        <div style="font-size:48px; margin-bottom:12px; opacity:0.4">📦</div>
+        <h3 style="font-size:16px; font-weight:600; color:var(--text); margin-bottom:6px;">Belum ada produk</h3>
+        <p>Tambahkan product knowledge untuk mulai generate copy iklan</p></div>`;
+      return;
+    }
+
+    grid.innerHTML = data.map(p => `
+      <div class="card" style="padding:20px; border:1.5px solid ${p.is_active ? 'var(--gray-3)' : 'var(--gray-2)'}; box-shadow:none; opacity:${p.is_active ? 1 : 0.6};">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px;">
+          <div>
+            <div style="font-size:15px; font-weight:700;">${p.name}</div>
+            ${p.tagline ? `<div style="font-size:12px; color:var(--text-sub); margin-top:2px;">${p.tagline}</div>` : ''}
+          </div>
+          <span class="badge ${p.is_active ? 'badge-success' : 'badge-gray'}">${p.is_active ? 'Aktif' : 'Nonaktif'}</span>
+        </div>
+
+        ${p.benefits ? `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px; font-weight:600; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Manfaat</div>
+          <div style="font-size:12px; color:var(--text); line-height:1.6; background:var(--gray-1); padding:10px 12px; border-radius:8px; white-space:pre-line;">${p.benefits.slice(0, 150)}${p.benefits.length > 150 ? '...' : ''}</div>
+        </div>` : ''}
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+          ${p.audience ? `<span class="badge badge-primary" style="font-size:10px;">👥 ${p.audience}</span>` : ''}
+          ${p.tone ? `<span class="badge badge-gray" style="font-size:10px;">${p.tone}</span>` : ''}
+          ${p.price ? `<span class="badge badge-gray" style="font-size:10px;">💰 ${p.price}</span>` : ''}
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-primary btn-sm" style="flex:1;" onclick="window.location.href='create-ad.html?product=${p.id}'">
+            ➕ Buat Iklan
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="editProduct('${p.id}')">Edit</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteProduct('${p.id}')">Hapus</button>
+        </div>
+      </div>`).join('');
+  }
+
+  function filterProducts() {
+    const search = document.getElementById('search-product').value.toLowerCase();
+    const active = document.getElementById('filter-active').value;
+    const filtered = allProducts.filter(p => {
+      const matchSearch = !search || p.name.toLowerCase().includes(search);
+      const matchActive = active === '' || String(p.is_active) === active;
+      return matchSearch && matchActive;
+    });
+    renderProducts(filtered);
+  }
+
+  function resetForm() {
+    ['p-name','p-tagline','p-benefits','p-audience','p-price','p-promo','p-restrictions','p-notes']
+      .forEach(id => document.getElementById(id).value = '');
+    document.getElementById('p-tone').value = 'santai';
+    document.getElementById('p-cta').value = 'Hubungi Sekarang';
+    document.getElementById('p-active').checked = true;
+  }
+
+  async function saveProduct() {
+    const name = document.getElementById('p-name').value.trim();
+    const benefits = document.getElementById('p-benefits').value.trim();
+    if (!name || !benefits) return showToast('Nama dan manfaat produk wajib diisi', 'warning');
+
+    const btn = document.getElementById('btn-save-product');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    const payload = {
+      name,
+      tagline: document.getElementById('p-tagline').value.trim(),
+      benefits,
+      target_audience: document.getElementById('p-audience').value.trim(),
+      tone: document.getElementById('p-tone').value,
+      price: document.getElementById('p-price').value.trim(),
+      cta: document.getElementById('p-cta').value,
+      promo: document.getElementById('p-promo').value.trim(),
+      restrictions: document.getElementById('p-restrictions').value.trim(),
+      notes: document.getElementById('p-notes').value.trim(),
+      is_active: document.getElementById('p-active').checked
+    };
+
+    let error;
+    if (editingId) {
+      ({ error } = await sb.from('products').update(payload).eq('id', editingId));
+    } else {
+      ({ error } = await sb.from('products').insert(payload));
+    }
+
+    btn.disabled = false; btn.textContent = 'Simpan Produk';
+    if (error) return showToast('Gagal simpan: ' + error.message, 'error');
+
+    showToast(editingId ? 'Produk diperbarui!' : 'Produk berhasil ditambahkan!', 'success');
+    closeModal('modal-product');
+    await loadProducts();
+  }
+
+  window.editProduct = function(id) {
+    const p = allProducts.find(x => x.id === id);
+    if (!p) return;
+    editingId = id;
+    document.getElementById('modal-product-title').textContent = 'Edit Produk';
+    document.getElementById('p-name').value = p.name || '';
+    document.getElementById('p-tagline').value = p.tagline || '';
+    document.getElementById('p-benefits').value = p.benefits || '';
+    document.getElementById('p-audience').value = p.target_audience || '';
+    document.getElementById('p-tone').value = p.tone || 'santai';
+    document.getElementById('p-price').value = p.price || '';
+    document.getElementById('p-cta').value = p.cta || 'Hubungi Sekarang';
+    document.getElementById('p-promo').value = p.promo || '';
+    document.getElementById('p-restrictions').value = p.restrictions || '';
+    document.getElementById('p-notes').value = p.notes || '';
+    document.getElementById('p-active').checked = p.is_active;
+    openModal('modal-product');
+  };
+
+  window.deleteProduct = async function(id) {
+    if (!confirm('Hapus produk ini?')) return;
+    const { error } = await sb.from('products').delete().eq('id', id);
+    if (error) return showToast('Gagal hapus: ' + error.message, 'error');
+    showToast('Produk dihapus', 'success');
+    await loadProducts();
+  };
+
+  init();
+</script>
+</body>
+</html>

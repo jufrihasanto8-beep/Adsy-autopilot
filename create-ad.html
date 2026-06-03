@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Buat Iklan — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <style>
+    .upload-zone {
+      border: 2px dashed var(--gray-4);
+      border-radius: var(--radius);
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+      background: var(--gray-1);
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+    .upload-zone .upload-icon { font-size: 40px; margin-bottom: 12px; }
+    .upload-zone h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .upload-zone p { font-size: 13px; color: var(--text-sub); }
+
+    .content-item {
+      background: white;
+      border: 1.5px solid var(--gray-3);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 16px;
+      transition: var(--transition);
+    }
+    .content-item.generating { border-color: var(--primary); }
+    .content-item.ready { border-color: var(--success); }
+
+    .content-item-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: var(--gray-1);
+      border-bottom: 1px solid var(--gray-3);
+    }
+    .content-preview {
+      width: 80px;
+      height: 60px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--gray-3);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    .content-preview img, .content-preview video {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    .content-item-info { flex: 1; min-width: 0; }
+    .content-item-name {
+      font-size: 13px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .content-item-meta { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
+
+    .content-item-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    .copy-fields { padding: 16px; border-right: 1px solid var(--gray-3); }
+    .ad-preview-wrap { padding: 16px; background: var(--gray-1); }
+
+    /* Facebook Ad Preview */
+    .fb-preview {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      max-width: 320px;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      overflow: hidden;
+    }
+    .fb-preview-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px;
+    }
+    .fb-page-avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), #7C3AED);
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 700; font-size: 14px;
+    }
+    .fb-page-name { font-size: 13px; font-weight: 700; line-height: 1.3; }
+    .fb-sponsored { font-size: 11px; color: #65676B; }
+    .fb-primary-text {
+      padding: 0 12px 12px;
+      font-size: 13px;
+      color: #1C1E21;
+      line-height: 1.5;
+      white-space: pre-line;
+      max-height: 80px;
+      overflow: hidden;
+    }
+    .fb-media {
+      width: 100%;
+      aspect-ratio: 1;
+      background: var(--gray-3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 48px;
+      overflow: hidden;
+    }
+    .fb-media img, .fb-media video { width: 100%; height: 100%; object-fit: cover; }
+    .fb-caption-bar {
+      background: #F0F2F5;
+      padding: 10px 12px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .fb-caption-text { flex: 1; }
+    .fb-headline { font-size: 13px; font-weight: 700; color: #1C1E21; }
+    .fb-description { font-size: 12px; color: #65676B; margin-top: 2px; }
+    .fb-cta-btn {
+      background: #E4E6EB;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1C1E21;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-left: 10px;
+    }
+
+    .generating-overlay {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; padding: 24px;
+      color: var(--primary); font-size: 13px; font-weight: 500;
+    }
+
+    .publish-bar {
+      position: sticky;
+      bottom: 0;
+      background: white;
+      border-top: 1px solid var(--gray-3);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 50;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+    }
+    .publish-info { font-size: 13px; color: var(--text-sub); }
+    .publish-info strong { color: var(--text); font-size: 15px; display: block; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🚀</div>
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item active" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-section-label" data-admin-only>Admin</div>
+      <div class="nav-item" data-page="products.html" data-admin-only><span class="nav-icon">📦</span> Produk</div>
+      <div class="nav-item" data-page="settings.html" data-admin-only><span class="nav-icon">⚙️</span> Pengaturan</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content" style="padding-bottom:80px;">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>Buat Iklan</h2>
+        <p>Upload konten, AI generate copy, publish ke Meta</p>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- STEP 1: PRODUK & BRIEF -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">1. Pilih Produk & Brief</div>
+            <div class="card-sub">AI akan generate copy berdasarkan product knowledge</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Produk <span>*</span></label>
+            <select class="form-input form-select" id="select-product">
+              <option value="">-- Pilih Produk --</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Tambahan / Brief Hari Ini</label>
+            <input type="text" class="form-input" id="input-brief"
+              placeholder="Misal: fokus promo lebaran, stok terbatas, dll" />
+          </div>
+        </div>
+
+        <!-- Product Knowledge Preview -->
+        <div id="product-preview" style="display:none; margin-top:16px; padding:14px; background:var(--primary-light); border-radius:var(--radius-sm); border-left:3px solid var(--primary);">
+          <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Product Knowledge</div>
+          <div id="product-preview-content" style="font-size:13px; color:var(--text); line-height:1.6;"></div>
+        </div>
+      </div>
+
+      <!-- STEP 2: UPLOAD KONTEN -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">2. Upload Konten</div>
+            <div class="card-sub">Gambar (JPG, PNG) dan video (MP4, MOV) — bisa sekaligus banyak</div>
+          </div>
+          <button class="btn btn-outline btn-sm" id="btn-add-more" style="display:none;">+ Tambah File</button>
+        </div>
+
+        <div class="upload-zone" id="upload-zone">
+          <div class="upload-icon">📁</div>
+          <h3>Drop file di sini atau klik untuk pilih</h3>
+          <p>Gambar & video bisa sekaligus · Max 200MB per file</p>
+          <input type="file" id="file-input" multiple accept="image/*,video/*" style="display:none;" />
+        </div>
+
+        <div id="content-list" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- STEP 3: GENERATE & EDIT -->
+      <div id="generate-section" style="display:none;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+          <div>
+            <h3 style="font-size:16px; font-weight:700;">3. Generate & Edit Copy</h3>
+            <p style="font-size:13px; color:var(--text-sub); margin-top:2px;">AI sudah generate copy untuk setiap konten — bisa diedit sebelum publish</p>
+          </div>
+          <button class="btn btn-outline" id="btn-regenerate-all">✨ Generate Ulang Semua</button>
+        </div>
+        <div id="ad-items-list"></div>
+      </div>
+    </div>
+
+    <!-- PUBLISH BAR -->
+    <div class="publish-bar" id="publish-bar" style="display:none;">
+      <div class="publish-info">
+        <strong id="publish-count">0 iklan siap dipublish</strong>
+        Semua akan diupload ke Meta Ads sekaligus
+      </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <select class="form-input form-select" id="pub-account" style="width:200px;">
+          <option value="">Pilih Ad Account</option>
+        </select>
+        <button class="btn btn-dark" id="btn-publish">🚀 Publish ke Meta</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast } from './js/sidebar.js';
+  import { getSupabase } from './js/supabase.js';
+
+  let sb;
+  let currentProfile = null;
+  let selectedProduct = null;
+  let adItems = []; // { file, preview, type, headline, primaryText, description, status }
+
+  async function init() {
+    sb = await getSupabase();
+    const session = await requireAuth();
+    if (!session) return;
+    currentProfile = await renderUserInfo();
+    initSidebar();
+
+    await loadProducts();
+    setupUpload();
+    setupEvents();
+
+    // Auto-select product from URL param
+    const params = new URLSearchParams(window.location.search);
+    const productId = params.get('product');
+    if (productId) {
+      document.getElementById('select-product').value = productId;
+      document.getElementById('select-product').dispatchEvent(new Event('change'));
+    }
+  }
+
+  async function loadProducts() {
+    const { data } = await sb.from('products').select('*').eq('is_active', true).order('name');
+    const sel = document.getElementById('select-product');
+    sel.innerHTML = '<option value="">-- Pilih Produk --</option>' +
+      (data || []).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+    sel.addEventListener('change', async () => {
+      if (!sel.value) { selectedProduct = null; document.getElementById('product-preview').style.display = 'none'; return; }
+      const { data: p } = await sb.from('products').select('*').eq('id', sel.value).single();
+      selectedProduct = p;
+      showProductPreview(p);
+    });
+  }
+
+  function showProductPreview(p) {
+    const preview = document.getElementById('product-preview');
+    const content = document.getElementById('product-preview-content');
+    preview.style.display = '';
+    content.innerHTML = `
+      <strong>${p.name}</strong>${p.tagline ? ` — ${p.tagline}` : ''}<br>
+      ${p.benefits ? `<span style="color:var(--text-sub);">${p.benefits.replace(/\n/g,'<br>')}</span>` : ''}
+      ${p.promo ? `<br><strong>Promo:</strong> ${p.promo}` : ''}
+      ${p.audience ? `<br><strong>Target:</strong> ${p.audience}` : ''}`;
+  }
+
+  function setupUpload() {
+    const zone = document.getElementById('upload-zone');
+    const input = document.getElementById('file-input');
+
+    zone.addEventListener('click', () => input.click());
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('dragover');
+      handleFiles([...e.dataTransfer.files]);
+    });
+    input.addEventListener('change', () => handleFiles([...input.files]));
+    document.getElementById('btn-add-more').addEventListener('click', () => input.click());
+  }
+
+  function setupEvents() {
+    document.getElementById('btn-regenerate-all').addEventListener('click', generateAllCopies);
+    document.getElementById('btn-publish').addEventListener('click', publishAll);
+    loadAdAccounts();
+  }
+
+  async function loadAdAccounts() {
+    const { data: config } = await sb.from('app_config').select('meta_token, meta_account').eq('user_id', currentProfile.id).single();
+    const sel = document.getElementById('pub-account');
+    if (config?.meta_account) {
+      sel.innerHTML = `<option value="${config.meta_account}">${config.meta_account}</option>`;
+    }
+  }
+
+  async function handleFiles(files) {
+    if (!files.length) return;
+
+    // Show upload zone as mini after first upload
+    document.getElementById('upload-zone').style.display = 'none';
+    document.getElementById('btn-add-more').style.display = '';
+
+    for (const file of files) {
+      const isVideo = file.type.startsWith('video/');
+      const previewUrl = URL.createObjectURL(file);
+      const item = {
+        id: crypto.randomUUID(),
+        file, previewUrl,
+        type: isVideo ? 'video' : 'image',
+        headline: '', primaryText: '', description: '',
+        status: 'pending' // pending | generating | ready
+      };
+      adItems.push(item);
+    }
+
+    renderAdItems();
+
+    // Auto-generate if product selected
+    if (selectedProduct) {
+      document.getElementById('generate-section').style.display = '';
+      await generateAllCopies();
+    } else {
+      document.getElementById('generate-section').style.display = '';
+      showToast('Pilih produk dulu untuk generate copy otomatis', 'warning');
+    }
+
+    updatePublishBar();
+  }
+
+  function renderAdItems() {
+    const list = document.getElementById('ad-items-list');
+    if (!adItems.length) { list.innerHTML = ''; return; }
+
+    list.innerHTML = adItems.map(item => `
+      <div class="content-item ${item.status}" id="item-${item.id}">
+        <div class="content-item-header">
+          <div class="content-preview">
+            ${item.type === 'video'
+              ? `<video src="${item.previewUrl}" style="width:100%;height:100%;object-fit:cover;"></video>`
+              : `<img src="${item.previewUrl}" alt="preview" />`}
+          </div>
+          <div class="content-item-info">
+            <div class="content-item-name">${item.file.name}</div>
+            <div class="content-item-meta">${item.type === 'video' ? '🎬 Video' : '🖼️ Gambar'} · ${formatFileSize(item.file.size)}</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            ${item.status === 'ready' ? '<span class="badge badge-success">✓ Siap</span>' : ''}
+            ${item.status === 'generating' ? '<span class="badge badge-warning">✨ Generating...</span>' : ''}
+            ${item.status === 'pending' ? '<span class="badge badge-gray">Menunggu</span>' : ''}
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeItem('${item.id}')">✕</button>
+          </div>
+        </div>
+
+        ${item.status === 'generating' ? `
+          <div class="generating-overlay">
+            <div class="loading-spinner" style="border-color:var(--gray-3);border-top-color:var(--primary);width:20px;height:20px;border-width:3px;"></div>
+            Claude AI sedang menulis copy...
+          </div>` : `
+        <div class="content-item-body">
+          <div class="copy-fields">
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px;">Judul (Headline)</label>
+              <input type="text" class="form-input" value="${escHtml(item.headline)}"
+                oninput="updateField('${item.id}','headline',this.value)"
+                placeholder="Judul iklan yang menarik..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px;">Teks Utama (Primary Text)</label>
+              <textarea class="form-input form-textarea" style="min-height:110px;"
+                oninput="updateField('${item.id}','primaryText',this.value)"
+                placeholder="Body copy iklan...">${escHtml(item.primaryText)}</textarea>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:11px;">Deskripsi</label>
+              <input type="text" class="form-input" value="${escHtml(item.description)}"
+                oninput="updateField('${item.id}','description',this.value)"
+                placeholder="Deskripsi singkat..." />
+            </div>
+          </div>
+          <div class="ad-preview-wrap">
+            <div style="font-size:11px; font-weight:600; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Preview Iklan</div>
+            <div class="fb-preview" id="preview-${item.id}">
+              <div class="fb-preview-header">
+                <div class="fb-page-avatar">A</div>
+                <div>
+                  <div class="fb-page-name">${selectedProduct?.name || 'Nama Page'}</div>
+                  <div class="fb-sponsored">Iklan · <span style="color:#1877F2;">ℹ</span></div>
+                </div>
+              </div>
+              <div class="fb-primary-text">${escHtml(item.primaryText) || '<span style="color:#aaa;">Teks utama iklan...</span>'}</div>
+              <div class="fb-media">
+                ${item.type === 'video'
+                  ? `<video src="${item.previewUrl}" style="width:100%;height:100%;object-fit:cover;" muted></video>`
+                  : `<img src="${item.previewUrl}" alt="ad" style="width:100%;height:100%;object-fit:cover;" />`}
+              </div>
+              <div class="fb-caption-bar">
+                <div class="fb-caption-text">
+                  <div class="fb-headline">${escHtml(item.headline) || 'Judul iklan...'}</div>
+                  <div class="fb-description">${escHtml(item.description) || ''}</div>
+                </div>
+                <button class="fb-cta-btn">${selectedProduct?.cta || 'Selengkapnya'}</button>
+              </div>
+            </div>
+          </div>
+        </div>`}
+      </div>`).join('');
+  }
+
+  async function generateAllCopies() {
+    if (!selectedProduct) return showToast('Pilih produk dulu', 'warning');
+
+    const pendingItems = adItems.filter(i => i.status !== 'ready');
+    if (!pendingItems.length) return showToast('Semua copy sudah di-generate', 'warning');
+
+    for (const item of pendingItems) {
+      item.status = 'generating';
+      renderAdItems();
+
+      try {
+        const res = await fetch('/api/ai-copy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            product: selectedProduct.name,
+            benefit: selectedProduct.benefits,
+            audience: selectedProduct.target_audience,
+            tone: selectedProduct.tone,
+            cta: selectedProduct.cta,
+            promo: selectedProduct.promo,
+            restrictions: selectedProduct.restrictions,
+            notes: selectedProduct.notes,
+            extra_brief: document.getElementById('input-brief').value,
+            content_type: item.type,
+            single_variant: true
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        const copy = Array.isArray(data.copies) ? data.copies[0] : data.copy;
+        item.headline = copy.headline || '';
+        item.primaryText = copy.primary_text || '';
+        item.description = copy.description || '';
+        item.status = 'ready';
+      } catch (err) {
+        item.status = 'pending';
+        showToast(`Gagal generate copy untuk ${item.file.name}: ${err.message}`, 'error');
+      }
+
+      renderAdItems();
+    }
+
+    updatePublishBar();
+    showToast('Semua copy berhasil di-generate!', 'success');
+  }
+
+  window.updateField = function(id, field, value) {
+    const item = adItems.find(i => i.id === id);
+    if (!item) return;
+    item[field] = value;
+    // Update preview live
+    const preview = document.getElementById(`preview-${id}`);
+    if (!preview) return;
+    if (field === 'primaryText') {
+      const el = preview.querySelector('.fb-primary-text');
+      if (el) el.textContent = value || 'Teks utama iklan...';
+    }
+    if (field === 'headline') {
+      const el = preview.querySelector('.fb-headline');
+      if (el) el.textContent = value || 'Judul iklan...';
+    }
+    if (field === 'description') {
+      const el = preview.querySelector('.fb-description');
+      if (el) el.textContent = value || '';
+    }
+  };
+
+  window.removeItem = function(id) {
+    adItems = adItems.filter(i => i.id !== id);
+    renderAdItems();
+    updatePublishBar();
+    if (!adItems.length) {
+      document.getElementById('upload-zone').style.display = '';
+      document.getElementById('btn-add-more').style.display = 'none';
+      document.getElementById('generate-section').style.display = 'none';
+    }
+  };
+
+  function updatePublishBar() {
+    const bar = document.getElementById('publish-bar');
+    const readyCount = adItems.filter(i => i.status === 'ready').length;
+    if (readyCount > 0) {
+      bar.style.display = '';
+      document.getElementById('publish-count').textContent = `${readyCount} iklan siap dipublish`;
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+
+  async function publishAll() {
+    const readyItems = adItems.filter(i => i.status === 'ready' && i.headline && i.primaryText);
+    if (!readyItems.length) return showToast('Belum ada iklan yang siap dipublish', 'warning');
+    if (!selectedProduct) return showToast('Pilih produk dulu', 'warning');
+
+    const accountId = document.getElementById('pub-account').value;
+    if (!accountId) return showToast('Pilih Ad Account dulu', 'warning');
+
+    const btn = document.getElementById('btn-publish');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="loading-spinner"></div> Publishing...';
+
+    let successCount = 0;
+    for (const item of readyItems) {
+      try {
+        const formData = new FormData();
+        formData.append('file', item.file);
+        formData.append('file_type', item.type);
+        formData.append('headline', item.headline);
+        formData.append('primary_text', item.primaryText);
+        formData.append('description', item.description);
+        formData.append('product_id', selectedProduct.id);
+        formData.append('ad_account_id', accountId);
+        formData.append('cta', selectedProduct.cta || 'LEARN_MORE');
+        formData.append('user_id', currentProfile.id);
+
+        const res = await fetch('/api/create-ad', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        successCount++;
+        item.status = 'published';
+      } catch (err) {
+        showToast(`Gagal publish ${item.file.name}: ${err.message}`, 'error');
+      }
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '🚀 Publish ke Meta';
+
+    if (successCount > 0) {
+      showToast(`${successCount} iklan berhasil dipublish ke Meta!`, 'success');
+      setTimeout(() => window.location.href = 'campaigns.html', 2000);
+    }
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function escHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  init();
+</script>
+</body>
+</html>

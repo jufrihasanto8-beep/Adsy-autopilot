@@ -6,11 +6,15 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { product, audience, benefit, tone, objective, cta, promo } = req.body;
+  const { product, audience, benefit, tone, objective, cta, promo,
+    restrictions, notes, extra_brief, content_type, single_variant } = req.body;
 
   if (!product || !benefit) {
     return res.status(400).json({ error: 'product dan benefit wajib diisi' });
   }
+
+  const variantCount = single_variant ? 1 : 3;
+  const mediaNote = content_type === 'video' ? 'Copy ini untuk iklan VIDEO — teks harus kuat karena video akan autoplay.' : '';
 
   const toneGuide = {
     santai: 'bahasa santai, akrab, pakai kata "kamu", informal tapi sopan',
@@ -29,21 +33,25 @@ export default async function handler(req, res) {
 
   const prompt = `Kamu adalah copywriter iklan Meta (Facebook/Instagram) terbaik di Indonesia.
 
-Buat 3 variasi copy iklan untuk:
+Buat ${variantCount} variasi copy iklan untuk:
 - Produk/Layanan: ${product}
 - Target Audience: ${audience || 'umum'}
 - Keunggulan/Benefit: ${benefit}
 - Tone: ${toneGuide[tone] || tone}
-- Tujuan Iklan: ${objectiveGuide[objective] || objective}
+- Tujuan Iklan: ${objectiveGuide[objective] || objective || 'penjualan'}
 - CTA: ${cta || 'Hubungi Sekarang'}
 ${promo ? `- Promo/Penawaran: ${promo}` : ''}
+${restrictions ? `- JANGAN sebut: ${restrictions}` : ''}
+${notes ? `- Catatan tambahan: ${notes}` : ''}
+${extra_brief ? `- Brief hari ini: ${extra_brief}` : ''}
+${mediaNote}
 
 Untuk SETIAP variasi, berikan:
 1. headline (maks 40 karakter, catchy & langsung)
-2. primary_text (150-250 karakter, engaging, ada hook di kalimat pertama)
+2. primary_text (150-300 karakter, engaging, ada hook di kalimat pertama, gunakan emoji secukupnya)
 3. description (maks 30 karakter, pendek & jelas)
 
-Buat setiap variasi dengan pendekatan berbeda (misal: benefit-focused, problem-solution, social proof/FOMO).
+${variantCount > 1 ? 'Buat setiap variasi dengan pendekatan berbeda (benefit-focused, problem-solution, social proof/FOMO).' : 'Buat 1 variasi terbaik.'}
 
 Format output JSON array:
 [
@@ -52,8 +60,7 @@ Format output JSON array:
     "primary_text": "...",
     "description": "...",
     "tone": "nama pendekatan"
-  },
-  ...
+  }
 ]
 
 PENTING: Output HANYA JSON, tanpa penjelasan tambahan.`;

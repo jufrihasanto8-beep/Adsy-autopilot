@@ -27,7 +27,37 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
--- 2. APP CONFIG (API keys per user)
+-- 2. PRODUCTS (product knowledge untuk AI)
+CREATE TABLE products (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  tagline TEXT,
+  benefits TEXT,
+  target_audience TEXT,
+  tone TEXT DEFAULT 'santai',
+  price TEXT,
+  cta TEXT DEFAULT 'Hubungi Sekarang',
+  promo TEXT,
+  restrictions TEXT,
+  notes TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS Products: semua user bisa baca, admin yang bisa ubah
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "products_select" ON products FOR SELECT USING (TRUE);
+CREATE POLICY "products_insert" ON products FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','superadmin'))
+);
+CREATE POLICY "products_update" ON products FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','superadmin'))
+);
+CREATE POLICY "products_delete" ON products FOR DELETE USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','superadmin'))
+);
+
+-- 3. APP CONFIG (API keys per user)
 CREATE TABLE app_config (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE UNIQUE,
