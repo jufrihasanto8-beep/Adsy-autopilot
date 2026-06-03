@@ -143,8 +143,9 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           name: finalCampaignName,
           objective,
-          status: 'PAUSED', // mulai paused, user aktifkan manual atau via autopilot
+          status: 'PAUSED',
           special_ad_categories: [],
+          is_adset_budget_sharing_enabled: false,
           access_token: token
         })
       });
