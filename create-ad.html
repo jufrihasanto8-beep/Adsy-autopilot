@@ -289,38 +289,54 @@
       </div>
     </div>
 
-    <!-- PUBLISH BAR -->
-    <div class="publish-bar" id="publish-bar" style="display:none; padding:16px 32px;">
-      <!-- Row 1: Campaign Settings -->
-      <div style="display:grid; grid-template-columns:1fr 160px 160px 190px; gap:10px; margin-bottom:12px;">
-        <input type="text" class="form-input" id="pub-campaign-name" placeholder="Nama kampanye (opsional)" style="height:36px; font-size:13px;" />
-        <select class="form-input form-select" id="pub-objective" style="height:36px; font-size:13px;">
-          <option value="OUTCOME_TRAFFIC">Traffic</option>
-          <option value="OUTCOME_LEADS">Leads</option>
-          <option value="OUTCOME_SALES">Sales</option>
-          <option value="OUTCOME_ENGAGEMENT">Engagement</option>
-          <option value="OUTCOME_AWARENESS">Awareness</option>
-        </select>
-        <div style="display:flex; align-items:center; gap:4px;">
-          <span style="font-size:12px; color:var(--text-sub); white-space:nowrap; font-weight:500;">Rp</span>
-          <input type="number" class="form-input" id="pub-budget" placeholder="Budget/hari" min="10000" step="5000" style="height:36px; font-size:13px; flex:1;" />
+    <!-- PUBLISH PANEL -->
+    <div id="publish-bar" style="display:none;">
+      <!-- Pengaturan Kampanye -->
+      <div style="background:var(--gray-1); border-top:1px solid var(--gray-3); padding:20px 32px;">
+        <div style="font-size:12px; font-weight:700; color:var(--text-sub); letter-spacing:.5px; margin-bottom:14px;">⚙️ PENGATURAN KAMPANYE</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div>
+            <label style="font-size:12px; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">Nama Kampanye</label>
+            <input type="text" class="form-input" id="pub-campaign-name" placeholder="Otomatis dari nama produk jika kosong" />
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">Tujuan Kampanye</label>
+            <select class="form-input form-select" id="pub-objective">
+              <option value="OUTCOME_TRAFFIC">Traffic — Kunjungan ke website</option>
+              <option value="OUTCOME_LEADS">Leads — Formulir / DM</option>
+              <option value="OUTCOME_SALES">Sales — Konversi pembelian</option>
+              <option value="OUTCOME_ENGAGEMENT">Engagement — Like, komentar</option>
+              <option value="OUTCOME_AWARENESS">Awareness — Jangkauan luas</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">Budget Harian</label>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:13px; font-weight:600; color:var(--text);">Rp</span>
+              <input type="number" class="form-input" id="pub-budget" placeholder="Misal: 50000" min="10000" step="5000" style="flex:1;" />
+            </div>
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:600; color:var(--text-sub); display:block; margin-bottom:6px;">Mulai Tayang <span style="font-weight:400;">(opsional, default sekarang)</span></label>
+            <input type="datetime-local" class="form-input" id="pub-start" />
+          </div>
         </div>
-        <input type="datetime-local" class="form-input" id="pub-start" style="height:36px; font-size:13px;" />
       </div>
-      <!-- Row 2: Info + Account + Publish -->
-      <div style="display:flex; gap:10px; align-items:center; justify-content:space-between;">
-        <div class="publish-info" style="margin:0; flex-shrink:0;">
-          <strong id="publish-count">0 iklan siap dipublish</strong>
-          <span style="color:var(--text-sub); font-size:12px;">— 1 kampanye · semua konten dalam 1 ad set</span>
+
+      <!-- Publish Bar -->
+      <div class="publish-bar" style="position:sticky; bottom:0; background:white; border-top:1px solid var(--gray-3); padding:14px 32px; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <strong id="publish-count" style="font-size:14px;">0 iklan siap dipublish</strong>
+          <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">1 kampanye · semua konten masuk dalam 1 ad set</div>
         </div>
-        <div style="display:flex; gap:10px; align-items:center; flex-shrink:0;">
-          <select class="form-input form-select" id="pub-account" style="width:200px; height:36px; font-size:13px;">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <select class="form-input form-select" id="pub-account" style="width:200px;">
             <option value="">Pilih Ad Account</option>
           </select>
-          <select class="form-input form-select" id="pub-url" style="width:170px; height:36px; font-size:13px;">
+          <select class="form-input form-select" id="pub-url" style="width:170px;">
             <option value="">Pilih URL Tujuan</option>
           </select>
-          <button class="btn btn-dark" id="btn-publish" style="height:36px; white-space:nowrap;">🚀 Publish ke Meta</button>
+          <button class="btn btn-dark" id="btn-publish">🚀 Publish ke Meta</button>
         </div>
       </div>
     </div>
