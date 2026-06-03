@@ -76,16 +76,32 @@ export default async function handler(req, res) {
         throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code}${e.error_subcode ? '/' + e.error_subcode : ''})`);
       }
 
+      // Ambil thumbnail otomatis dari Meta (wajib untuk video creative)
+      let thumbnailUrl = null;
+      try {
+        const thumbRes  = await fetch(`${META_API}/${videoData.id}?fields=thumbnails&access_token=${encodeURIComponent(token)}`);
+        const thumbData = await thumbRes.json();
+        const thumbs    = thumbData?.thumbnails?.data || [];
+        thumbnailUrl    = thumbs[0]?.uri || null;
+      } catch (e) {
+        console.warn('Gagal fetch thumbnail, lanjut tanpa thumbnail:', e.message);
+      }
+
+      const videoDataPayload = {
+        video_id: videoData.id,
+        title: headline,
+        message: primaryText,
+        call_to_action: { type: ctaMap(cta), value: { link: destUrl } }
+      };
+      if (thumbnailUrl) videoDataPayload.image_url = thumbnailUrl;
+
       const creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: `Creative - ${headline}`,
           object_story_spec: {
             page_id: pageId,
-            video_data: {
-              video_id: videoData.id, title: headline, message: primaryText,
-              call_to_action: { type: ctaMap(cta), value: { link: destUrl } }
-            }
+            video_data: videoDataPayload
           },
           access_token: token
         })
