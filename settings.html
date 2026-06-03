@@ -374,7 +374,6 @@
         ? `Berlaku ~${Math.round(data.expires_in / 86400)} hari`
         : 'Long-lived token aktif';
       showToast(`Token diperpanjang! ${expiry}`, 'success');
-      document.getElementById('token-info').style.display = 'none';
     } catch (err) {
       showToast('Error: ' + err.message, 'error');
     } finally {
