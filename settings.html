@@ -145,13 +145,15 @@
         </div>
         <div class="form-group">
           <label class="form-label">Ad Account <span>*</span></label>
-          <select class="form-input form-select" id="acc-id-select">
+          <input type="text" class="form-input" id="acc-id-search" placeholder="🔍 Cari nama akun..." style="margin-bottom:6px;" />
+          <select class="form-input form-select" id="acc-id-select" size="6" style="height:auto; padding:0;">
             <option value="">Pilih Ad Account</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Facebook Page <span>*</span></label>
-          <select class="form-input form-select" id="acc-page-select" style="margin-bottom:8px;">
+          <input type="text" class="form-input" id="acc-page-search" placeholder="🔍 Cari nama page..." style="margin-bottom:6px; display:none;" />
+          <select class="form-input form-select" id="acc-page-select" size="5" style="margin-bottom:8px; height:auto; padding:0;">
             <option value="">Pilih Page</option>
           </select>
           <input type="text" class="form-input" id="acc-page-manual" placeholder="Atau ketik Page ID manual (misal: 123456789)" style="display:none;" />
@@ -310,6 +312,8 @@
     document.getElementById('acc-error').style.display = 'none';
     document.getElementById('btn-save-account').style.display = 'none';
     document.getElementById('acc-label').value = '';
+    document.getElementById('acc-id-search').value = '';
+    document.getElementById('acc-page-search').value = '';
     openModal('modal-account');
 
     try {
@@ -365,21 +369,46 @@
 
       // Populate dropdowns
       const accSel = document.getElementById('acc-id-select');
-      accSel.innerHTML = `<option value="">Pilih Ad Account</option>` +
-        accounts.map(a => `<option value="${a.id}" data-name="${a.name}">${a.name} (${a.id})</option>`).join('');
+      const allAccountOptions = accounts.map(a => ({ id: a.id, name: a.name }));
+
+      function renderAccOptions(filter = '') {
+        const q = filter.toLowerCase();
+        const filtered = allAccountOptions.filter(a => !q || a.name.toLowerCase().includes(q) || a.id.includes(q));
+        accSel.innerHTML = filtered.length
+          ? filtered.map(a => `<option value="${a.id}">${a.name} (${a.id})</option>`).join('')
+          : `<option value="" disabled>Tidak ditemukan</option>`;
+      }
+      renderAccOptions();
+
+      document.getElementById('acc-id-search').addEventListener('input', e => renderAccOptions(e.target.value));
 
       const pageSel = document.getElementById('acc-page-select');
       const pageManual = document.getElementById('acc-page-manual');
       const pageHint = document.getElementById('acc-page-hint');
 
+      const pageSearch = document.getElementById('acc-page-search');
+
       if (pages.length) {
-        pageSel.innerHTML = `<option value="">Pilih Page</option>` +
-          pages.map(p => `<option value="${p.id}">${p.name} (${p.id})</option>`).join('') +
-          `<option value="__manual__">✏️ Masukkan ID manual...</option>`;
+        const allPageOptions = pages.map(p => ({ id: p.id, name: p.name }));
+
+        function renderPageOptions(filter = '') {
+          const q = filter.toLowerCase();
+          const filtered = allPageOptions.filter(p => !q || p.name.toLowerCase().includes(q) || p.id.includes(q));
+          pageSel.innerHTML = filtered.length
+            ? filtered.map(p => `<option value="${p.id}">${p.name} (${p.id})</option>`).join('') +
+              `<option value="__manual__">✏️ Masukkan ID manual...</option>`
+            : `<option value="" disabled>Tidak ditemukan</option>`;
+        }
+        renderPageOptions();
+
+        pageSearch.style.display = '';
         pageSel.style.display = '';
         pageManual.style.display = 'none';
         pageHint.textContent = '';
+
+        pageSearch.addEventListener('input', e => renderPageOptions(e.target.value));
       } else {
+        pageSearch.style.display = 'none';
         pageSel.style.display = 'none';
         pageManual.style.display = '';
         pageHint.innerHTML = 'Page tidak terdeteksi otomatis. Cek Page ID kamu di <a href="https://www.facebook.com/" target="_blank" style="color:var(--primary);">facebook.com</a> → About halaman → Page ID.';
@@ -505,7 +534,7 @@
     if (!pageId) return showToast('Page ID wajib diisi', 'warning');
 
     // Get account name for label hint
-    const accName = document.getElementById('acc-id-select').selectedOptions[0]?.dataset.name || '';
+    const accName = document.getElementById('acc-id-select').selectedOptions[0]?.text?.split(' (')[0] || '';
     const finalLabel = label || accName;
 
     const btn = document.getElementById('btn-save-account');
