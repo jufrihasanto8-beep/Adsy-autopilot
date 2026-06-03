@@ -49,7 +49,7 @@ export async function renderUserInfo() {
   if (sidebarAvatarEl) sidebarAvatarEl.textContent = initials;
 
   if (['admin', 'superadmin'].includes(profile.role)) {
-    document.body.classList.add('is-admin');
+    document.querySelectorAll('[data-admin-only]').forEach(el => el.style.display = '');
   }
 
   return profile;
