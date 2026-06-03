@@ -46,7 +46,13 @@ export async function renderUserInfo() {
   if (avatarEl) avatarEl.textContent = initials;
   if (sidebarNameEl) sidebarNameEl.textContent = profile.name || 'User';
   if (sidebarRoleEl) sidebarRoleEl.textContent = profile.role === 'admin' ? 'Admin' : 'Advertiser';
-  if (sidebarAvatarEl) sidebarAvatarEl.textContent = initials;
+  if (sidebarAvatarEl) {
+    if (profile.avatar_url) {
+      sidebarAvatarEl.innerHTML = `<img src="${profile.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+    } else {
+      sidebarAvatarEl.textContent = initials;
+    }
+  }
 
   if (['admin', 'superadmin'].includes(profile.role)) {
     document.querySelectorAll('[data-admin-only]').forEach(el => el.style.display = '');
