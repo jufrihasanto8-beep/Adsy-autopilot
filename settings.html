@@ -151,9 +151,11 @@
         </div>
         <div class="form-group">
           <label class="form-label">Facebook Page <span>*</span></label>
-          <select class="form-input form-select" id="acc-page-select">
+          <select class="form-input form-select" id="acc-page-select" style="margin-bottom:8px;">
             <option value="">Pilih Page</option>
           </select>
+          <input type="text" class="form-input" id="acc-page-manual" placeholder="Atau ketik Page ID manual (misal: 123456789)" style="display:none;" />
+          <div class="form-hint" id="acc-page-hint"></div>
         </div>
         <div class="form-group">
           <label class="form-label">Pixel</label>
@@ -311,21 +313,55 @@
     openModal('modal-account');
 
     try {
-      // Fetch ad accounts
-      const [accRes, pageRes] = await Promise.all([
-        fetch(`${META}/me/adaccounts?fields=id,name,account_id&limit=50&access_token=${token}`),
-        fetch(`${META}/me/accounts?fields=id,name&limit=50&access_token=${token}`)
+      // Fetch pages & check token permissions
+      const [pageRes, permRes] = await Promise.all([
+        fetch(`${META}/me/accounts?fields=id,name&limit=50&access_token=${token}`),
+        fetch(`${META}/me/permissions?access_token=${token}`)
       ]);
-      const accData = await accRes.json();
       const pageData = await pageRes.json();
+      const permData = await permRes.json();
+      if (pageData.error) throw new Error('Token tidak valid: ' + pageData.error.message);
 
-      if (accData.error) throw new Error(accData.error.message);
-      if (pageData.error) throw new Error(pageData.error.message);
+      // Check ads_read permission
+      const perms = permData.data || [];
+      const hasAdsRead = perms.some(p => p.permission === 'ads_read' && p.status === 'granted');
+      const hasAdsMgmt = perms.some(p => p.permission === 'ads_management' && p.status === 'granted');
 
-      const accounts = accData.data || [];
+      // Jalur 1: /me/adaccounts (personal accounts)
+      const accRes = await fetch(`${META}/me/adaccounts?fields=id,name&limit=100&access_token=${token}`);
+      const accData = await accRes.json();
+      let accounts = accData.data || [];
+
+      // Jalur 2: /me/businesses → owned/client ad accounts (Business Manager)
+      if (!accounts.length) {
+        const bizRes = await fetch(`${META}/me/businesses?fields=id,name&limit=20&access_token=${token}`);
+        const bizData = await bizRes.json();
+        const businesses = bizData.data || [];
+
+        for (const biz of businesses) {
+          const [ownedRes, clientRes] = await Promise.all([
+            fetch(`${META}/${biz.id}/owned_ad_accounts?fields=id,name&limit=50&access_token=${token}`),
+            fetch(`${META}/${biz.id}/client_ad_accounts?fields=id,name&limit=50&access_token=${token}`)
+          ]);
+          const owned = (await ownedRes.json()).data || [];
+          const clients = (await clientRes.json()).data || [];
+          accounts = [...accounts, ...owned, ...clients];
+        }
+        // Deduplicate
+        accounts = [...new Map(accounts.map(a => [a.id, a])).values()];
+      }
+
+      if (!accounts.length) {
+        const missingPerms = [];
+        if (!hasAdsRead) missingPerms.push('ads_read');
+        if (!hasAdsMgmt) missingPerms.push('ads_management');
+        const hint = missingPerms.length
+          ? `\n\nToken kamu belum punya permission: ${missingPerms.join(', ')}. Tambahkan di Graph API Explorer sebelum generate token.`
+          : '\n\nPastikan token punya akses ke ad account dan sudah ditambahkan sebagai user di Business Manager.';
+        throw new Error('Tidak ada ad account ditemukan.' + hint);
+      }
+
       const pages = pageData.data || [];
-
-      if (!accounts.length) throw new Error('Tidak ada ad account yang terhubung ke token ini');
 
       // Populate dropdowns
       const accSel = document.getElementById('acc-id-select');
@@ -333,9 +369,30 @@
         accounts.map(a => `<option value="${a.id}" data-name="${a.name}">${a.name} (${a.id})</option>`).join('');
 
       const pageSel = document.getElementById('acc-page-select');
-      pageSel.innerHTML = pages.length
-        ? `<option value="">Pilih Page</option>` + pages.map(p => `<option value="${p.id}">${p.name} (${p.id})</option>`).join('')
-        : `<option value="">Tidak ada page terhubung — isi manual</option>`;
+      const pageManual = document.getElementById('acc-page-manual');
+      const pageHint = document.getElementById('acc-page-hint');
+
+      if (pages.length) {
+        pageSel.innerHTML = `<option value="">Pilih Page</option>` +
+          pages.map(p => `<option value="${p.id}">${p.name} (${p.id})</option>`).join('') +
+          `<option value="__manual__">✏️ Masukkan ID manual...</option>`;
+        pageSel.style.display = '';
+        pageManual.style.display = 'none';
+        pageHint.textContent = '';
+      } else {
+        pageSel.style.display = 'none';
+        pageManual.style.display = '';
+        pageHint.innerHTML = 'Page tidak terdeteksi otomatis. Cek Page ID kamu di <a href="https://www.facebook.com/" target="_blank" style="color:var(--primary);">facebook.com</a> → About halaman → Page ID.';
+      }
+
+      pageSel.addEventListener('change', () => {
+        if (pageSel.value === '__manual__') {
+          pageManual.style.display = '';
+          pageManual.focus();
+        } else {
+          pageManual.style.display = 'none';
+        }
+      });
 
       // Load pixels when account changes
       accSel.addEventListener('change', async () => {
@@ -362,7 +419,8 @@
       document.getElementById('acc-loading').style.display = 'none';
       const errEl = document.getElementById('acc-error');
       errEl.style.display = '';
-      errEl.textContent = '⚠ ' + err.message;
+      errEl.innerHTML = '⚠ ' + err.message.replace(/\n/g, '<br>') +
+        '<br><br><a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:#DC2626;font-weight:600;">Buka Graph API Explorer →</a> lalu centang permission <strong>ads_read</strong> dan <strong>ads_management</strong> sebelum generate token.';
     }
   }
 
@@ -437,12 +495,14 @@
   async function saveAccount() {
     const label = document.getElementById('acc-label').value.trim();
     const accountId = document.getElementById('acc-id-select').value;
-    const pageId = document.getElementById('acc-page-select').value;
+    const pageSelVal = document.getElementById('acc-page-select').value;
+    const pageManualVal = document.getElementById('acc-page-manual').value.trim();
+    const pageId = (pageSelVal === '__manual__' || pageSelVal === '') ? pageManualVal : pageSelVal;
     const pixelId = document.getElementById('acc-pixel-select').value;
 
     if (!label) return showToast('Label wajib diisi', 'warning');
     if (!accountId) return showToast('Pilih Ad Account dulu', 'warning');
-    if (!pageId) return showToast('Pilih Page dulu', 'warning');
+    if (!pageId) return showToast('Page ID wajib diisi', 'warning');
 
     // Get account name for label hint
     const accName = document.getElementById('acc-id-select').selectedOptions[0]?.dataset.name || '';
