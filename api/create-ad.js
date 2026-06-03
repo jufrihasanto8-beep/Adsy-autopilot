@@ -2,8 +2,6 @@
 import { createClient } from '@supabase/supabase-js';
 import formidable from 'formidable';
 import fs from 'fs';
-import fetch from 'node-fetch';
-import FormData from 'form-data';
 
 const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const META_API = 'https://graph.facebook.com/v18.0';
@@ -55,17 +53,15 @@ export default async function handler(req, res) {
 
     if (fileType === 'video') {
       // ── Upload Video ke Meta ──
+      const videoBuffer = fs.readFileSync(file.filepath);
+      const videoBlob = new Blob([videoBuffer], { type: file.mimetype });
       const videoForm = new FormData();
-      videoForm.append('file', fs.createReadStream(file.filepath), {
-        filename: file.originalFilename,
-        contentType: file.mimetype
-      });
+      videoForm.append('file', videoBlob, file.originalFilename);
       videoForm.append('access_token', token);
 
       const videoRes = await fetch(`${META_API}/${accountId}/advideos`, {
         method: 'POST',
-        body: videoForm,
-        headers: videoForm.getHeaders()
+        body: videoForm
       });
       const videoData = await videoRes.json();
       if (videoData.error) throw new Error(videoData.error.message);
@@ -94,17 +90,15 @@ export default async function handler(req, res) {
 
     } else {
       // ── Upload Gambar ke Meta ──
+      const imgBuffer = fs.readFileSync(file.filepath);
+      const imgBlob = new Blob([imgBuffer], { type: file.mimetype });
       const imgForm = new FormData();
-      imgForm.append('filename', fs.createReadStream(file.filepath), {
-        filename: file.originalFilename,
-        contentType: file.mimetype
-      });
+      imgForm.append('filename', imgBlob, file.originalFilename);
       imgForm.append('access_token', token);
 
       const imgRes = await fetch(`${META_API}/${accountId}/adimages`, {
         method: 'POST',
-        body: imgForm,
-        headers: imgForm.getHeaders()
+        body: imgForm
       });
       const imgData = await imgRes.json();
       if (imgData.error) throw new Error(imgData.error.message);
