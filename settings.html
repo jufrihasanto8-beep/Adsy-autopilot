@@ -66,17 +66,17 @@
         <div class="card-header">
           <div>
             <div class="card-title">🔑 Meta Access Token</div>
-            <div class="card-sub">Token ini digunakan untuk semua ad account kamu</div>
+            <div class="card-sub">Masukkan token, lalu klik "Ambil Akun" untuk load ad account kamu</div>
           </div>
           <span class="badge badge-gray" id="token-status">Belum diisi</span>
         </div>
-        <div style="display:flex; gap:12px; align-items:flex-end;">
+        <div style="display:flex; gap:10px; align-items:flex-end;">
           <div class="form-group" style="flex:1; margin-bottom:0;">
             <input type="password" class="form-input" id="meta-token" placeholder="EAAxxxxxxxx..." />
             <div class="form-hint">Long-lived user access token dari Meta Developer · <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:var(--primary);">Ambil token →</a></div>
           </div>
-          <button class="btn btn-outline btn-sm" id="btn-test-token" style="flex-shrink:0;">Test</button>
-          <button class="btn btn-primary btn-sm" id="btn-save-token" style="flex-shrink:0;">Simpan</button>
+          <button class="btn btn-primary btn-sm" id="btn-fetch-accounts" style="flex-shrink:0; white-space:nowrap;">⬇ Ambil Akun</button>
+          <button class="btn btn-outline btn-sm" id="btn-save-token" style="flex-shrink:0;">Simpan</button>
         </div>
       </div>
 
@@ -125,35 +125,51 @@
 
 <!-- MODAL ADD/EDIT AD ACCOUNT -->
 <div class="modal-overlay hidden" id="modal-account">
-  <div class="modal" style="max-width:520px;">
+  <div class="modal" style="max-width:540px;">
     <div class="modal-header">
       <h3 id="modal-account-title">Tambah Ad Account</h3>
       <div class="modal-close">✕</div>
     </div>
     <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Label / Nama Akun <span>*</span></label>
-        <input type="text" class="form-input" id="acc-label" placeholder="Misal: Akun Utama, Akun Promo Q4" />
+      <!-- Loading state -->
+      <div id="acc-loading" style="text-align:center; padding:30px; color:var(--text-sub);">
+        <div class="loading-spinner" style="margin:0 auto 12px;"></div>
+        Mengambil data dari Meta...
       </div>
-      <div class="form-group">
-        <label class="form-label">Ad Account ID <span>*</span></label>
-        <input type="text" class="form-input" id="acc-id" placeholder="act_XXXXXXXXXX" />
-        <div class="form-hint">Format: act_ diikuti angka. Cek di Meta Business Manager.</div>
-      </div>
-      <div class="form-row">
+
+      <!-- Form (hidden until loaded) -->
+      <div id="acc-form" style="display:none;">
         <div class="form-group">
-          <label class="form-label">Facebook Page ID <span>*</span></label>
-          <input type="text" class="form-input" id="acc-page" placeholder="123456789" />
+          <label class="form-label">Label <span>*</span></label>
+          <input type="text" class="form-input" id="acc-label" placeholder="Misal: Akun Utama, Akun Promo Q4" />
         </div>
         <div class="form-group">
-          <label class="form-label">Pixel ID</label>
-          <input type="text" class="form-input" id="acc-pixel" placeholder="123456789012345" />
-          <div class="form-hint">Opsional, untuk tracking konversi</div>
+          <label class="form-label">Ad Account <span>*</span></label>
+          <select class="form-input form-select" id="acc-id-select">
+            <option value="">Pilih Ad Account</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Facebook Page <span>*</span></label>
+          <select class="form-input form-select" id="acc-page-select">
+            <option value="">Pilih Page</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pixel</label>
+          <select class="form-input form-select" id="acc-pixel-select">
+            <option value="">Tidak pakai pixel / Pilih pixel</option>
+          </select>
+          <div class="form-hint">Otomatis dimuat berdasarkan ad account yang dipilih</div>
         </div>
       </div>
+
+      <!-- Error state -->
+      <div id="acc-error" style="display:none; padding:16px; background:#FEF2F2; border-radius:8px; color:#DC2626; font-size:13px; margin-bottom:16px;"></div>
+
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
         <button class="btn btn-outline modal-close">Batal</button>
-        <button class="btn btn-primary" id="btn-save-account">Simpan</button>
+        <button class="btn btn-primary" id="btn-save-account" style="display:none;">Simpan</button>
       </div>
     </div>
   </div>
@@ -262,8 +278,14 @@
     }
   }
 
+  const META = 'https://graph.facebook.com/v18.0';
+
+  async function getToken() {
+    return document.getElementById('meta-token').value.trim();
+  }
+
   async function saveToken() {
-    const token = document.getElementById('meta-token').value.trim();
+    const token = await getToken();
     if (!token) return showToast('Token tidak boleh kosong', 'warning');
     const { error } = await sb.from('app_config').upsert({ user_id: currentProfile.id, meta_token: token }, { onConflict: 'user_id' });
     if (error) return showToast('Gagal simpan: ' + error.message, 'error');
@@ -272,16 +294,75 @@
     showToast('Token disimpan!', 'success');
   }
 
-  async function testToken() {
-    const token = document.getElementById('meta-token').value.trim();
+  async function fetchAndOpenAccount() {
+    const token = await getToken();
     if (!token) return showToast('Masukkan token dulu', 'warning');
+
+    // Auto-save token
+    await saveToken();
+
+    editingAccountId = null;
+    document.getElementById('modal-account-title').textContent = 'Tambah Ad Account';
+    document.getElementById('acc-loading').style.display = '';
+    document.getElementById('acc-form').style.display = 'none';
+    document.getElementById('acc-error').style.display = 'none';
+    document.getElementById('btn-save-account').style.display = 'none';
+    document.getElementById('acc-label').value = '';
+    openModal('modal-account');
+
     try {
-      const res = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${token}`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-      showToast(`Terkoneksi sebagai: ${data.name}`, 'success');
+      // Fetch ad accounts
+      const [accRes, pageRes] = await Promise.all([
+        fetch(`${META}/me/adaccounts?fields=id,name,account_id&limit=50&access_token=${token}`),
+        fetch(`${META}/me/accounts?fields=id,name&limit=50&access_token=${token}`)
+      ]);
+      const accData = await accRes.json();
+      const pageData = await pageRes.json();
+
+      if (accData.error) throw new Error(accData.error.message);
+      if (pageData.error) throw new Error(pageData.error.message);
+
+      const accounts = accData.data || [];
+      const pages = pageData.data || [];
+
+      if (!accounts.length) throw new Error('Tidak ada ad account yang terhubung ke token ini');
+
+      // Populate dropdowns
+      const accSel = document.getElementById('acc-id-select');
+      accSel.innerHTML = `<option value="">Pilih Ad Account</option>` +
+        accounts.map(a => `<option value="${a.id}" data-name="${a.name}">${a.name} (${a.id})</option>`).join('');
+
+      const pageSel = document.getElementById('acc-page-select');
+      pageSel.innerHTML = pages.length
+        ? `<option value="">Pilih Page</option>` + pages.map(p => `<option value="${p.id}">${p.name} (${p.id})</option>`).join('')
+        : `<option value="">Tidak ada page terhubung — isi manual</option>`;
+
+      // Load pixels when account changes
+      accSel.addEventListener('change', async () => {
+        const accId = accSel.value;
+        const pixelSel = document.getElementById('acc-pixel-select');
+        if (!accId) { pixelSel.innerHTML = `<option value="">Tidak pakai pixel</option>`; return; }
+        pixelSel.innerHTML = `<option value="">Memuat pixel...</option>`;
+        try {
+          const pxRes = await fetch(`${META}/${accId}/adspixels?fields=id,name&access_token=${token}`);
+          const pxData = await pxRes.json();
+          const pixels = pxData.data || [];
+          pixelSel.innerHTML = `<option value="">Tidak pakai pixel</option>` +
+            pixels.map(px => `<option value="${px.id}">${px.name || 'Pixel'} (${px.id})</option>`).join('');
+        } catch {
+          pixelSel.innerHTML = `<option value="">Gagal muat pixel</option>`;
+        }
+      });
+
+      document.getElementById('acc-loading').style.display = 'none';
+      document.getElementById('acc-form').style.display = '';
+      document.getElementById('btn-save-account').style.display = '';
+
     } catch (err) {
-      showToast('Gagal: ' + err.message, 'error');
+      document.getElementById('acc-loading').style.display = 'none';
+      const errEl = document.getElementById('acc-error');
+      errEl.style.display = '';
+      errEl.textContent = '⚠ ' + err.message;
     }
   }
 
@@ -344,19 +425,10 @@
   }
 
   function setupEvents() {
-    document.getElementById('btn-add-account').addEventListener('click', () => {
-      editingAccountId = null;
-      document.getElementById('acc-label').value = '';
-      document.getElementById('acc-id').value = '';
-      document.getElementById('acc-page').value = '';
-      document.getElementById('acc-pixel').value = '';
-      document.getElementById('modal-account-title').textContent = 'Tambah Ad Account';
-      openModal('modal-account');
-    });
-
+    document.getElementById('btn-add-account').addEventListener('click', fetchAndOpenAccount);
+    document.getElementById('btn-fetch-accounts').addEventListener('click', fetchAndOpenAccount);
     document.getElementById('btn-save-account').addEventListener('click', saveAccount);
     document.getElementById('btn-save-token').addEventListener('click', saveToken);
-    document.getElementById('btn-test-token').addEventListener('click', testToken);
     document.getElementById('btn-save-url').addEventListener('click', saveUrl);
     document.getElementById('btn-invite-user')?.addEventListener('click', () => openModal('modal-invite'));
     document.getElementById('btn-create-user')?.addEventListener('click', createUser);
@@ -364,40 +436,41 @@
 
   async function saveAccount() {
     const label = document.getElementById('acc-label').value.trim();
-    const accountId = document.getElementById('acc-id').value.trim();
-    const pageId = document.getElementById('acc-page').value.trim();
-    const pixelId = document.getElementById('acc-pixel').value.trim();
+    const accountId = document.getElementById('acc-id-select').value;
+    const pageId = document.getElementById('acc-page-select').value;
+    const pixelId = document.getElementById('acc-pixel-select').value;
 
-    if (!label || !accountId || !pageId) return showToast('Label, Ad Account ID, dan Page ID wajib diisi', 'warning');
+    if (!label) return showToast('Label wajib diisi', 'warning');
+    if (!accountId) return showToast('Pilih Ad Account dulu', 'warning');
+    if (!pageId) return showToast('Pilih Page dulu', 'warning');
+
+    // Get account name for label hint
+    const accName = document.getElementById('acc-id-select').selectedOptions[0]?.dataset.name || '';
+    const finalLabel = label || accName;
 
     const btn = document.getElementById('btn-save-account');
     btn.disabled = true; btn.textContent = 'Menyimpan...';
 
-    const payload = { user_id: currentProfile.id, label, account_id: accountId, page_id: pageId, pixel_id: pixelId || null };
-    let error;
-    if (editingAccountId) {
-      ({ error } = await sb.from('ad_accounts').update(payload).eq('id', editingAccountId));
-    } else {
-      ({ error } = await sb.from('ad_accounts').insert(payload));
-    }
+    const payload = { user_id: currentProfile.id, label: finalLabel, account_id: accountId, page_id: pageId, pixel_id: pixelId || null };
+    const { error } = await sb.from('ad_accounts').insert(payload);
 
     btn.disabled = false; btn.textContent = 'Simpan';
     if (error) return showToast('Gagal: ' + error.message, 'error');
-    showToast(editingAccountId ? 'Ad account diperbarui!' : 'Ad account ditambahkan!', 'success');
+    showToast('Ad account ditambahkan!', 'success');
     closeModal('modal-account');
     await loadAccounts();
   }
 
-  window.editAccount = function(id) {
+  window.editAccount = async function(id) {
     const acc = allAccounts.find(a => a.id === id);
     if (!acc) return;
-    editingAccountId = id;
-    document.getElementById('acc-label').value = acc.label;
-    document.getElementById('acc-id').value = acc.account_id;
-    document.getElementById('acc-page').value = acc.page_id || '';
-    document.getElementById('acc-pixel').value = acc.pixel_id || '';
-    document.getElementById('modal-account-title').textContent = 'Edit Ad Account';
-    openModal('modal-account');
+    // For edit, just open a simple prompt for label change
+    const newLabel = prompt('Ubah label ad account:', acc.label);
+    if (!newLabel || newLabel === acc.label) return;
+    const { error } = await sb.from('ad_accounts').update({ label: newLabel }).eq('id', id);
+    if (error) return showToast('Gagal: ' + error.message, 'error');
+    showToast('Label diperbarui', 'success');
+    await loadAccounts();
   };
 
   window.deleteAccount = async function(id) {
