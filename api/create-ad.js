@@ -217,6 +217,27 @@ export default async function handler(req, res) {
 
     // ── 3. Buat Ad Set (hanya jika belum ada) ──
     if (!metaAdsetId) {
+      // Baca global settings (lokasi & penempatan dari admin)
+      const SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
+      const { data: globalCfg } = await sb.from('global_settings').select('*').eq('id', SETTINGS_ID).single();
+
+      // Bangun geo_locations berdasarkan mode
+      let geoLocations;
+      const locMode = globalCfg?.ad_location_mode || 'ID_ALL';
+      if (locMode === 'ID_JAVA') {
+        // Target Pulau Jawa + Bali via koordinat GPS (tidak butuh region key Meta)
+        geoLocations = {
+          custom_locations: [
+            { latitude: -6.5,  longitude: 107.0, radius: 280, distance_unit: 'kilometer' }, // Barat Jawa (Jakarta, Jabar, Banten)
+            { latitude: -7.8,  longitude: 112.5, radius: 280, distance_unit: 'kilometer' }  // Timur Jawa (Jatim, Yogya, Bali)
+          ]
+        };
+      } else if (locMode === 'CUSTOM' && globalCfg?.ad_custom_location_json) {
+        geoLocations = globalCfg.ad_custom_location_json;
+      } else {
+        geoLocations = { countries: ['ID'] };
+      }
+
       const { optimizationGoal, billingEvent } = objectiveConfig(objective);
       const adsetPayload = {
         name: `${finalCampaignName} - Ad Set`,
@@ -224,13 +245,51 @@ export default async function handler(req, res) {
         billing_event: billingEvent,
         optimization_goal: optimizationGoal,
         targeting: {
-          geo_locations: { countries: ['ID'] },
+          geo_locations: geoLocations,
           age_min: 21, // Meta: min 21 tahun untuk Indonesia
           age_max: 65
         },
         status: adStatus,
         access_token: token
       };
+
+      // Terapkan placement jika admin set manual
+      const plMode = globalCfg?.ad_placement_mode || 'AUTO';
+      if (plMode === 'MANUAL' && globalCfg?.ad_manual_placements?.length) {
+        const pl = globalCfg.ad_manual_placements;
+        const publisherPlatforms = [];
+        const fbPositions = [];
+        const igPositions = [];
+        const msgPositions = [];
+        const anPositions = [];
+
+        if (pl.some(p => p.startsWith('fb_'))) publisherPlatforms.push('facebook');
+        if (pl.some(p => p.startsWith('ig_'))) publisherPlatforms.push('instagram');
+        if (pl.some(p => p.startsWith('msg_'))) publisherPlatforms.push('messenger');
+        if (pl.some(p => p.startsWith('an_'))) publisherPlatforms.push('audience_network');
+
+        if (pl.includes('fb_feed'))        fbPositions.push('feed');
+        if (pl.includes('fb_story'))       fbPositions.push('story');
+        if (pl.includes('fb_reels'))       fbPositions.push('reels');
+        if (pl.includes('fb_marketplace')) fbPositions.push('marketplace');
+        if (pl.includes('fb_video_feeds')) fbPositions.push('video_feeds');
+        if (pl.includes('fb_search'))      fbPositions.push('search');
+        if (pl.includes('ig_stream'))      igPositions.push('stream');
+        if (pl.includes('ig_story'))       igPositions.push('story');
+        if (pl.includes('ig_reels'))       igPositions.push('reels');
+        if (pl.includes('ig_explore'))     igPositions.push('explore');
+        if (pl.includes('msg_home'))       msgPositions.push('messenger_home');
+        if (pl.includes('msg_story'))      msgPositions.push('story');
+        if (pl.includes('an_classic'))     anPositions.push('classic');
+        if (pl.includes('an_video'))       anPositions.push('instream_video');
+
+        adsetPayload.targeting.publisher_platforms = publisherPlatforms;
+        if (fbPositions.length)  adsetPayload.targeting.facebook_positions = fbPositions;
+        if (igPositions.length)  adsetPayload.targeting.instagram_positions = igPositions;
+        if (msgPositions.length) adsetPayload.targeting.messenger_positions = msgPositions;
+        if (anPositions.length)  adsetPayload.targeting.audience_network_positions = anPositions;
+      }
+      // Jika AUTO: tidak set publisher_platforms → Meta pakai Advantage+ Placement
       // ABO: budget + bid di ad set level
       if (budgetType === 'ABO') {
         adsetPayload.daily_budget = dailyBudget;
