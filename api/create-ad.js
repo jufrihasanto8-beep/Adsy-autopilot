@@ -225,7 +225,7 @@ export default async function handler(req, res) {
         optimization_goal: optimizationGoal,
         targeting: {
           geo_locations: { countries: ['ID'] },
-          age_min: 18,
+          age_min: 21, // Meta: min 21 tahun untuk Indonesia
           age_max: 65
         },
         status: adStatus,
