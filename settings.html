@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <style>[data-admin-only]{display:none}</style>
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pengaturan — Adsy Autopilot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -109,6 +109,107 @@
             <div style="font-size:40px; margin-bottom:12px; opacity:0.4;">📱</div>
             <p>Belum ada ad account. Klik "+ Tambah Ad Account" untuk mulai.</p>
           </div>
+        </div>
+      </div>
+
+      <!-- ADMIN SECTION: AD DEFAULTS -->
+      <div data-admin-only style="margin-top:32px;">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🌍 Default Targeting Iklan (Global)</div>
+              <div class="card-sub">Berlaku untuk semua iklan baru dari semua advertiser</div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-save-ad-defaults">Simpan Pengaturan</button>
+          </div>
+
+          <!-- LOKASI -->
+          <div style="margin-bottom:24px;">
+            <div style="font-size:13px; font-weight:700; margin-bottom:12px;">📍 Lokasi Target</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <label class="loc-option" id="loc-opt-all" style="display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border:1.5px solid var(--gray-3); border-radius:8px; cursor:pointer;">
+                <input type="radio" name="loc_mode" value="ID_ALL" style="margin-top:3px; flex-shrink:0;" />
+                <div>
+                  <div style="font-size:13px; font-weight:600;">🇮🇩 Seluruh Indonesia</div>
+                  <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">Meta target semua provinsi. Cocok kalau pengiriman kamu sudah merata.</div>
+                </div>
+              </label>
+              <label class="loc-option" id="loc-opt-java" style="display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border:1.5px solid var(--gray-3); border-radius:8px; cursor:pointer;">
+                <input type="radio" name="loc_mode" value="ID_JAVA" style="margin-top:3px; flex-shrink:0;" />
+                <div>
+                  <div style="font-size:13px; font-weight:600;">☕ Pulau Jawa + Bali</div>
+                  <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">Target via koordinat GPS — otomatis exclude Kalimantan, Sulawesi, Papua, Sumatera (kecuali Lampung). Cocok untuk kurangi retur dari daerah remote.</div>
+                </div>
+              </label>
+              <label class="loc-option" id="loc-opt-custom" style="display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border:1.5px solid var(--gray-3); border-radius:8px; cursor:pointer;">
+                <input type="radio" name="loc_mode" value="CUSTOM" style="margin-top:3px; flex-shrink:0;" />
+                <div style="flex:1;">
+                  <div style="font-size:13px; font-weight:600;">✋ Custom JSON</div>
+                  <div style="font-size:12px; color:var(--text-sub); margin-top:2px; margin-bottom:8px;">Paste geo_locations JSON langsung dari Meta API (untuk targeting spesifik).</div>
+                  <div id="custom-json-wrap" style="display:none;">
+                    <textarea class="form-input" id="custom-location-json" rows="5"
+                      style="font-family:monospace; font-size:12px; resize:vertical;"
+                      placeholder='{"countries":["ID"],"regions":[{"key":"1707"}]}'></textarea>
+                    <div style="font-size:11px; color:var(--text-sub); margin-top:4px;">
+                      Cari region key via: <code style="background:var(--gray-2); padding:1px 4px; border-radius:3px;">graph.facebook.com/search?type=adgeolocation&q=Jawa+Barat&country_code=ID</code>
+                    </div>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- PENEMPATAN -->
+          <div style="border-top:1px solid var(--gray-3); padding-top:20px;">
+            <div style="font-size:13px; font-weight:700; margin-bottom:12px;">📱 Penempatan (Placement)</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <label style="display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border:1.5px solid var(--gray-3); border-radius:8px; cursor:pointer;">
+                <input type="radio" name="placement_mode" value="AUTO" style="margin-top:3px; flex-shrink:0;" />
+                <div>
+                  <div style="font-size:13px; font-weight:600;">⚡ Advantage+ (Otomatis) — Direkomendasikan</div>
+                  <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">Meta pilihkan penempatan dengan performa terbaik secara otomatis.</div>
+                </div>
+              </label>
+              <label style="display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border:1.5px solid var(--gray-3); border-radius:8px; cursor:pointer;">
+                <input type="radio" name="placement_mode" value="MANUAL" style="margin-top:3px; flex-shrink:0;" />
+                <div>
+                  <div style="font-size:13px; font-weight:600;">✋ Manual — Pilih Platform & Posisi</div>
+                  <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">Kontrol penuh, tapi bisa batasi jangkauan Meta Delivery.</div>
+                </div>
+              </label>
+            </div>
+
+            <!-- Manual placement checkboxes -->
+            <div id="manual-placements-wrap" style="display:none; margin-top:14px; padding:14px; background:var(--gray-1); border-radius:8px;">
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;">
+                <div>
+                  <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:8px;">Facebook</div>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_feed" /> Feed</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_story" /> Stories</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_reels" /> Reels</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_marketplace" /> Marketplace</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_video_feeds" /> Video Feeds</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_search" /> Search</label>
+                </div>
+                <div>
+                  <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:8px;">Instagram</div>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="ig_stream" /> Feed</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="ig_story" /> Stories</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="ig_reels" /> Reels</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="ig_explore" /> Explore</label>
+                </div>
+                <div>
+                  <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:8px;">Messenger</div>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="msg_home" /> Inbox</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="msg_story" /> Stories</label>
+                  <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:8px; margin-top:12px;">Audience Network</div>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="an_classic" /> Classic</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="an_video" /> In-stream Video</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -272,6 +373,10 @@
 <div class="toast-container"></div>
 
 <style>
+.pl-row { display:flex; align-items:center; gap:8px; font-size:13px; padding:4px 0; cursor:pointer; }
+.pl-row input { flex-shrink:0; }
+.loc-option:has(input:checked) { border-color:var(--primary); background:var(--primary-light); }
+
 .searchable-select { position: relative; }
 .searchable-select .form-input { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
 .ss-dropdown { position: absolute; z-index: 999; left: 0; right: 0; background: #fff; border: 1.5px solid var(--gray-3); border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,0.12); margin-top: 4px; overflow: hidden; }
@@ -306,7 +411,11 @@
     setupEvents();
     await loadToken();
     await loadAccounts();
-    if (['admin','superadmin'].includes(currentProfile.role)) loadUsers();
+    if (['admin','superadmin'].includes(currentProfile.role)) {
+      loadUsers();
+      loadAdDefaults();
+      setupAdDefaultsEvents();
+    }
   }
 
   // ── TOKEN ──
@@ -738,6 +847,102 @@
     showToast('URL dihapus', 'success');
     await loadAccounts();
   };
+
+  // ── AD DEFAULTS (admin only) ──
+  async function loadAdDefaults() {
+    try {
+      const res = await fetch('/api/global-settings');
+      const data = await res.json();
+
+      // Set location mode
+      const locMode = data.ad_location_mode || 'ID_ALL';
+      const locRadio = document.querySelector(`input[name="loc_mode"][value="${locMode}"]`);
+      if (locRadio) locRadio.checked = true;
+      document.getElementById('custom-json-wrap').style.display = locMode === 'CUSTOM' ? '' : 'none';
+      if (data.ad_custom_location_json) {
+        document.getElementById('custom-location-json').value =
+          typeof data.ad_custom_location_json === 'string'
+            ? data.ad_custom_location_json
+            : JSON.stringify(data.ad_custom_location_json, null, 2);
+      }
+
+      // Set placement mode
+      const plMode = data.ad_placement_mode || 'AUTO';
+      const plRadio = document.querySelector(`input[name="placement_mode"][value="${plMode}"]`);
+      if (plRadio) plRadio.checked = true;
+      document.getElementById('manual-placements-wrap').style.display = plMode === 'MANUAL' ? '' : 'none';
+
+      // Set manual placement checkboxes
+      const savedPlacements = data.ad_manual_placements || [];
+      document.querySelectorAll('input[name="placement"]').forEach(cb => {
+        cb.checked = savedPlacements.includes(cb.value);
+      });
+    } catch (err) {
+      console.warn('Gagal load ad defaults:', err.message);
+    }
+  }
+
+  function setupAdDefaultsEvents() {
+    // Location mode toggle
+    document.querySelectorAll('input[name="loc_mode"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        document.getElementById('custom-json-wrap').style.display =
+          radio.value === 'CUSTOM' ? '' : 'none';
+      });
+    });
+
+    // Placement mode toggle
+    document.querySelectorAll('input[name="placement_mode"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        document.getElementById('manual-placements-wrap').style.display =
+          radio.value === 'MANUAL' ? '' : 'none';
+      });
+    });
+
+    // Save button
+    document.getElementById('btn-save-ad-defaults')?.addEventListener('click', saveAdDefaults);
+  }
+
+  async function saveAdDefaults() {
+    const locMode = document.querySelector('input[name="loc_mode"]:checked')?.value || 'ID_ALL';
+    const plMode  = document.querySelector('input[name="placement_mode"]:checked')?.value || 'AUTO';
+
+    let customLocationJson = null;
+    if (locMode === 'CUSTOM') {
+      const raw = document.getElementById('custom-location-json').value.trim();
+      if (raw) {
+        try { customLocationJson = JSON.parse(raw); }
+        catch { return showToast('JSON lokasi tidak valid', 'error'); }
+      }
+    }
+
+    const manualPlacements = plMode === 'MANUAL'
+      ? [...document.querySelectorAll('input[name="placement"]:checked')].map(cb => cb.value)
+      : null;
+
+    const btn = document.getElementById('btn-save-ad-defaults');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    try {
+      const res = await fetch('/api/global-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ad_location_mode: locMode,
+          ad_custom_location_json: customLocationJson,
+          ad_placement_mode: plMode,
+          ad_manual_placements: manualPlacements
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast('Pengaturan iklan disimpan!', 'success');
+    } catch (err) {
+      showToast('Gagal simpan: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Simpan Pengaturan';
+    }
+  }
 
   // ── USERS (admin only) ──
   async function loadUsers() {
