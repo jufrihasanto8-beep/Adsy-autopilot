@@ -261,18 +261,30 @@ export default async function handler(req, res) {
 
       // Bangun geo_locations dari pilihan provinsi admin
       let geoLocations;
-      const selectedProvinces = globalCfg?.ad_selected_provinces;
-      if (selectedProvinces?.length && selectedProvinces.length < 34) {
-        // Pakai custom_locations per provinsi (koordinat GPS, no Meta region key needed)
-        const customLocs = selectedProvinces
-          .filter(name => PROVINCE_COORDS[name])
-          .map(name => ({
+      const locModeCfg = globalCfg?.ad_location_mode || 'include';
+      const selectedProvinces = globalCfg?.ad_selected_provinces || [];
+
+      if (selectedProvinces.length > 0) {
+        let targetProvinces;
+        if (locModeCfg === 'exclude') {
+          // Kecualikan → include semua provinsi KECUALI yang dipilih
+          targetProvinces = Object.keys(PROVINCE_COORDS).filter(n => !selectedProvinces.includes(n));
+        } else {
+          // Include → hanya provinsi yang dipilih
+          targetProvinces = selectedProvinces.filter(n => PROVINCE_COORDS[n]);
+        }
+
+        if (targetProvinces.length > 0 && targetProvinces.length < 34) {
+          const customLocs = targetProvinces.map(name => ({
             latitude: PROVINCE_COORDS[name].lat,
             longitude: PROVINCE_COORDS[name].lng,
             radius: PROVINCE_COORDS[name].r,
             distance_unit: 'kilometer'
           }));
-        geoLocations = customLocs.length ? { custom_locations: customLocs } : { countries: ['ID'] };
+          geoLocations = { custom_locations: customLocs };
+        } else {
+          geoLocations = { countries: ['ID'] };
+        }
       } else {
         geoLocations = { countries: ['ID'] };
       }
