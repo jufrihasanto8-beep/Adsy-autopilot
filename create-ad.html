@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <style>[data-admin-only]{display:none}</style>
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Buat Iklan — Adsy Autopilot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -789,6 +789,22 @@
     btn.disabled = true;
     btn.innerHTML = '<div class="loading-spinner"></div> Publishing...';
 
+    // Pre-fetch Meta token & account ID sekali — dipakai untuk direct video upload
+    let metaToken = null;
+    let metaAccountId = null;
+    const hasVideoItems = readyItems.some(i => i.type === 'video');
+    if (hasVideoItems) {
+      const { data: cfg } = await sb.from('app_config').select('meta_token').eq('user_id', currentProfile.id).single();
+      metaToken = cfg?.meta_token;
+      if (!metaToken) {
+        btn.disabled = false;
+        btn.innerHTML = '🚀 Publish ke Meta';
+        return showToast('Meta token belum dikonfigurasi — isi di Pengaturan', 'error');
+      }
+      const acc = userAdAccounts.find(a => a.id === accDbId);
+      metaAccountId = acc?.account_id;
+    }
+
     let successCount = 0;
     let metaCampaignId = null;
     let metaAdsetId = null;
@@ -797,8 +813,29 @@
     for (const item of readyItems) {
       try {
         const formData = new FormData();
-        formData.append('file', item.file);
-        formData.append('file_type', item.type);
+
+        // Video: upload langsung dari browser ke Meta (bypass Vercel 4.5MB limit)
+        if (item.type === 'video') {
+          btn.innerHTML = `<div class="loading-spinner"></div> Upload video ke Meta...`;
+          const videoForm = new FormData();
+          videoForm.append('file', item.file, item.file.name);
+          const videoRes = await fetch(
+            `https://graph.facebook.com/v18.0/${metaAccountId}/advideos?access_token=${encodeURIComponent(metaToken)}`,
+            { method: 'POST', body: videoForm }
+          );
+          const videoData = await videoRes.json();
+          if (videoData.error) {
+            const e = videoData.error;
+            throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code})`);
+          }
+          formData.append('video_id', videoData.id);
+          formData.append('file_type', 'video');
+          btn.innerHTML = `<div class="loading-spinner"></div> Publishing...`;
+        } else {
+          formData.append('file', item.file);
+          formData.append('file_type', item.type);
+        }
+
         formData.append('headline', item.headline);
         formData.append('primary_text', item.primaryText);
         formData.append('description', item.description || '');
