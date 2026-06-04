@@ -23,11 +23,10 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { ad_location_mode, ad_custom_location_json, ad_placement_mode, ad_manual_placements } = req.body;
+    const { ad_selected_provinces, ad_placement_mode, ad_manual_placements } = req.body;
     const { error } = await sb.from('global_settings').upsert({
       id: SETTINGS_ID,
-      ad_location_mode,
-      ad_custom_location_json,
+      ad_selected_provinces,
       ad_placement_mode,
       ad_manual_placements,
       updated_at: new Date().toISOString()

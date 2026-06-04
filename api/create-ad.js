@@ -221,19 +221,58 @@ export default async function handler(req, res) {
       const SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
       const { data: globalCfg } = await sb.from('global_settings').select('*').eq('id', SETTINGS_ID).single();
 
-      // Bangun geo_locations berdasarkan mode
+      // Koordinat per provinsi (same as settings.html)
+      const PROVINCE_COORDS = {
+        'DKI Jakarta':        { lat: -6.21,  lng: 106.85, r: 60  },
+        'Jawa Barat':         { lat: -6.92,  lng: 107.61, r: 250 },
+        'Banten':             { lat: -6.40,  lng: 106.10, r: 120 },
+        'Jawa Tengah':        { lat: -7.15,  lng: 110.40, r: 220 },
+        'DI Yogyakarta':      { lat: -7.80,  lng: 110.37, r: 60  },
+        'Jawa Timur':         { lat: -7.54,  lng: 112.24, r: 280 },
+        'Bali':               { lat: -8.41,  lng: 115.19, r: 100 },
+        'Aceh':               { lat:  4.69,  lng:  96.75, r: 320 },
+        'Sumatera Utara':     { lat:  2.12,  lng:  99.54, r: 300 },
+        'Sumatera Barat':     { lat: -0.74,  lng: 100.37, r: 220 },
+        'Riau':               { lat:  0.29,  lng: 101.70, r: 300 },
+        'Kepulauan Riau':     { lat:  3.92,  lng: 108.14, r: 300 },
+        'Jambi':              { lat: -1.61,  lng: 103.62, r: 220 },
+        'Sumatera Selatan':   { lat: -3.31,  lng: 104.06, r: 260 },
+        'Bangka Belitung':    { lat: -2.74,  lng: 106.44, r: 160 },
+        'Bengkulu':           { lat: -3.79,  lng: 102.26, r: 180 },
+        'Lampung':            { lat: -4.56,  lng: 105.41, r: 200 },
+        'Kalimantan Barat':   { lat:  0.13,  lng: 109.34, r: 430 },
+        'Kalimantan Tengah':  { lat: -1.68,  lng: 113.92, r: 430 },
+        'Kalimantan Selatan': { lat: -2.78,  lng: 115.53, r: 250 },
+        'Kalimantan Timur':   { lat:  0.54,  lng: 116.43, r: 370 },
+        'Kalimantan Utara':   { lat:  3.07,  lng: 116.04, r: 300 },
+        'Sulawesi Utara':     { lat:  0.62,  lng: 124.10, r: 220 },
+        'Gorontalo':          { lat:  0.70,  lng: 122.45, r: 120 },
+        'Sulawesi Tengah':    { lat: -1.43,  lng: 121.45, r: 350 },
+        'Sulawesi Barat':     { lat: -2.84,  lng: 119.25, r: 160 },
+        'Sulawesi Selatan':   { lat: -3.66,  lng: 119.97, r: 280 },
+        'Sulawesi Tenggara':  { lat: -4.14,  lng: 122.17, r: 220 },
+        'NTB':                { lat: -8.65,  lng: 117.36, r: 160 },
+        'NTT':                { lat: -8.66,  lng: 121.08, r: 350 },
+        'Maluku':             { lat: -3.24,  lng: 130.14, r: 350 },
+        'Maluku Utara':       { lat:  1.57,  lng: 127.81, r: 280 },
+        'Papua Barat':        { lat: -1.34,  lng: 132.52, r: 380 },
+        'Papua':              { lat: -4.27,  lng: 138.08, r: 550 },
+      };
+
+      // Bangun geo_locations dari pilihan provinsi admin
       let geoLocations;
-      const locMode = globalCfg?.ad_location_mode || 'ID_ALL';
-      if (locMode === 'ID_JAVA') {
-        // Target Pulau Jawa + Bali via koordinat GPS (tidak butuh region key Meta)
-        geoLocations = {
-          custom_locations: [
-            { latitude: -6.5,  longitude: 107.0, radius: 280, distance_unit: 'kilometer' }, // Barat Jawa (Jakarta, Jabar, Banten)
-            { latitude: -7.8,  longitude: 112.5, radius: 280, distance_unit: 'kilometer' }  // Timur Jawa (Jatim, Yogya, Bali)
-          ]
-        };
-      } else if (locMode === 'CUSTOM' && globalCfg?.ad_custom_location_json) {
-        geoLocations = globalCfg.ad_custom_location_json;
+      const selectedProvinces = globalCfg?.ad_selected_provinces;
+      if (selectedProvinces?.length && selectedProvinces.length < 34) {
+        // Pakai custom_locations per provinsi (koordinat GPS, no Meta region key needed)
+        const customLocs = selectedProvinces
+          .filter(name => PROVINCE_COORDS[name])
+          .map(name => ({
+            latitude: PROVINCE_COORDS[name].lat,
+            longitude: PROVINCE_COORDS[name].lng,
+            radius: PROVINCE_COORDS[name].r,
+            distance_unit: 'kilometer'
+          }));
+        geoLocations = customLocs.length ? { custom_locations: customLocs } : { countries: ['ID'] };
       } else {
         geoLocations = { countries: ['ID'] };
       }
