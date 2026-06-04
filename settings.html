@@ -65,13 +65,17 @@
 
       <!-- META TOKEN -->
       <div class="card" style="margin-bottom:20px;">
-        <div class="card-header">
+        <div class="card-header" id="token-card-header" onclick="toggleTokenCard()" style="cursor:pointer; user-select:none;">
           <div>
             <div class="card-title">🔑 Meta Access Token</div>
-            <div class="card-sub">Masukkan token, lalu klik "Ambil Akun" untuk load ad account kamu</div>
+            <div class="card-sub" id="token-card-sub">Masukkan token, lalu klik "Ambil Akun" untuk load ad account kamu</div>
           </div>
-          <span class="badge badge-gray" id="token-status">Belum diisi</span>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="badge badge-gray" id="token-status">Belum diisi</span>
+            <span id="token-card-chevron" style="font-size:12px; color:var(--gray-5); transition:transform 0.2s;">▲</span>
+          </div>
         </div>
+        <div id="token-card-body">
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">App ID <span>*</span></label>
@@ -101,6 +105,7 @@
           <button class="btn btn-outline btn-sm" id="btn-save-token" style="flex-shrink:0;">Simpan</button>
           <button class="btn btn-outline btn-sm" id="btn-extend-token" style="flex-shrink:0; white-space:nowrap; border-color:#F59E0B; color:#F59E0B;">⏳ Perpanjang (60 hari)</button>
         </div>
+        </div><!-- end token-card-body -->
       </div>
 
       <!-- AD ACCOUNTS LIST -->
@@ -401,6 +406,14 @@
   let activeUrlAccountId = null;
   let allAccounts = [];
 
+  window.toggleTokenCard = function() {
+    const body = document.getElementById('token-card-body');
+    const chevron = document.getElementById('token-card-chevron');
+    const isHidden = body.style.display === 'none';
+    body.style.display = isHidden ? '' : 'none';
+    chevron.style.transform = isHidden ? '' : 'rotate(180deg)';
+  };
+
   async function init() {
     sb = await getSupabase();
     const session = await requireAuth();
@@ -427,6 +440,9 @@
       document.getElementById('meta-token').value = data.meta_token;
       document.getElementById('token-status').textContent = 'Tersimpan';
       document.getElementById('token-status').className = 'badge badge-success';
+      // Auto-collapse kalau token sudah ada
+      document.getElementById('token-card-body').style.display = 'none';
+      document.getElementById('token-card-chevron').style.transform = 'rotate(180deg)';
     }
     if (data?.meta_app_id) document.getElementById('meta-app-id').value = data.meta_app_id;
     if (data?.meta_app_secret) document.getElementById('meta-app-secret').value = data.meta_app_secret;
