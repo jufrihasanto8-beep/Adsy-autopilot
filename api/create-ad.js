@@ -40,8 +40,13 @@ export default async function handler(req, res) {
     const existingMetaAdsetId    = fields.meta_adset_id?.[0];
     const existingSbCampaignId   = fields.sb_campaign_id?.[0];
 
-    if (!file || !headline || !primaryText) {
-      return res.status(400).json({ error: 'File, headline, dan primary text wajib ada' });
+    const preUploadedVideoId = fields.video_id?.[0]; // Video sudah diupload dari browser langsung ke Meta
+
+    if (!file && !preUploadedVideoId) {
+      return res.status(400).json({ error: 'File atau video_id wajib ada' });
+    }
+    if (!headline || !primaryText) {
+      return res.status(400).json({ error: 'Headline dan primary text wajib ada' });
     }
 
     // Get account config
@@ -64,21 +69,30 @@ export default async function handler(req, res) {
     let creativeId;
 
     if (fileType === 'video') {
-      const videoBuffer = fs.readFileSync(file.filepath);
-      const videoBlob   = new Blob([videoBuffer], { type: file.mimetype });
-      const videoForm   = new FormData();
-      videoForm.append('file', videoBlob, file.originalFilename);
+      let metaVideoId;
 
-      const videoRes  = await fetch(`${META_API}/${accountId}/advideos?access_token=${encodeURIComponent(token)}`, { method: 'POST', body: videoForm });
-      const videoData = await videoRes.json();
-      if (videoData.error) {
-        const e = videoData.error;
-        throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code}${e.error_subcode ? '/' + e.error_subcode : ''})`);
+      if (preUploadedVideoId) {
+        // Video sudah diupload langsung dari browser ke Meta — skip upload
+        metaVideoId = preUploadedVideoId;
+      } else {
+        // Upload melalui server (fallback untuk file kecil)
+        const videoBuffer = fs.readFileSync(file.filepath);
+        const videoBlob   = new Blob([videoBuffer], { type: file.mimetype });
+        const videoForm   = new FormData();
+        videoForm.append('file', videoBlob, file.originalFilename);
+
+        const videoRes  = await fetch(`${META_API}/${accountId}/advideos?access_token=${encodeURIComponent(token)}`, { method: 'POST', body: videoForm });
+        const videoData = await videoRes.json();
+        if (videoData.error) {
+          const e = videoData.error;
+          throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code}${e.error_subcode ? '/' + e.error_subcode : ''})`);
+        }
+        metaVideoId = videoData.id;
       }
 
       // Deklarasi payload dulu
       const videoDataPayload = {
-        video_id: videoData.id,
+        video_id: metaVideoId,
         title: headline,
         message: primaryText,
         call_to_action: { type: ctaMap(cta), value: { link: destUrl } }
@@ -315,7 +329,7 @@ export default async function handler(req, res) {
       });
     } catch (e) { console.error('action_logs insert failed (non-fatal):', e.message); }
 
-    fs.unlink(file.filepath, () => {});
+    if (file?.filepath) fs.unlink(file.filepath, () => {});
 
     return res.status(200).json({
       success: true,
