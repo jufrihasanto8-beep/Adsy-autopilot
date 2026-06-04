@@ -411,7 +411,9 @@
     setupEvents();
     await loadToken();
     await loadAccounts();
-    if (['admin','superadmin'].includes(currentProfile.role)) {
+    if (['admin','superadmin'].includes(currentProfile?.role)) {
+      // Paksa tampilkan semua elemen admin-only di halaman ini
+      document.querySelectorAll('[data-admin-only]').forEach(el => el.style.display = 'block');
       loadUsers();
       loadAdDefaults();
       setupAdDefaultsEvents();
