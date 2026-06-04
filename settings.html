@@ -109,19 +109,14 @@
       </div>
 
       <!-- AD ACCOUNTS LIST -->
-      <div>
+      <div id="accounts-section" style="display:none;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
           <div>
             <h3 style="font-size:15px; font-weight:700;">Ad Accounts</h3>
             <p style="font-size:13px; color:var(--text-sub); margin-top:2px;">Tiap account punya Page, Pixel, dan URL tujuan sendiri</p>
           </div>
         </div>
-        <div id="accounts-list">
-          <div style="text-align:center; padding:60px; color:var(--gray-5);">
-            <div style="font-size:40px; margin-bottom:12px; opacity:0.4;">📱</div>
-            <p>Belum ada ad account. Klik "+ Tambah Ad Account" untuk mulai.</p>
-          </div>
-        </div>
+        <div id="accounts-list"></div>
       </div>
 
       <!-- ADMIN SECTION: AD DEFAULTS -->
@@ -701,12 +696,12 @@
 
   function renderAccounts() {
     const el = document.getElementById('accounts-list');
+    const section = document.getElementById('accounts-section');
     if (!allAccounts.length) {
-      el.innerHTML = `<div style="text-align:center; padding:60px; color:var(--gray-5);">
-        <div style="font-size:40px; margin-bottom:12px; opacity:0.4;">📱</div>
-        <p>Belum ada ad account. Klik "+ Tambah Ad Account" untuk mulai.</p></div>`;
+      section.style.display = 'none';
       return;
     }
+    section.style.display = '';
 
     el.innerHTML = allAccounts.map(acc => {
       const urls = acc.ad_urls || [];
