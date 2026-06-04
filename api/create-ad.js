@@ -103,7 +103,7 @@ export default async function handler(req, res) {
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           if (attempt > 0) await new Promise(r => setTimeout(r, 3000));
-          const thumbRes  = await fetch(`${META_API}/${videoData.id}?fields=thumbnails&access_token=${encodeURIComponent(token)}`);
+          const thumbRes  = await fetch(`${META_API}/${metaVideoId}?fields=thumbnails&access_token=${encodeURIComponent(token)}`);
           const thumbData = await thumbRes.json();
           const thumbs    = thumbData?.thumbnails?.data || [];
           const midIdx    = Math.floor(thumbs.length / 2);
@@ -114,22 +114,10 @@ export default async function handler(req, res) {
         }
       }
 
+      // Kalau thumbnail tersedia, set. Kalau tidak, biarkan Meta auto-generate dari video.
+      // (jangan upload 1x1 pixel — Meta render itu jadi thumbnail kuning/blank)
       if (thumbnailUrl) {
         videoDataPayload.image_url = thumbnailUrl;
-      } else {
-        // Fallback: upload dummy image 1x1 sebagai thumbnail
-        try {
-          const pixel     = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI6QAAAABJRU5ErkJggg==', 'base64');
-          const pixelBlob = new Blob([pixel], { type: 'image/png' });
-          const pixelForm = new FormData();
-          pixelForm.append('thumb.png', pixelBlob, 'thumb.png');
-          const pxRes   = await fetch(`${META_API}/${accountId}/adimages?access_token=${encodeURIComponent(token)}`, { method: 'POST', body: pixelForm });
-          const pxData  = await pxRes.json();
-          const imgHash = Object.values(pxData.images || {})[0]?.hash;
-          if (imgHash) videoDataPayload.image_hash = imgHash;
-        } catch (e) {
-          console.warn('Fallback thumbnail gagal:', e.message);
-        }
       }
 
       const creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
