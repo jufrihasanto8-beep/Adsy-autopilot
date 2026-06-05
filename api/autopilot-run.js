@@ -106,11 +106,13 @@ export default async function handler(req, res) {
 
 // ── Sync insights dari Meta (impressions, CPR, CTR, spend) ──
 async function syncCampaignInsights(camp, token) {
-  if (!camp.meta_campaign_id || !token) return;
+  if ((!camp.meta_campaign_id && !camp.meta_adset_id) || !token) return;
   try {
     const fields = 'impressions,spend,clicks,ctr,actions';
+    // Pakai adset-level kalau ada (lebih akurat, khususnya untuk Phase 2b multi-adset)
+    const targetId = camp.meta_adset_id || camp.meta_campaign_id;
     const res = await fetch(
-      `${META_API}/${camp.meta_campaign_id}/insights?fields=${fields}&date_preset=today&access_token=${encodeURIComponent(token)}`
+      `${META_API}/${targetId}/insights?fields=${fields}&date_preset=today&access_token=${encodeURIComponent(token)}`
     );
     const data = await res.json();
     const insight = data?.data?.[0];
