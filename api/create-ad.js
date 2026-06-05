@@ -368,12 +368,35 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── Upsert ke content_library ── track file ini untuk performa
+    let contentLibraryId = null;
+    try {
+      const fileName = file?.originalFilename || file?.newFilename || `content-${Date.now()}`;
+      const { data: existingContent } = await sb.from('content_library')
+        .select('id').eq('user_id', userId).eq('name', fileName).single();
+      if (existingContent) {
+        contentLibraryId = existingContent.id;
+        await sb.from('content_library').update({ status: 'used' }).eq('id', contentLibraryId);
+      } else {
+        const { data: newContent } = await sb.from('content_library').insert({
+          user_id: userId,
+          name: fileName,
+          content_type: fileType || 'image',
+          status: 'used',
+          gdrive_url: null
+        }).select('id').single();
+        contentLibraryId = newContent?.id;
+      }
+    } catch (e) { console.error('content_library upsert failed (non-fatal):', e.message); }
+
     try {
       await sb.from('ad_copies').insert({
         campaign_id: sbCampaignId, user_id: userId,
         headline, primary_text: primaryText,
         description: description || '', status: 'testing',
-        meta_creative_id: creativeId, meta_ad_id: metaAdId
+        meta_creative_id: creativeId, meta_ad_id: metaAdId,
+        file_name: file?.originalFilename || file?.newFilename || null,
+        content_library_id: contentLibraryId || null
       });
     } catch (e) { console.error('ad_copies insert failed (non-fatal):', e.message); }
 
