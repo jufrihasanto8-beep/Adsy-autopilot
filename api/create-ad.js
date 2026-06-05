@@ -224,53 +224,8 @@ export default async function handler(req, res) {
       const SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
       const { data: globalCfg } = await sb.from('global_settings').select('*').eq('id', SETTINGS_ID).single();
 
-      // Region key Meta per provinsi Indonesia (dari Meta adgeolocation API)
-      const PROVINCE_KEYS = {
-        'Aceh':               '526108', 'Sumatera Utara':     '526109',
-        'Sumatera Barat':     '526110', 'Riau':               '526111',
-        'Kepulauan Riau':     '526112', 'Jambi':              '526113',
-        'Sumatera Selatan':   '526114', 'Bangka Belitung':    '526115',
-        'Bengkulu':           '526116', 'Lampung':            '526117',
-        'DKI Jakarta':        '526118', 'Jawa Barat':         '526119',
-        'Banten':             '526120', 'Jawa Tengah':        '526121',
-        'DI Yogyakarta':      '526122', 'Jawa Timur':         '526123',
-        'Bali':               '526124', 'NTB':                '526125',
-        'NTT':                '526126', 'Kalimantan Barat':   '526127',
-        'Kalimantan Tengah':  '526128', 'Kalimantan Selatan': '526129',
-        'Kalimantan Timur':   '526130', 'Kalimantan Utara':   '526131',
-        'Sulawesi Utara':     '526132', 'Gorontalo':          '526133',
-        'Sulawesi Tengah':    '526134', 'Sulawesi Barat':     '526135',
-        'Sulawesi Selatan':   '526136', 'Sulawesi Tenggara':  '526137',
-        'Maluku':             '526138', 'Maluku Utara':       '526139',
-        'Papua Barat':        '526140', 'Papua':              '526141',
-      };
-
-      // Bangun geo_locations dari pilihan provinsi admin
-      let geoLocations;
-      let excludedGeoLocations = null;
-      const locModeCfg = globalCfg?.ad_location_mode || 'include';
-      const selectedProvinces = globalCfg?.ad_selected_provinces || [];
-
-      if (selectedProvinces.length > 0) {
-        if (locModeCfg === 'exclude') {
-          // Exclude: target seluruh Indonesia, kecualikan provinsi yang dipilih
-          geoLocations = { countries: ['ID'] };
-          const excludeKeys = selectedProvinces
-            .filter(n => PROVINCE_KEYS[n])
-            .map(n => ({ key: PROVINCE_KEYS[n] }));
-          if (excludeKeys.length > 0) excludedGeoLocations = { regions: excludeKeys };
-        } else {
-          // Include: hanya provinsi yang dipilih
-          const includeKeys = selectedProvinces
-            .filter(n => PROVINCE_KEYS[n])
-            .map(n => ({ key: PROVINCE_KEYS[n] }));
-          geoLocations = includeKeys.length > 0
-            ? { regions: includeKeys }
-            : { countries: ['ID'] };
-        }
-      } else {
-        geoLocations = { countries: ['ID'] };
-      }
+      // Geo targeting: selalu Indonesia — batasan wilayah dihandle dari Meta Business Manager
+      const geoLocations = { countries: ['ID'] };
 
       const { optimizationGoal, billingEvent } = objectiveConfig(objective);
       const adsetPayload = {
@@ -280,7 +235,6 @@ export default async function handler(req, res) {
         optimization_goal: optimizationGoal,
         targeting: {
           geo_locations: geoLocations,
-          ...(excludedGeoLocations ? { excluded_geo_locations: excludedGeoLocations } : {}),
           age_min: 21,
           age_max: 65
         },
