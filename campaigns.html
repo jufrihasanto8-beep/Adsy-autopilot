@@ -590,7 +590,10 @@
       }
 
       // Logs
-      const { data: logs } = await sb.from('action_logs').select('*').eq('campaign_name', c.name).order('created_at', { ascending: false }).limit(5);
+      const { data: logs } = await sb.from('action_logs').select('*')
+        .eq('campaign_name', c.name)
+        .neq('action_type', 'create')
+        .order('created_at', { ascending: false }).limit(5);
       if (!logs?.length) {
         document.getElementById('detail-logs').innerHTML = '<div style="color:var(--gray-5);font-size:13px;">Belum ada aksi autopilot</div>';
       } else {
