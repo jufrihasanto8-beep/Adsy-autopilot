@@ -585,7 +585,8 @@
     document.getElementById('notif-winner').checked = notif?.notif_winner !== false;
 
     // Auto-collapse kalau nomor WA sudah tersimpan
-    if (config?.wa_target) {
+    const waNum = document.getElementById('wa-number').value.trim();
+    if (waNum) {
       document.getElementById('notif-card-body').style.display = 'none';
       document.getElementById('notif-card-chevron').style.transform = 'rotate(180deg)';
       document.getElementById('notif-status').style.display = 'inline-block';
