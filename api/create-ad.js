@@ -197,7 +197,6 @@ export default async function handler(req, res) {
       if (budgetType === 'CBO') {
         campPayloadMeta.daily_budget = dailyBudget;
         campPayloadMeta.bid_strategy = bidStrategy;
-        campPayloadMeta.is_adset_budget_sharing_enabled = true;
         if (bidValue && bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
           if (bidStrategy === 'MINIMUM_ROAS') campPayloadMeta.roas_average_floor = parseFloat(bidValue) * 100;
           else campPayloadMeta.bid_amount = parseInt(bidValue);
