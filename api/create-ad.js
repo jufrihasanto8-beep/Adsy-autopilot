@@ -317,10 +317,12 @@ export default async function handler(req, res) {
         const msgPositions = [];
         const anPositions = [];
 
-        if (pl.some(p => p.startsWith('fb_'))) publisherPlatforms.push('facebook');
-        if (pl.some(p => p.startsWith('ig_'))) publisherPlatforms.push('instagram');
-        if (pl.some(p => p.startsWith('msg_'))) publisherPlatforms.push('messenger');
-        if (pl.some(p => p.startsWith('an_'))) publisherPlatforms.push('audience_network');
+        // Platform dari plt_* checkboxes (prioritas), fallback ke deteksi dari posisi
+        if (pl.includes('plt_facebook') || pl.some(p => p.startsWith('fb_'))) publisherPlatforms.push('facebook');
+        if (pl.includes('plt_instagram') || pl.some(p => p.startsWith('ig_'))) publisherPlatforms.push('instagram');
+        if (pl.includes('plt_messenger') || pl.some(p => p.startsWith('msg_'))) publisherPlatforms.push('messenger');
+        if (pl.includes('plt_audience_network') || pl.some(p => p.startsWith('an_'))) publisherPlatforms.push('audience_network');
+        if (pl.includes('plt_threads')) publisherPlatforms.push('threads');
 
         if (pl.includes('fb_feed'))        fbPositions.push('feed');
         if (pl.includes('fb_story'))       fbPositions.push('story');
