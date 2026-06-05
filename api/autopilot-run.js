@@ -63,29 +63,18 @@ export default async function handler(req, res) {
         const daysRunning = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
         await sb.from('campaigns').update({ days_running: daysRunning }).eq('id', fresh.id);
 
-        // ── GATE: Jangan ambil keputusan sebelum 8.000 impressions ──
-        if (impressions < IMPRESSIONS_GATE) {
-          logs.push({
-            campaign_name: fresh.name,
-            action_type: 'gate',
-            description: `"${fresh.name}" — gate belum tercapai (${impressions.toLocaleString('id-ID')} / ${IMPRESSIONS_GATE.toLocaleString('id-ID')} impressions)`,
-            status: 'skipped'
-          });
-          continue;
-        }
+        // ── Blueprint Rules (pause/budget) — jalan tanpa nunggu impressions ──
+        const acted = await runBlueprintRules(fresh, targetCpr, targetRoas, token, logs);
+        if (acted) actionsTaken++;
 
-        // ── Phase Advancement ──
+        // ── Phase Advancement — impressions 8.000 hanya dicek saat hari ke-3 (di dalam fungsi) ──
         await checkPhaseAdvancement(fresh, targetCpr, daysRunning, token, logs);
 
-        // Re-fetch lagi setelah phase advance
+        // Re-fetch lagi setelah phase advance untuk custom rules
         const { data: latest } = await sb.from('campaigns')
           .select('*, products(target_cpr, target_roas)')
           .eq('id', fresh.id).single();
         if (!latest || !latest.autopilot_enabled || latest.status === 'PAUSED') continue;
-
-        // ── Blueprint Rules (per phase) ──
-        const acted = await runBlueprintRules(latest, targetCpr, targetRoas, token, logs);
-        if (acted) actionsTaken++;
 
         // ── User-defined custom rules ──
         const { data: rules } = await sb.from('autopilot_rules')
