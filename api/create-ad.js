@@ -324,7 +324,6 @@ export default async function handler(req, res) {
 
         if (pl.includes('fb_feed'))        fbPositions.push('feed');
         if (pl.includes('fb_story'))       fbPositions.push('story');
-        if (pl.includes('fb_reels'))       fbPositions.push('reels');
         if (pl.includes('fb_marketplace')) fbPositions.push('marketplace');
         if (pl.includes('fb_video_feeds')) fbPositions.push('video_feeds');
         if (pl.includes('fb_search'))      fbPositions.push('search');
