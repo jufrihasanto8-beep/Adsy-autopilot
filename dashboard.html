@@ -57,6 +57,10 @@
         <p>Selamat datang kembali, <span id="user-name">-</span> 👋</p>
       </div>
       <div class="topbar-right">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span id="last-updated" style="font-size:12px; color:var(--gray-5);"></span>
+          <button class="btn btn-outline btn-sm" id="btn-refresh" onclick="refreshData()">🔄 Refresh</button>
+        </div>
         <div class="topbar-icon-btn" title="Notifikasi">🔔</div>
         <div class="topbar-user">
           <div class="topbar-avatar" id="user-avatar">?</div>
@@ -176,16 +180,45 @@
 
   let sb;
 
+  let currentDashProfile = null;
+
+  function setLastUpdated() {
+    document.getElementById('last-updated').textContent = 'Diperbarui: ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  window.refreshData = async function() {
+    const btn = document.getElementById('btn-refresh');
+    btn.disabled = true;
+    btn.textContent = '🔄 Loading...';
+    try {
+      await fetch('/api/meta-insights', { method: 'POST' });
+      await Promise.all([
+        loadStats(currentDashProfile),
+        loadCampaigns(currentDashProfile),
+        loadActionLog(currentDashProfile),
+      ]);
+      setLastUpdated();
+      showToast('Data diperbarui!', 'success');
+    } catch(e) {
+      showToast('Gagal refresh: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔄 Refresh';
+    }
+  };
+
   async function init() {
     sb = await getSupabase();
     const session = await requireAuth();
     if (!session) return;
     const profile = await renderUserInfo();
+    currentDashProfile = profile;
     initSidebar();
     loadStats(profile);
     loadCampaigns(profile);
     loadActionLog(profile);
     loadRecentContent(profile);
+    setLastUpdated();
   }
 
   async function loadStats(profile) {
