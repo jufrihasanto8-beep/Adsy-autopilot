@@ -2,12 +2,6 @@
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" }
   ],
-  "crons": [
-    {
-      "path": "/api/meta-insights",
-      "schedule": "0 */2 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/api/(.*)",
