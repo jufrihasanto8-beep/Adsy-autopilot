@@ -45,10 +45,10 @@ export default async function handler(req, res) {
 
         // Update campaign
         await sb.from('campaigns').update({
-          spend_today: parseFloat(d.spend) * 1000, // convert to IDR approx
+          spend_today: parseFloat(d.spend) || 0,
           clicks_today: parseInt(d.clicks) || 0,
           ctr: parseFloat(d.ctr) || null,
-          cpr: cpr ? cpr * 1000 : null,
+          cpr: cpr ? Math.round(cpr) : null,
           results_today: parseInt(results),
           last_synced: new Date().toISOString()
         }).eq('id', camp.id);
@@ -103,7 +103,7 @@ async function fetchRangeInsights(req, res) {
       }
 
       const d = insight.data[0];
-      const spend = parseFloat(d.spend || 0) * 1000; // USD → IDR approx
+      const spend = parseFloat(d.spend || 0); // IDR langsung dari Meta
       const clicks = parseInt(d.clicks || 0);
       const impressions = parseInt(d.impressions || 0);
       const ctr = parseFloat(d.ctr || 0);

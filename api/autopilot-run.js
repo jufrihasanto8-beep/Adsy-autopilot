@@ -191,7 +191,7 @@ async function syncCampaignInsights(camp, token) {
     if (!insight) return;
 
     const impressions = parseInt(insight.impressions || 0);
-    const spend       = parseFloat(insight.spend || 0) * 1000; // Meta dalam USD → approx IDR
+    const spend       = parseFloat(insight.spend || 0); // Meta return IDR langsung untuk akun IDR
     const ctr         = parseFloat(insight.ctr || 0);
 
     // CPR = spend / results (sama persis dengan Ads Manager)
