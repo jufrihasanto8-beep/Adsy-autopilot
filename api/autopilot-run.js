@@ -81,7 +81,7 @@ export default async function handler(req, res) {
         const { data: latest } = await sb.from('campaigns')
           .select('*, products(target_cpr, target_roas)')
           .eq('id', fresh.id).single();
-        if (!latest) continue;
+        if (!latest || !latest.autopilot_enabled || latest.status === 'PAUSED') continue;
 
         // ── Blueprint Rules (per phase) ──
         const acted = await runBlueprintRules(latest, targetCpr, targetRoas, token, logs);
