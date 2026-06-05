@@ -117,7 +117,7 @@ export default async function handler(req, res) {
 async function syncCampaignInsights(camp, token) {
   if (!camp.meta_campaign_id || !token) return;
   try {
-    const fields = 'impressions,spend,clicks,ctr,cost_per_action_type';
+    const fields = 'impressions,spend,clicks,ctr,actions';
     const res = await fetch(
       `${META_API}/${camp.meta_campaign_id}/insights?fields=${fields}&date_preset=today&access_token=${encodeURIComponent(token)}`
     );
@@ -126,11 +126,18 @@ async function syncCampaignInsights(camp, token) {
     if (!insight) return;
 
     const impressions = parseInt(insight.impressions || 0);
-    const spend       = parseFloat(insight.spend || 0) * 1000; // Meta dalam USD → kalikan 1000 (approx IDR, user pakai IDR)
+    const spend       = parseFloat(insight.spend || 0) * 1000; // Meta dalam USD → approx IDR
     const ctr         = parseFloat(insight.ctr || 0);
-    const cprArr      = insight.cost_per_action_type || [];
-    const cprObj      = cprArr.find(x => x.action_type === 'offsite_conversion.fb_pixel_purchase' || x.action_type === 'link_click');
-    const cpr         = cprObj ? parseFloat(cprObj.value) * 1000 : null;
+
+    // CPR = spend / results (sama persis dengan Ads Manager)
+    const actions = insight.actions || [];
+    const resultAction = actions.find(x =>
+      x.action_type === 'offsite_conversion.fb_pixel_purchase' ||
+      x.action_type === 'lead' ||
+      x.action_type === 'post_engagement'
+    );
+    const results = parseInt(resultAction?.value || 0);
+    const cpr = results > 0 ? Math.round(spend / results) : null;
 
     await sb.from('campaigns').update({
       impressions,
