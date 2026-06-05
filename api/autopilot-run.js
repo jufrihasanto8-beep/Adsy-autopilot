@@ -56,10 +56,12 @@ export default async function handler(req, res) {
         const targetCpr  = fresh.products?.target_cpr || null;
         const targetRoas = fresh.products?.target_roas || null;
         const impressions = fresh.impressions || 0;
-        const daysRunning = fresh.days_running || 0;
 
-        // ── Increment hari berjalan ──
-        await sb.from('campaigns').update({ days_running: daysRunning + 1 }).eq('id', fresh.id);
+        // ── Hitung hari berjalan dari phase_started_at (akurat, tidak terpengaruh frekuensi cron) ──
+        const startDate  = fresh.phase_started_at ? new Date(fresh.phase_started_at) : new Date(fresh.created_at);
+        const today      = new Date();
+        const daysRunning = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+        await sb.from('campaigns').update({ days_running: daysRunning }).eq('id', fresh.id);
 
         // ── GATE: Jangan ambil keputusan sebelum 8.000 impressions ──
         if (impressions < IMPRESSIONS_GATE) {
@@ -161,6 +163,20 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, logs) {
     if (!targetCpr) {
       // Tidak ada target CPR → langsung maju
       newPhase = 2;
+    } else if (cpr === null && daysRunning >= 4) {
+      // Tidak ada konversi sama sekali setelah 4 hari → pause permanen
+      await pauseCampaign(camp, token);
+      await sb.from('campaigns').update({ autopilot_enabled: false }).eq('id', camp.id);
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'pause',
+        description: `"${camp.name}" dihentikan permanen — tidak ada konversi setelah ${daysRunning} hari`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+      return;
     } else if (cpr !== null && cpr <= targetCpr) {
       // CPR ≤ target → langsung maju Phase 2
       newPhase = 2;
@@ -181,11 +197,9 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, logs) {
         logs.push(logEntry);
       }
     } else if (cpr !== null && cpr > targetCpr * 1.1) {
-      // CPR terlalu jelek setelah 3 hari → pause permanen
-      await sb.from('campaigns').update({
-        status: 'PAUSED',
-        autopilot_enabled: false
-      }).eq('id', camp.id);
+      // CPR terlalu jelek setelah 3 hari → pause permanen (di Meta + Supabase)
+      await pauseCampaign(camp, token);
+      await sb.from('campaigns').update({ autopilot_enabled: false }).eq('id', camp.id);
       const logEntry = {
         user_id: camp.user_id,
         campaign_name: camp.name,
