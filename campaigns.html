@@ -151,6 +151,67 @@
   </main>
 </div>
 
+<!-- MODAL DETAIL KAMPANYE -->
+<div class="modal-overlay hidden" id="modal-detail">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <div>
+        <h3 id="detail-name">-</h3>
+        <div style="display:flex;gap:6px;margin-top:6px;" id="detail-badges"></div>
+      </div>
+      <div class="modal-close">✕</div>
+    </div>
+    <div class="modal-body" style="padding:0;">
+
+      <!-- Performa -->
+      <div style="padding:20px 24px;border-bottom:1px solid var(--gray-3);">
+        <div style="font-size:11px;font-weight:700;color:var(--gray-5);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Performa Hari Ini</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">
+          <div style="text-align:center;">
+            <div style="font-size:18px;font-weight:800;color:var(--text);" id="detail-spend">-</div>
+            <div style="font-size:11px;color:var(--gray-5);margin-top:2px;">Spend</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:18px;font-weight:800;color:var(--text);" id="detail-cpr">-</div>
+            <div style="font-size:11px;color:var(--gray-5);margin-top:2px;">CPR</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:18px;font-weight:800;color:var(--text);" id="detail-ctr">-</div>
+            <div style="font-size:11px;color:var(--gray-5);margin-top:2px;">CTR</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:18px;font-weight:800;color:var(--text);" id="detail-impressions">-</div>
+            <div style="font-size:11px;color:var(--gray-5);margin-top:2px;">Impresi</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:18px;font-weight:800;color:var(--text);" id="detail-results">-</div>
+            <div style="font-size:11px;color:var(--gray-5);margin-top:2px;">Hasil</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Kampanye -->
+      <div style="padding:20px 24px;border-bottom:1px solid var(--gray-3);">
+        <div style="font-size:11px;font-weight:700;color:var(--gray-5);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Info Kampanye</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;" id="detail-info"></div>
+      </div>
+
+      <!-- Ad Copies -->
+      <div style="padding:20px 24px;border-bottom:1px solid var(--gray-3);">
+        <div style="font-size:11px;font-weight:700;color:var(--gray-5);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Iklan</div>
+        <div id="detail-ads"><div style="color:var(--gray-5);font-size:13px;">Memuat...</div></div>
+      </div>
+
+      <!-- Log Autopilot -->
+      <div style="padding:20px 24px;">
+        <div style="font-size:11px;font-weight:700;color:var(--gray-5);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Log Autopilot</div>
+        <div id="detail-logs"><div style="color:var(--gray-5);font-size:13px;">Memuat...</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- MODAL KAMPANYE BARU -->
 <div class="modal-overlay hidden" id="modal-campaign">
   <div class="modal" style="max-width: 580px;">
@@ -229,7 +290,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
   import { requireAuth, renderUserInfo } from './js/auth.js';
-  import { initSidebar, showToast, openModal, closeModal, initModals, formatRupiah, formatDate } from './js/sidebar.js';
+  import { initSidebar, showToast, openModal, closeModal, initModals, formatRupiah, formatDate, timeAgo } from './js/sidebar.js';
   import { getSupabase } from './js/supabase.js';
 
   let sb;
@@ -468,8 +529,85 @@
     }
   };
 
-  window.viewDetail = function(id) {
-    window.location.href = `campaigns.html?id=${id}`;
+  window.viewDetail = async function(id) {
+    openModal('modal-detail');
+
+    // Reset
+    document.getElementById('detail-name').textContent = 'Memuat...';
+    document.getElementById('detail-badges').innerHTML = '';
+    ['detail-spend','detail-cpr','detail-ctr','detail-impressions','detail-results'].forEach(i => document.getElementById(i).textContent = '-');
+    document.getElementById('detail-info').innerHTML = '';
+    document.getElementById('detail-ads').innerHTML = '<div style="color:var(--gray-5);font-size:13px;">Memuat...</div>';
+    document.getElementById('detail-logs').innerHTML = '<div style="color:var(--gray-5);font-size:13px;">Memuat...</div>';
+
+    try {
+      // Fetch campaign
+      const { data: c } = await sb.from('campaigns').select('*, products(name,target_cpr)').eq('id', id).single();
+      if (!c) return;
+
+      const phaseLabel = { 1: 'Testing', 2: 'Evaluasi', 3: 'Scale' };
+      const phaseBadge = { 1: 'badge-warning', 2: 'badge-primary', 3: 'badge-success' };
+
+      document.getElementById('detail-name').textContent = c.name;
+      document.getElementById('detail-badges').innerHTML = `
+        <span class="badge ${c.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}"><span class="badge-dot"></span>${c.status === 'ACTIVE' ? 'Aktif' : 'Paused'}</span>
+        <span class="badge ${phaseBadge[c.current_phase] || 'badge-gray'}">Phase ${c.current_phase || 1}: ${phaseLabel[c.current_phase] || 'Testing'}</span>
+        ${c.autopilot_enabled ? '<span class="badge badge-primary">🤖 Autopilot ON</span>' : '<span class="badge badge-gray">Autopilot OFF</span>'}
+      `;
+
+      // Performa
+      document.getElementById('detail-spend').textContent = formatRupiah(c.spend_today);
+      document.getElementById('detail-cpr').textContent = c.cpr ? formatRupiah(c.cpr) : '-';
+      document.getElementById('detail-ctr').textContent = c.ctr ? c.ctr.toFixed(2) + '%' : '-';
+      document.getElementById('detail-impressions').textContent = (c.impressions || 0).toLocaleString('id-ID');
+      document.getElementById('detail-results').textContent = c.results_today || 0;
+
+      // Info
+      const startDate = c.phase_started_at || c.created_at;
+      const daysRunning = Math.floor((new Date() - new Date(startDate)) / (1000*60*60*24));
+      document.getElementById('detail-info').innerHTML = `
+        <div><span style="font-size:12px;color:var(--gray-5);">Budget Harian</span><div style="font-weight:600;font-size:14px;">${formatRupiah(c.daily_budget)}</div></div>
+        <div><span style="font-size:12px;color:var(--gray-5);">Hari Berjalan</span><div style="font-weight:600;font-size:14px;">${daysRunning} hari</div></div>
+        <div><span style="font-size:12px;color:var(--gray-5);">Target CPR</span><div style="font-weight:600;font-size:14px;">${c.products?.target_cpr ? formatRupiah(c.products.target_cpr) : '-'}</div></div>
+        <div><span style="font-size:12px;color:var(--gray-5);">Ad Account</span><div style="font-weight:600;font-size:14px;font-size:12px;">${c.ad_account_id || '-'}</div></div>
+        <div><span style="font-size:12px;color:var(--gray-5);">Produk</span><div style="font-weight:600;font-size:14px;">${c.products?.name || '-'}</div></div>
+        <div><span style="font-size:12px;color:var(--gray-5);">Dibuat</span><div style="font-weight:600;font-size:14px;">${new Date(c.created_at).toLocaleDateString('id-ID')}</div></div>
+      `;
+
+      // Ad Copies
+      const { data: ads } = await sb.from('ad_copies').select('*').eq('campaign_id', id).order('created_at', { ascending: false });
+      if (!ads?.length) {
+        document.getElementById('detail-ads').innerHTML = '<div style="color:var(--gray-5);font-size:13px;">Belum ada iklan</div>';
+      } else {
+        document.getElementById('detail-ads').innerHTML = ads.map(a => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--gray-3);">
+            <div>
+              <div style="font-weight:600;font-size:13px;">${a.headline}</div>
+              <div style="font-size:12px;color:var(--gray-5);margin-top:2px;">${(a.primary_text || '').substring(0, 60)}${(a.primary_text || '').length > 60 ? '...' : ''}</div>
+            </div>
+            <span class="badge badge-success" style="flex-shrink:0;">Aktif</span>
+          </div>`).join('');
+      }
+
+      // Logs
+      const { data: logs } = await sb.from('action_logs').select('*').eq('campaign_name', c.name).order('created_at', { ascending: false }).limit(5);
+      if (!logs?.length) {
+        document.getElementById('detail-logs').innerHTML = '<div style="color:var(--gray-5);font-size:13px;">Belum ada aksi autopilot</div>';
+      } else {
+        const icons = { pause:'⏸️', scale:'📈', create:'➕', resume:'▶️', increase_budget:'📈', decrease_budget:'📉', phase_advance:'🚀' };
+        document.getElementById('detail-logs').innerHTML = logs.map(l => `
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--gray-3);">
+            <span style="font-size:16px;">${icons[l.action_type] || '⚡'}</span>
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:600;">${l.description || l.action_type}</div>
+              <div style="font-size:11px;color:var(--gray-5);margin-top:2px;">${timeAgo(l.created_at)}</div>
+            </div>
+          </div>`).join('');
+      }
+
+    } catch(e) {
+      console.error('viewDetail error:', e.message);
+    }
   };
 
   init();
