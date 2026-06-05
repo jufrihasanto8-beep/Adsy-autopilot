@@ -40,6 +40,9 @@ export default async function handler(req, res) {
           .select('meta_token').eq('user_id', camp.user_id).single();
         const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
 
+        // Reset budget ke initial kalau Phase 1 winning (initial_budget tersimpan)
+        const resetBudget = camp.current_phase === 1 && camp.initial_budget ? camp.initial_budget : null;
+
         // Hidupkan di Meta
         if (camp.meta_campaign_id && token) {
           await fetch(`${META_API}/${camp.meta_campaign_id}`, {
@@ -49,14 +52,27 @@ export default async function handler(req, res) {
           });
         }
 
-        // Update status di Supabase
-        await sb.from('campaigns').update({ status: 'ACTIVE' }).eq('id', camp.id);
+        // Reset budget di adset kalau perlu
+        if (resetBudget && camp.meta_adset_id && token) {
+          await fetch(`${META_API}/${camp.meta_adset_id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ daily_budget: resetBudget, access_token: token })
+          });
+        }
+
+        // Update status + reset budget di Supabase
+        await sb.from('campaigns').update({
+          status: 'ACTIVE',
+          last_results: 0,
+          ...(resetBudget ? { daily_budget: resetBudget } : {})
+        }).eq('id', camp.id);
 
         const logEntry = {
           user_id: camp.user_id,
           campaign_name: camp.name,
           action_type: 'resume',
-          description: `"${camp.name}" dihidupkan kembali jam 3 pagi — Phase ${camp.current_phase} hari ke-${camp.days_running}`,
+          description: `"${camp.name}" dihidupkan kembali jam 3 pagi — Phase ${camp.current_phase} hari ke-${camp.days_running}${resetBudget ? `, budget reset ke Rp ${resetBudget.toLocaleString('id-ID')}` : ''}`,
           status: 'success'
         };
         await sb.from('action_logs').insert(logEntry);

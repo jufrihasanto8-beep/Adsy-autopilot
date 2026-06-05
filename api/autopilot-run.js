@@ -134,6 +134,7 @@ async function syncCampaignInsights(camp, token) {
       impressions,
       spend_today: spend,
       ctr,
+      results_today: results,
       ...(cpr !== null ? { cpr } : {})
     }).eq('id', camp.id);
 
@@ -217,6 +218,11 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
       .maybeSingle();
 
     if (!existing) {
+      // Simpan initial_budget Phase 1 sebelum ada perubahan
+      await sb.from('campaigns').update({
+        initial_budget: camp.daily_budget
+      }).eq('id', camp.id);
+
       // Buat kampanye Phase 2 baru, Phase 1 tetap jalan dengan autopilot aktif
       await createPhase2Campaign(camp, token, logs);
 
@@ -346,15 +352,57 @@ async function runBlueprintRules(camp, targetCpr, targetRoas, token, logs) {
   // Cegah multiple budget change dalam satu hari
   if (camp.last_budget_change_date === today) return false;
 
-  // Phase 1: Testing — pause kalau CPR > 2.5x target
+  // Phase 1: Testing
   if (currentPhase === 1 && cpr !== null && cpr !== undefined) {
+
+    // Phase 1 Winning (Phase 2 sudah dibuat = initial_budget tersimpan)
+    if (camp.initial_budget) {
+      const resultsToday = camp.results_today || 0;
+      const lastResults  = camp.last_results || 0;
+
+      // CPR > 2× target → pause, reset budget ke awal jam 3 pagi
+      if (cpr > targetCpr * 2) {
+        await pauseCampaign(camp, token);
+        const logEntry = {
+          user_id: camp.user_id,
+          campaign_name: camp.name,
+          action_type: 'pause',
+          description: `"${camp.name}" di-pause (Phase 1 Winning) — CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} > 2× target`,
+          status: 'success'
+        };
+        await sb.from('action_logs').insert(logEntry);
+        logs.push(logEntry);
+        return true;
+      }
+
+      // Hasil naik ≥ 2 dari sebelumnya + CPR ≤ target → naik budget 30%
+      if (resultsToday >= lastResults + 2 && cpr <= targetCpr) {
+        const newBudget = Math.floor(budget * 1.3);
+        await updateBudget(camp, newBudget, token);
+        await sb.from('campaigns').update({ last_results: resultsToday }).eq('id', camp.id);
+        const logEntry = {
+          user_id: camp.user_id,
+          campaign_name: camp.name,
+          action_type: 'increase_budget',
+          description: `"${camp.name}" budget naik 30% → Rp ${newBudget.toLocaleString('id-ID')} (hasil ${lastResults} → ${resultsToday}, CPR ≤ target)`,
+          status: 'success'
+        };
+        await sb.from('action_logs').insert(logEntry);
+        logs.push(logEntry);
+        return true;
+      }
+
+      return false; // Phase 1 Winning: tidak ada aksi lain
+    }
+
+    // Phase 1 biasa (belum winning) — pause kalau CPR > 2.5× target
     if (cpr > targetCpr * 2.5) {
       await pauseCampaign(camp, token);
       const logEntry = {
         user_id: camp.user_id,
         campaign_name: camp.name,
         action_type: 'pause',
-        description: `"${camp.name}" di-pause di Phase 1 — CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} (${Math.round(cpr/targetCpr*100)}% dari target, > 2.5× target)`,
+        description: `"${camp.name}" di-pause di Phase 1 — CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} (> 2.5× target)`,
         status: 'success'
       };
       await sb.from('action_logs').insert(logEntry);
