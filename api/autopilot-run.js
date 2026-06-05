@@ -206,10 +206,38 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
     }
   }
 
-  // Phase 2 → 3: 7 hari + CPR ≤ target (baseline sudah ada, siap scale)
-  if (camp.current_phase === 2 && daysRunning >= 7) {
-    const cprOk = !targetCpr || (cpr && cpr <= targetCpr);
-    if (cprOk) newPhase = 3;
+  // Phase 2 — Evaluasi hari ke-7 (Phase 3 belum diimplementasi)
+  if (camp.current_phase === 2 && daysRunning >= 7 && targetCpr) {
+    if (cpr === null) {
+      // 0 konversi selama 7 hari → pause permanen
+      await pauseCampaign(camp, token);
+      await sb.from('campaigns').update({ autopilot_enabled: false }).eq('id', camp.id);
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'pause',
+        description: `"${camp.name}" dihentikan permanen — 0 konversi selama ${daysRunning} hari di Phase 2`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+      return;
+    } else if (cpr > targetCpr * 1.1) {
+      // CPR masih > +10% target setelah 7 hari → pause permanen
+      await pauseCampaign(camp, token);
+      await sb.from('campaigns').update({ autopilot_enabled: false }).eq('id', camp.id);
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'pause',
+        description: `"${camp.name}" dihentikan permanen — CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} masih > +10% target setelah ${daysRunning} hari di Phase 2`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+      return;
+    }
+    // CPR ≤ target + 10% → tetap jalan (Phase 3 belum ada)
   }
 
   if (newPhase === 2 && camp.current_phase === 1) {
@@ -250,22 +278,7 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
     // Phase 1 tidak diubah apapun — tetap jalan dengan autopilot aktif
   }
 
-  if (newPhase === 3 && camp.current_phase === 2) {
-    await sb.from('campaigns').update({
-      current_phase: 3,
-      phase_started_at: new Date().toISOString()
-    }).eq('id', camp.id);
-
-    const logEntry = {
-      user_id: camp.user_id,
-      campaign_name: camp.name,
-      action_type: 'phase_advance',
-      description: `"${camp.name}" maju ke Phase 3 — Scale`,
-      status: 'success'
-    };
-    await sb.from('action_logs').insert(logEntry);
-    logs.push(logEntry);
-  }
+  // Phase 3 belum diimplementasi — akan ditambahkan nanti
 }
 
 // ── Buat kampanye Phase 2 di Meta (duplikat dari Phase 1) ──
