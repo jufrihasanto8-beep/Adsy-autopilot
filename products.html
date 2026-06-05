@@ -299,7 +299,7 @@
           <button class="btn btn-primary btn-sm" style="flex:1;" onclick="window.location.href='create-ad.html?product=${p.id}'">
             ➕ Buat Iklan
           </button>
-          ${document.body.classList.contains('is-admin') ? `
+          ${['admin','superadmin'].includes(currentProfile?.role) ? `
           <button class="btn btn-outline btn-sm" onclick="editProduct('${p.id}')">Edit</button>
           <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteProduct('${p.id}')">Hapus</button>` : ''}
         </div>
@@ -335,7 +335,10 @@
 
     const targetCpr = parseFloat(document.getElementById('p-target-cpr').value);
     const targetRoas = parseFloat(document.getElementById('p-target-roas').value);
-    if (!targetCpr) return showToast('Target CPR wajib diisi untuk autopilot', 'warning');
+    if (!targetCpr) {
+      btn.disabled = false; btn.textContent = 'Simpan Produk';
+      return showToast('Target CPR wajib diisi untuk autopilot', 'warning');
+    }
 
     const payload = {
       name,
