@@ -266,33 +266,61 @@
             </div>
 
             <!-- Manual placement checkboxes -->
-            <div id="manual-placements-wrap" style="display:none; margin-top:14px; padding:14px; background:var(--gray-1); border-radius:8px;">
-              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;">
-                <div>
-                  <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:8px;">Facebook</div>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_feed" /> Feed</label>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_story" /> Stories</label>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_reels" /> Reels</label>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_marketplace" /> Marketplace</label>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_video_feeds" /> Video Feeds</label>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="fb_search" /> Search</label>
-                </div>
-                <div>
-                  <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:8px;">Instagram</div>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="ig_stream" /> Feed</label>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="ig_story" /> Stories</label>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="ig_reels" /> Reels</label>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="ig_explore" /> Explore</label>
-                </div>
-                <div>
-                  <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:8px;">Messenger</div>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="msg_home" /> Inbox</label>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="msg_story" /> Stories</label>
-                  <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:8px; margin-top:12px;">Audience Network</div>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="an_classic" /> Classic</label>
-                  <label class="pl-row"><input type="checkbox" name="placement" value="an_video" /> In-stream Video</label>
+            <div id="manual-placements-wrap" style="display:none; margin-top:14px;">
+
+              <!-- Platform -->
+              <div style="border:1.5px solid var(--gray-3); border-radius:10px; overflow:hidden; margin-bottom:12px;">
+                <div style="background:var(--gray-2); padding:10px 16px; font-size:12px; font-weight:700; color:var(--text);">Platform</div>
+                <div style="padding:14px 16px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+                  <label class="pl-row"><input type="checkbox" name="placement" value="plt_facebook" checked /> Facebook</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="plt_instagram" checked /> Instagram</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="plt_messenger" /> Messenger</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="plt_audience_network" /> Audience Network</label>
+                  <label class="pl-row"><input type="checkbox" name="placement" value="plt_threads" /> Threads</label>
                 </div>
               </div>
+
+              <!-- Pengaturan Penempatan -->
+              <div style="border:1.5px solid var(--gray-3); border-radius:10px; overflow:hidden;">
+                <div style="background:var(--gray-2); padding:10px 16px; font-size:12px; font-weight:700; color:var(--text);">Pengaturan Penempatan</div>
+                <div style="padding:14px 16px; display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+
+                  <!-- Facebook -->
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:10px; letter-spacing:.5px;">Facebook</div>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="fb_feed" /> Beranda (Feed)</label>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="fb_story" /> Cerita, Status & Reels</label>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="fb_marketplace" /> Marketplace</label>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="fb_search" /> Hasil Pencarian</label>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="fb_video_feeds" /> Video Feeds</label>
+                  </div>
+
+                  <!-- Instagram -->
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:10px; letter-spacing:.5px;">Instagram</div>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="ig_stream" /> Feed</label>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="ig_story" /> Stories</label>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="ig_reels" /> Reels</label>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="ig_explore" /> Explore</label>
+                  </div>
+
+                  <!-- Messenger -->
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:10px; letter-spacing:.5px;">Messenger</div>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="msg_home" /> Inbox</label>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="msg_story" /> Stories</label>
+                  </div>
+
+                  <!-- Audience Network -->
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; margin-bottom:10px; letter-spacing:.5px;">Audience Network</div>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="an_classic" /> Aplikasi & Situs</label>
+                    <label class="pl-row"><input type="checkbox" name="placement" value="an_video" /> In-stream Video</label>
+                  </div>
+
+                </div>
+              </div>
+
             </div>
           </div>
 
