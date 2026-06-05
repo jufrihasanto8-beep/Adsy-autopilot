@@ -122,14 +122,15 @@
 
       <!-- NOTIFIKASI WHATSAPP (semua user) -->
       <div class="card" style="margin-top:28px;">
-        <div class="card-header">
+        <div class="card-header" style="cursor:pointer;" onclick="document.getElementById('notif-card-body').style.display = document.getElementById('notif-card-body').style.display === 'none' ? 'block' : 'none'">
           <div>
-            <div class="card-title">💬 Notifikasi WhatsApp</div>
+            <div class="card-title">💬 Notifikasi WhatsApp <span id="notif-status" class="badge badge-success" style="display:none; margin-left:8px; font-size:11px;">Tersimpan</span></div>
             <div class="card-sub">Terima notif otomatis setiap ada perubahan di kampanye kamu</div>
           </div>
-          <button class="btn btn-primary btn-sm" id="btn-save-notif">Simpan</button>
+          <button class="btn btn-primary btn-sm" id="btn-save-notif" onclick="event.stopPropagation()">Simpan</button>
         </div>
 
+        <div id="notif-card-body">
         <div class="form-group" style="margin-bottom:16px;">
           <label class="form-label">Nomor WhatsApp</label>
           <div style="display:flex; gap:8px; align-items:center;">
@@ -177,6 +178,7 @@
             </div>
           </label>
         </div>
+        </div><!-- end notif-card-body -->
       </div>
 
       <!-- ADMIN SECTION: FONNTE TOKEN -->
@@ -567,6 +569,12 @@
     document.getElementById('notif-budget').checked = notif?.notif_budget !== false;
     document.getElementById('notif-create').checked = notif?.notif_create !== false;
     document.getElementById('notif-winner').checked = notif?.notif_winner !== false;
+
+    // Auto-collapse kalau nomor WA sudah tersimpan
+    if (config?.wa_target) {
+      document.getElementById('notif-card-body').style.display = 'none';
+      document.getElementById('notif-status').style.display = 'inline-block';
+    }
   }
 
   async function saveNotifSettings() {
@@ -595,6 +603,8 @@
     btn.disabled = false; btn.textContent = 'Simpan';
     if (e1 || e2) return showToast('Gagal simpan: ' + (e1||e2).message, 'error');
     showToast('Pengaturan notifikasi disimpan!', 'success');
+    document.getElementById('notif-card-body').style.display = 'none';
+    document.getElementById('notif-status').style.display = 'inline-block';
   }
 
   // ── FONNTE TOKEN (admin only) ──
