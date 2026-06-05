@@ -211,7 +211,29 @@
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
     const { data, error } = await q;
     if (error) { showToast('Gagal memuat konten', 'error'); return; }
-    allContent = data || [];
+
+    // Enrichment: ambil performa per konten dari ad_copies + campaigns
+    const contentIds = (data || []).map(c => c.id).filter(Boolean);
+    let perfMap = {};
+    if (contentIds.length) {
+      const { data: copies } = await sb.from('ad_copies')
+        .select('content_library_id, campaigns(cpr, ctr, spend_today, name, is_winner)')
+        .in('content_library_id', contentIds);
+      for (const copy of (copies || [])) {
+        const cid = copy.content_library_id;
+        if (!cid) continue;
+        if (!perfMap[cid]) perfMap[cid] = { cprs: [], ctrs: [], campaigns: new Set(), winner: false };
+        const camp = copy.campaigns;
+        if (camp?.cpr) perfMap[cid].cprs.push(camp.cpr);
+        if (camp?.ctr) perfMap[cid].ctrs.push(parseFloat(camp.ctr));
+        if (camp?.name) perfMap[cid].campaigns.add(camp.name);
+        if (camp?.is_winner) perfMap[cid].winner = true;
+      }
+    }
+    allContent = (data || []).map(c => ({
+      ...c,
+      _perf: perfMap[c.id] || null
+    }));
     renderContent(allContent);
     updateStats(allContent);
   }
@@ -233,10 +255,15 @@
     }
     const statusBadge = { ready: 'badge-success', used: 'badge-primary', archived: 'badge-gray' };
     const statusLabel = { ready: 'Siap', used: 'Terpakai', archived: 'Arsip' };
-    grid.innerHTML = data.map(c => `
+    grid.innerHTML = data.map(c => {
+      const p = c._perf;
+      const avgCpr = p?.cprs?.length ? Math.round(p.cprs.reduce((a,b)=>a+b,0) / p.cprs.length) : null;
+      const campCount = p?.campaigns?.size || 0;
+      return `
       <div class="content-card" onclick="showDetail('${c.id}')">
         <div class="content-thumb">
           ${c.thumb_url ? `<img src="${c.thumb_url}" alt="${c.name}" />` : (c.content_type === 'video' ? '🎬' : '🖼️')}
+          ${p?.winner ? `<div style="position:absolute;top:6px;left:6px;"><span class="badge badge-success" style="font-size:10px;">🏆 Winner</span></div>` : ''}
           <div class="content-thumb-overlay">
             <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();showDetail('${c.id}')">Lihat Detail</button>
           </div>
@@ -247,8 +274,12 @@
             <span>${c.content_type === 'video' ? '🎬 Video' : '🖼️ Gambar'}</span>
             <span class="badge ${statusBadge[c.status] || 'badge-gray'}" style="font-size:10px;">${statusLabel[c.status] || c.status}</span>
           </div>
+          ${campCount > 0 ? `<div style="font-size:11px;color:var(--text-sub);margin-top:4px;">
+            ${campCount} kampanye${avgCpr ? ` · CPR avg Rp ${avgCpr.toLocaleString('id-ID')}` : ''}
+          </div>` : ''}
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function filterContent() {
@@ -309,22 +340,54 @@
   window.showDetail = function(id) {
     const c = allContent.find(x => x.id === id);
     if (!c) return;
+    const p = c._perf;
+    const avgCpr = p?.cprs?.length ? Math.round(p.cprs.reduce((a,b)=>a+b,0) / p.cprs.length) : null;
+    const bestCpr = p?.cprs?.length ? Math.round(Math.min(...p.cprs)) : null;
+    const avgCtr = p?.ctrs?.length ? (p.ctrs.reduce((a,b)=>a+b,0) / p.ctrs.length).toFixed(2) : null;
+    const campList = p?.campaigns ? [...p.campaigns] : [];
+
     document.getElementById('detail-name').textContent = c.name;
     document.getElementById('detail-body').innerHTML = `
       <div style="background:var(--gray-1);border-radius:10px;padding:30px;text-align:center;font-size:48px;margin-bottom:16px;">
         ${c.content_type === 'video' ? '🎬' : '🖼️'}
       </div>
-      <a href="${c.gdrive_url}" target="_blank">
+      ${c.gdrive_url ? `<a href="${c.gdrive_url}" target="_blank">
         <button class="btn btn-outline" style="width:100%;margin-bottom:12px;">Buka di Google Drive ↗</button>
-      </a>
+      </a>` : ''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
         <div><div style="font-size:11px;color:var(--text-sub);font-weight:600;">Tipe</div><div style="font-size:13px;margin-top:4px;">${c.content_type === 'video' ? '🎬 Video' : '🖼️ Gambar'}</div></div>
         <div><div style="font-size:11px;color:var(--text-sub);font-weight:600;">Status</div><div style="font-size:13px;margin-top:4px;">${c.status}</div></div>
-        <div><div style="font-size:11px;color:var(--text-sub);font-weight:600;">Kategori</div><div style="font-size:13px;margin-top:4px;">${c.category || '-'}</div></div>
-        <div><div style="font-size:11px;color:var(--text-sub);font-weight:600;">Target</div><div style="font-size:13px;margin-top:4px;">${c.audience || '-'}</div></div>
+        ${c.category ? `<div><div style="font-size:11px;color:var(--text-sub);font-weight:600;">Kategori</div><div style="font-size:13px;margin-top:4px;">${c.category}</div></div>` : ''}
+        ${c.audience ? `<div><div style="font-size:11px;color:var(--text-sub);font-weight:600;">Target</div><div style="font-size:13px;margin-top:4px;">${c.audience}</div></div>` : ''}
       </div>
-      ${c.notes ? `<div class="form-hint" style="background:var(--gray-1);padding:12px;border-radius:8px;">📝 ${c.notes}</div>` : ''}
-      <div class="divider"></div>
+      ${c.notes ? `<div class="form-hint" style="background:var(--gray-1);padding:12px;border-radius:8px;margin-bottom:16px;">📝 ${c.notes}</div>` : ''}
+
+      ${campList.length > 0 ? `
+      <div style="background:var(--primary-light);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:12px;">📊 PERFORMA KONTEN INI</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px;">
+          <div style="text-align:center;">
+            <div style="font-size:10px;font-weight:600;color:var(--text-sub);text-transform:uppercase;">Dipakai di</div>
+            <div style="font-size:18px;font-weight:800;color:var(--primary);margin-top:2px;">${campList.length} kampanye</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:10px;font-weight:600;color:var(--text-sub);text-transform:uppercase;">CPR Terbaik</div>
+            <div style="font-size:18px;font-weight:800;color:var(--success);margin-top:2px;">${bestCpr ? 'Rp ' + bestCpr.toLocaleString('id-ID') : '-'}</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:10px;font-weight:600;color:var(--text-sub);text-transform:uppercase;">Avg CTR</div>
+            <div style="font-size:18px;font-weight:800;color:var(--primary);margin-top:2px;">${avgCtr ? avgCtr + '%' : '-'}</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--text-sub);">
+          <strong style="color:var(--text);">Kampanye:</strong> ${campList.slice(0,3).join(', ')}${campList.length > 3 ? ` +${campList.length - 3} lainnya` : ''}
+        </div>
+        ${p?.winner ? `<div style="margin-top:8px;"><span class="badge badge-success">🏆 Ada kampanye Winner dari konten ini!</span></div>` : ''}
+      </div>` : `
+      <div style="background:var(--gray-1);border-radius:var(--radius-sm);padding:14px;text-align:center;color:var(--text-sub);font-size:13px;margin-bottom:16px;">
+        Belum ada data performa — konten ini belum digunakan di iklan
+      </div>`}
+
       <div style="display:flex;gap:10px;">
         <button class="btn btn-danger btn-sm" onclick="deleteContent('${c.id}')">Hapus</button>
         <button class="btn btn-primary btn-sm" onclick="markStatus('${c.id}','ready')">Tandai Siap</button>
