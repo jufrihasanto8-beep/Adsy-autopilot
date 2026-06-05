@@ -381,7 +381,7 @@
       return `
       <tr>
         <td>
-          <strong>${c.name}</strong>
+          <strong>${c.name}</strong>${c.is_winner ? ' <span class="badge badge-success" style="font-size:10px;vertical-align:middle;">🏆 Winner</span>' : ''}
           <div style="font-size:11px; color:var(--gray-5); margin-top:2px;">${c.objective || '-'} · ${c.content_library?.name || 'No content'}</div>
         </td>
         <td>
@@ -553,6 +553,7 @@
         <span class="badge ${c.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}"><span class="badge-dot"></span>${c.status === 'ACTIVE' ? 'Aktif' : 'Paused'}</span>
         <span class="badge ${phaseBadge[c.current_phase] || 'badge-gray'}">Phase ${c.current_phase || 1}: ${phaseLabel[c.current_phase] || 'Testing'}</span>
         ${c.autopilot_enabled ? '<span class="badge badge-primary">🤖 Autopilot ON</span>' : '<span class="badge badge-gray">Autopilot OFF</span>'}
+        ${c.is_winner ? '<span class="badge badge-success">🏆 Winner</span>' : ''}
       `;
 
       // Performa
