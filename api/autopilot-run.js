@@ -914,6 +914,18 @@ async function executeAction(camp, rule, token, userId, logs) {
 
 async function sendWASummary(count, logs) {
   try {
+    // Ambil fonnte token dari admin (role admin/superadmin) atau env var fallback
+    let fonnteToken = process.env.FONNTE_TOKEN;
+    if (!fonnteToken) {
+      const { data: adminConfig } = await sb.from('app_config')
+        .select('fonnte_token, user_id')
+        .not('fonnte_token', 'is', null)
+        .limit(1)
+        .single();
+      fonnteToken = adminConfig?.fonnte_token;
+    }
+    if (!fonnteToken) return; // tidak ada fonnte token sama sekali
+
     // Kelompokkan logs per user_id
     const byUser = {};
     for (const log of logs) {
@@ -923,13 +935,13 @@ async function sendWASummary(count, logs) {
     }
 
     for (const [userId, userLogs] of Object.entries(byUser)) {
-      // Ambil fonnte config + notif settings secara paralel
+      // Ambil wa_target + notif settings per user (fonnte token dari admin)
       const [{ data: config }, { data: notif }] = await Promise.all([
-        sb.from('app_config').select('fonnte_token, wa_target').eq('user_id', userId).single(),
+        sb.from('app_config').select('wa_target').eq('user_id', userId).single(),
         sb.from('notif_settings').select('*').eq('user_id', userId).maybeSingle()
       ]);
 
-      if (!config?.fonnte_token || !config?.wa_target) continue;
+      if (!config?.wa_target) continue;
 
       // Filter logs berdasarkan notif_settings (default semua aktif kalau belum diset)
       const filteredLogs = userLogs.filter(log => {
@@ -988,7 +1000,7 @@ async function sendWASummary(count, logs) {
 
       await fetch('https://api.fonnte.com/send', {
         method: 'POST',
-        headers: { 'Authorization': config.fonnte_token, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: config.wa_target, message })
       });
     }
