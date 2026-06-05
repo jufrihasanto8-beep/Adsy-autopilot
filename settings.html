@@ -1310,10 +1310,10 @@
   }
 
   async function updateUser(userId, updates) {
-    const res = await fetch('/api/update-user-status', {
+    const res = await fetch('/api/create-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, ...updates })
+      body: JSON.stringify({ action: 'update', userId, ...updates })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Gagal update');
