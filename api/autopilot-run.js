@@ -224,14 +224,22 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
         initial_budget: camp.daily_budget
       }).eq('id', camp.id);
 
-      // Buat kampanye Phase 2 baru, Phase 1 tetap jalan dengan autopilot aktif
+      // Ambil data produk untuk Phase 2b interest
+      const { data: product } = await sb.from('products')
+        .select('name, tagline, benefits')
+        .eq('id', camp.product_id).single();
+
+      // Buat kampanye Phase 2a (COST_CAP)
       await createPhase2Campaign(camp, token, logs);
+
+      // Buat kampanye Phase 2b (ABO 3 adset interest)
+      await createPhase2bCampaign(camp, token, product, logs);
 
       const logEntry = {
         user_id: camp.user_id,
         campaign_name: camp.name,
         action_type: 'phase_advance',
-        description: `"${camp.name}" lolos Phase 1 → kampanye Phase 2 dibuat`,
+        description: `"${camp.name}" lolos Phase 1 → kampanye Phase 2a & 2b dibuat`,
         status: 'success'
       };
       await sb.from('action_logs').insert(logEntry);
@@ -547,6 +555,216 @@ async function runBlueprintRules(camp, targetCpr, targetRoas, token, logs) {
   }
 
   return false;
+}
+
+// ── Buat kampanye Phase 2b (ABO, 3 adset interest) ──
+async function createPhase2bCampaign(camp, token, product, logs) {
+  if (!token || !camp.meta_campaign_id) return;
+
+  try {
+    // 1. Ambil account_id + objective dari kampanye Phase 1
+    const campInfoRes = await fetch(
+      `${META_API}/${camp.meta_campaign_id}?fields=account_id,objective&access_token=${encodeURIComponent(token)}`
+    );
+    const campInfo = await campInfoRes.json();
+    const accountId = campInfo.account_id;
+    if (!accountId) throw new Error('Tidak bisa ambil account_id');
+
+    // 2. Ambil creative dari ads Phase 1
+    const adsRes = await fetch(
+      `${META_API}/${camp.meta_campaign_id}/ads?fields=creative{id}&access_token=${encodeURIComponent(token)}`
+    );
+    const adsData = await adsRes.json();
+    const creativeId = adsData.data?.[0]?.creative?.id;
+
+    // 3. Generate keyword per kategori via Claude
+    const keywords = await generateInterestKeywords(product);
+
+    // 4. Cari interest di Meta per kategori
+    const interests = await searchInterestsPerCategory(keywords, token);
+
+    // 5. Buat campaign ABO
+    const newCampRes = await fetch(`${META_API}/act_${accountId}/campaigns`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: camp.name + ' — Phase 2b',
+        objective: campInfo.objective || 'OUTCOME_SALES',
+        status: 'ACTIVE',
+        access_token: token
+      })
+    });
+    const newCampData = await newCampRes.json();
+    const newCampaignId = newCampData.id;
+    if (!newCampaignId) throw new Error('Gagal buat campaign: ' + JSON.stringify(newCampData));
+
+    // 6. Buat 3 adset dengan interest berbeda
+    const categories = [
+      { key: 'manfaat', label: 'Manfaat' },
+      { key: 'perilaku', label: 'Perilaku Belanja' },
+      { key: 'hobi', label: 'Hobi' }
+    ];
+
+    for (const cat of categories) {
+      const catInterests = interests[cat.key] || [];
+      if (catInterests.length === 0) continue;
+
+      const targeting = {
+        age_min: 21,
+        geo_locations: { countries: ['ID'] },
+        flexible_spec: [{ interests: catInterests.map(i => ({ id: i.id, name: i.name })) }]
+      };
+
+      // Buat adset
+      const adsetRes = await fetch(`${META_API}/act_${accountId}/adsets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `${camp.name} — Phase 2b ${cat.label}`,
+          campaign_id: newCampaignId,
+          daily_budget: 50000,
+          billing_event: 'IMPRESSIONS',
+          optimization_goal: 'OFFSITE_CONVERSIONS',
+          status: 'ACTIVE',
+          targeting,
+          access_token: token
+        })
+      });
+      const adsetData = await adsetRes.json();
+      const newAdsetId = adsetData.id;
+      if (!newAdsetId) continue;
+
+      // Buat ad dengan creative yang sama dari Phase 1
+      if (creativeId) {
+        await fetch(`${META_API}/act_${accountId}/ads`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: `${camp.name} — Phase 2b ${cat.label}`,
+            adset_id: newAdsetId,
+            creative: { creative_id: creativeId },
+            status: 'ACTIVE',
+            access_token: token
+          })
+        });
+      }
+
+      // Simpan ke Supabase (1 row per adset)
+      await sb.from('campaigns').insert({
+        user_id: camp.user_id,
+        name: `${camp.name} — Phase 2b ${cat.label}`,
+        status: 'ACTIVE',
+        current_phase: 2,
+        phase_type: '2b',
+        phase_started_at: new Date().toISOString(),
+        autopilot_enabled: true,
+        product_id: camp.product_id,
+        daily_budget: 50000,
+        meta_campaign_id: newCampaignId,
+        meta_adset_id: newAdsetId,
+        days_running: 0
+      });
+    }
+
+    const logEntry = {
+      user_id: camp.user_id,
+      campaign_name: camp.name + ' — Phase 2b',
+      action_type: 'create',
+      description: `Kampanye Phase 2b dibuat — ABO 3 adset interest (Manfaat, Perilaku, Hobi) @ Rp 50.000/adset`,
+      status: 'success'
+    };
+    await sb.from('action_logs').insert(logEntry);
+    logs.push(logEntry);
+
+  } catch (err) {
+    console.error('createPhase2bCampaign error:', err.message);
+    await sb.from('action_logs').insert({
+      user_id: camp.user_id,
+      campaign_name: camp.name,
+      action_type: 'create',
+      description: `Gagal buat kampanye Phase 2b: ${err.message}`,
+      status: 'error'
+    }).catch(() => {});
+  }
+}
+
+// ── Generate keyword interest per kategori via Claude ──
+async function generateInterestKeywords(product) {
+  if (!product) return { manfaat: [], perilaku: ['belanja online', 'e-commerce', 'shopee', 'tokopedia'], hobi: [] };
+
+  try {
+    const prompt = `Kamu adalah ahli Meta Ads Indonesia. Berdasarkan produk berikut, berikan keyword untuk mencari interest di Meta Ads:
+
+Nama: ${product.name}
+Tagline: ${product.tagline || '-'}
+Manfaat: ${product.benefits || '-'}
+
+Berikan dalam format JSON dengan 3 kategori, masing-masing 5 keyword dalam bahasa Indonesia:
+{
+  "manfaat": ["keyword masalah/kondisi yang diselesaikan produk ini"],
+  "perilaku": ["keyword perilaku belanja online yang relevan dengan target pembeli"],
+  "hobi": ["keyword hobi/aktivitas yang relevan dengan target pembeli produk ini"]
+}
+
+Hanya kembalikan JSON, tanpa penjelasan lain.`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '{}';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    return jsonMatch ? JSON.parse(jsonMatch[0]) : { manfaat: [product.name], perilaku: ['belanja online'], hobi: [] };
+
+  } catch (err) {
+    console.error('generateInterestKeywords error:', err.message);
+    return { manfaat: [product.name], perilaku: ['belanja online', 'e-commerce'], hobi: [] };
+  }
+}
+
+// ── Cari interest di Meta per kategori ──
+async function searchInterestsPerCategory(keywords, token) {
+  const result = { manfaat: [], perilaku: [], hobi: [] };
+
+  for (const [cat, terms] of Object.entries(keywords)) {
+    if (!terms?.length) continue;
+
+    const fetches = terms.map(term =>
+      fetch(`${META_API}/search?type=adinterest&q=${encodeURIComponent(term)}&limit=15&locale=id_ID&access_token=${encodeURIComponent(token)}`)
+        .then(r => r.json()).catch(() => ({ data: [] }))
+    );
+    const results = await Promise.all(fetches);
+
+    const seen = new Set();
+    results.forEach(r => {
+      (r.data || []).forEach(item => {
+        if (!item.id || !item.name) return;
+        const key = item.name.toLowerCase();
+        if (!seen.has(key) && (item.audience_size || 0) > 10000) {
+          seen.add(key);
+          result[cat].push({ id: item.id, name: item.name, audience_size: item.audience_size || 0 });
+        }
+      });
+    });
+
+    // Sort by audience size, ambil top 8
+    result[cat] = result[cat]
+      .sort((a, b) => b.audience_size - a.audience_size)
+      .slice(0, 8);
+  }
+
+  return result;
 }
 
 // ── Helpers ──
