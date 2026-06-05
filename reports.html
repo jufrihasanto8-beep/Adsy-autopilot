@@ -217,20 +217,25 @@
     ]);
   }
 
+  let campaignData = [];
+
   async function loadStats(since) {
-    let q = sb.from('campaigns').select('spend_total, clicks_total, cpr, current_phase');
+    let q = sb.from('campaigns').select('spend_today, results_today, cpr, ctr, autopilot_enabled, current_phase');
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
     const { data } = await q;
+    campaignData = data || [];
 
-    const totalSpend = (data || []).reduce((s, c) => s + (c.spend_total || 0), 0);
-    const totalClicks = (data || []).reduce((s, c) => s + (c.clicks_total || 0), 0);
-    const avgCPR = data?.length ? (data || []).reduce((s, c) => s + (c.cpr || 0), 0) / data.length : 0;
+    const totalSpend = campaignData.reduce((s, c) => s + (c.spend_today || 0), 0);
+    const totalResults = campaignData.reduce((s, c) => s + (c.results_today || 0), 0);
+    const activeCprs = campaignData.filter(c => c.cpr > 0);
+    const avgCPR = activeCprs.length ? activeCprs.reduce((s, c) => s + c.cpr, 0) / activeCprs.length : 0;
 
     document.getElementById('r-spend').textContent = formatRupiah(totalSpend);
-    document.getElementById('r-clicks').textContent = formatNumber(totalClicks);
-    document.getElementById('r-cpr').textContent = formatRupiah(Math.round(avgCPR));
+    document.getElementById('r-clicks').textContent = totalResults.toLocaleString('id-ID');
+    document.getElementById('r-cpr').textContent = avgCPR ? formatRupiah(Math.round(avgCPR)) : '-';
 
     let aq = sb.from('action_logs').select('*', { count: 'exact', head: true })
+      .neq('action_type', 'create')
       .gte('created_at', since.toISOString());
     if (currentProfile.role !== 'admin') aq = aq.eq('user_id', currentProfile.id);
     const { count } = await aq;
@@ -238,7 +243,7 @@
   }
 
   async function loadCampaignReport(since) {
-    let q = sb.from('campaigns').select('*').order('spend_total', { ascending: false });
+    let q = sb.from('campaigns').select('*').order('spend_today', { ascending: false });
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
     const { data } = await q;
 
@@ -255,17 +260,18 @@
       <tr>
         <td><strong>${c.name}</strong></td>
         <td><span class="badge ${phaseBadge[c.current_phase] || 'badge-gray'}">P${c.current_phase || 1}: ${phaseLabel[c.current_phase] || 'Testing'}</span></td>
-        <td>${formatRupiah(c.spend_total)}</td>
-        <td>${formatNumber(c.clicks_total)}</td>
+        <td>${formatRupiah(c.spend_today)}</td>
+        <td>${(c.results_today || 0).toLocaleString('id-ID')}</td>
         <td>${c.ctr ? c.ctr.toFixed(2) + '%' : '-'}</td>
-        <td>${formatRupiah(c.cpr)}</td>
-        <td>${formatNumber(c.results_total)}</td>
+        <td>${c.cpr ? formatRupiah(c.cpr) : '-'}</td>
+        <td>${(c.impressions || 0).toLocaleString('id-ID')}</td>
         <td><span class="badge ${c.autopilot_enabled ? 'badge-success' : 'badge-gray'}">${c.autopilot_enabled ? '🤖 Aktif' : 'Manual'}</span></td>
       </tr>`).join('');
   }
 
   async function loadActionLog(since) {
     let q = sb.from('action_logs').select('*')
+      .neq('action_type', 'create')
       .gte('created_at', since.toISOString())
       .order('created_at', { ascending: false }).limit(50);
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
@@ -273,48 +279,51 @@
 
     const tbody = document.getElementById('action-table');
     if (!data || data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--gray-5);">Belum ada aksi di periode ini</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--gray-5);">Belum ada aksi autopilot di periode ini</td></tr>`;
       return;
     }
 
+    const actionLabel = {
+      pause: '⏸ Pause', resume: '▶ Resume', scale: '📈 Scale',
+      increase_budget: '📈 Naikkan Budget', decrease_budget: '📉 Turunkan Budget',
+      phase_advance: '🚀 Naik Phase', duplicate: '📋 Duplikat', winner: '🏆 Winner'
+    };
     const actionBadge = {
-      pause: 'badge-warning', scale: 'badge-success', create: 'badge-primary',
-      duplicate: 'badge-primary', resume: 'badge-success', notify: 'badge-gray'
+      pause: 'badge-warning', resume: 'badge-success', scale: 'badge-success',
+      increase_budget: 'badge-success', decrease_budget: 'badge-warning',
+      phase_advance: 'badge-primary', duplicate: 'badge-primary', winner: 'badge-success'
     };
 
     tbody.innerHTML = data.map(log => `
       <tr>
-        <td style="font-size:12px; color:var(--gray-5);">${formatDate(log.created_at)}</td>
-        <td>${log.campaign_name || '-'}</td>
-        <td><span class="badge ${actionBadge[log.action_type] || 'badge-gray'}">${log.action_type}</span></td>
-        <td style="font-size:12px; color:var(--gray-5);">${log.reason || '-'}</td>
-        <td><span class="badge ${log.status === 'success' ? 'badge-success' : 'badge-danger'}">${log.status || 'success'}</span></td>
+        <td style="font-size:12px; color:var(--gray-5); white-space:nowrap;">${formatDate(log.created_at)}</td>
+        <td><strong>${log.campaign_name || '-'}</strong></td>
+        <td><span class="badge ${actionBadge[log.action_type] || 'badge-gray'}">${actionLabel[log.action_type] || log.action_type}</span></td>
+        <td style="font-size:12px; color:var(--gray-5);">${log.description || '-'}</td>
+        <td><span class="badge ${log.status === 'success' ? 'badge-success' : 'badge-danger'}">${log.status === 'success' ? 'Sukses' : 'Gagal'}</span></td>
       </tr>`).join('');
   }
 
   async function loadCharts(since, days) {
-    // Generate labels
-    const labels = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      labels.push(d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }));
-    }
+    let q = sb.from('campaigns').select('name, spend_today, ctr, cpr').order('spend_today', { ascending: false }).limit(8);
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+    const camps = (data || []).filter(c => c.spend_today > 0);
 
-    // Placeholder data (replace with real DB query)
-    const spendData = labels.map(() => Math.floor(Math.random() * 300000) + 50000);
-    const ctrData = labels.map(() => (Math.random() * 2 + 0.5).toFixed(2));
+    const labels = camps.map(c => c.name.length > 20 ? c.name.substring(0, 18) + '…' : c.name);
+    const spendData = camps.map(c => c.spend_today || 0);
+    const ctrData = camps.map(c => c.ctr || 0);
 
-    // Spend Chart
+    // Spend Chart — per kampanye
     const spendCtx = document.getElementById('chart-spend').getContext('2d');
     if (spendChart) spendChart.destroy();
     spendChart = new Chart(spendCtx, {
       type: 'bar',
       data: {
-        labels,
+        labels: labels.length ? labels : ['Belum ada data'],
         datasets: [{
-          label: 'Spend (Rp)',
-          data: spendData,
+          label: 'Spend Hari Ini (Rp)',
+          data: spendData.length ? spendData : [0],
           backgroundColor: 'rgba(37, 99, 235, 0.15)',
           borderColor: '#2563EB',
           borderWidth: 2,
@@ -326,34 +335,33 @@
         plugins: { legend: { display: false } },
         scales: {
           y: { ticks: { callback: v => 'Rp ' + (v/1000).toFixed(0) + 'K' }, grid: { color: '#F1F5F9' } },
-          x: { grid: { display: false }, ticks: { maxRotation: 0, maxTicksLimit: 8 } }
+          x: { grid: { display: false }, ticks: { maxRotation: 30 } }
         }
       }
     });
 
-    // CTR Chart
+    // CTR Chart — per kampanye
     const ctrCtx = document.getElementById('chart-ctr').getContext('2d');
     if (ctrChart) ctrChart.destroy();
     ctrChart = new Chart(ctrCtx, {
-      type: 'line',
+      type: 'bar',
       data: {
-        labels,
+        labels: labels.length ? labels : ['Belum ada data'],
         datasets: [{
           label: 'CTR (%)',
-          data: ctrData,
+          data: ctrData.length ? ctrData : [0],
+          backgroundColor: 'rgba(16,185,129,0.15)',
           borderColor: '#10B981',
-          backgroundColor: 'rgba(16,185,129,0.08)',
-          tension: 0.4,
-          pointRadius: 3,
-          fill: true
+          borderWidth: 2,
+          borderRadius: 6
         }]
       },
       options: {
         responsive: true,
         plugins: { legend: { display: false } },
         scales: {
-          y: { ticks: { callback: v => v + '%' }, grid: { color: '#F1F5F9' } },
-          x: { grid: { display: false }, ticks: { maxRotation: 0, maxTicksLimit: 8 } }
+          y: { ticks: { callback: v => v.toFixed(2) + '%' }, grid: { color: '#F1F5F9' } },
+          x: { grid: { display: false }, ticks: { maxRotation: 30 } }
         }
       }
     });
@@ -365,17 +373,18 @@
     const { data } = await q;
     if (!data || data.length === 0) return showToast('Tidak ada data untuk diekspor', 'warning');
 
-    const headers = ['Nama', 'Objective', 'Phase', 'Spend Total', 'Klik', 'CTR', 'CPR', 'Status', 'Autopilot'];
+    const headers = ['Nama', 'Phase', 'Status', 'Spend Hari Ini', 'Hasil', 'CTR', 'CPR', 'Impresi', 'Budget Harian', 'Autopilot'];
     const rows = data.map(c => [
-      c.name, c.objective, c.current_phase,
-      c.spend_total || 0, c.clicks_total || 0,
+      `"${c.name}"`, c.current_phase || 1, c.status,
+      c.spend_today || 0, c.results_today || 0,
       c.ctr ? c.ctr.toFixed(2) + '%' : '-',
-      c.cpr || '-', c.status,
+      c.cpr || '-', c.impressions || 0,
+      c.daily_budget || 0,
       c.autopilot_enabled ? 'Ya' : 'Tidak'
     ]);
 
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
