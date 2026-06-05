@@ -224,6 +224,23 @@ export default async function handler(req, res) {
       const SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
       const { data: globalCfg } = await sb.from('global_settings').select('*').eq('id', SETTINGS_ID).single();
 
+      // Bangun geo targeting dari pilihan provinsi admin
+      const locMode = globalCfg?.ad_location_mode || 'include';
+      const selectedProvinces = globalCfg?.ad_selected_provinces || [];
+      let geoLocations = { countries: ['ID'] };
+      let excludedGeoLocations = null;
+
+      if (selectedProvinces.length > 0) {
+        // Fetch region key dari Meta untuk setiap provinsi
+        const regionKeys = await resolveProvinceKeys(selectedProvinces, token);
+        if (regionKeys.length > 0) {
+          if (locMode === 'exclude') {
+            excludedGeoLocations = { regions: regionKeys };
+          } else {
+            geoLocations = { regions: regionKeys };
+          }
+        }
+      }
 
       const { optimizationGoal, billingEvent } = objectiveConfig(objective);
       const adsetPayload = {
@@ -232,7 +249,8 @@ export default async function handler(req, res) {
         billing_event: billingEvent,
         optimization_goal: optimizationGoal,
         targeting: {
-          geo_locations: { countries: ['ID'] },
+          geo_locations: geoLocations,
+          ...(excludedGeoLocations ? { excluded_geo_locations: excludedGeoLocations } : {}),
           age_min: 21,
           age_max: 65
         },
@@ -422,6 +440,27 @@ async function sendWANotif(userId, campaignName, headline, status) {
   } catch (err) {
     console.error('sendWANotif error:', err.message);
   }
+}
+
+// Fetch region key dari Meta API per nama provinsi
+async function resolveProvinceKeys(provinceNames, token) {
+  const keys = [];
+  for (const name of provinceNames) {
+    try {
+      const res = await fetch(
+        `${META_API}/search?type=adgeolocation&q=${encodeURIComponent(name)}&location_types=["region"]&country_codes=["ID"]&access_token=${encodeURIComponent(token)}`
+      );
+      const data = await res.json();
+      const match = data.data?.find(r =>
+        r.type === 'region' && r.country_code === 'ID' &&
+        r.name.toLowerCase().includes(name.toLowerCase().split(' ')[0])
+      );
+      if (match) keys.push({ key: match.key });
+    } catch (e) {
+      console.warn('resolveProvinceKeys error for', name, e.message);
+    }
+  }
+  return keys;
 }
 
 function getPromotedObject(objective, pageId, pixelId) {
