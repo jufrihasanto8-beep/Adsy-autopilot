@@ -58,6 +58,7 @@
         <p>Kelola aset konten untuk autopilot iklan</p>
       </div>
       <div class="topbar-right">
+        <button class="btn btn-outline" id="btn-analyze-winners">✨ Analisa Winner</button>
         <button class="btn btn-primary" id="btn-add-content">+ Tambah Konten</button>
       </div>
     </header>
@@ -176,6 +177,22 @@
   </div>
 </div>
 
+<!-- MODAL ANALISA WINNER -->
+<div class="modal-overlay hidden" id="modal-analyze">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h3>✨ Analisa Konten Winner</h3>
+      <div class="modal-close">✕</div>
+    </div>
+    <div class="modal-body" id="analyze-body">
+      <div style="text-align:center; padding:40px; color:var(--text-sub);">
+        <div class="loading-spinner" style="margin:0 auto 14px; width:28px; height:28px; border-width:3px;"></div>
+        AI sedang menganalisa pola winner kamu...
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -197,6 +214,7 @@
     initModals();
 
     document.getElementById('btn-add-content').addEventListener('click', () => openModal('modal-add'));
+    document.getElementById('btn-analyze-winners').addEventListener('click', analyzeWinners);
     document.getElementById('btn-save-content').addEventListener('click', saveContent);
     document.getElementById('btn-verify-gdrive').addEventListener('click', verifyGDrive);
     document.getElementById('search-input').addEventListener('input', filterContent);
@@ -410,6 +428,100 @@
     closeModal('modal-detail');
     await loadContent();
   };
+
+  async function analyzeWinners() {
+    // Kumpulkan konten yang punya performa bagus (ada CPR data)
+    const winners = allContent
+      .filter(c => c._perf?.cprs?.length > 0)
+      .map(c => {
+        const p = c._perf;
+        const bestCpr = Math.min(...p.cprs);
+        const avgCtr = p.ctrs?.length ? (p.ctrs.reduce((a,b)=>a+b,0) / p.ctrs.length).toFixed(2) : null;
+        return {
+          name: c.name,
+          type: c.content_type,
+          category: c.category || '',
+          audience: c.audience || '',
+          notes: c.notes || '',
+          cpr: bestCpr,
+          ctr: avgCtr,
+          campCount: p.campaigns?.size || 0,
+          isWinner: p.winner || false
+        };
+      })
+      .sort((a, b) => a.cpr - b.cpr)
+      .slice(0, 10); // ambil 10 terbaik
+
+    if (!winners.length) {
+      return showToast('Belum ada konten dengan data performa. Pastikan konten sudah digunakan di kampanye.', 'warning');
+    }
+
+    // Buka modal loading
+    openModal('modal-analyze');
+    document.getElementById('analyze-body').innerHTML = `
+      <div style="text-align:center; padding:40px; color:var(--text-sub);">
+        <div class="loading-spinner" style="margin:0 auto 14px; width:28px; height:28px; border-width:3px; border-color:var(--gray-3); border-top-color:var(--primary);"></div>
+        AI sedang menganalisa ${winners.length} konten terbaik kamu...
+      </div>`;
+
+    try {
+      const res = await fetch('/api/ai-copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'analyze-winners', winners })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal');
+
+      const r = data.result;
+      document.getElementById('analyze-body').innerHTML = `
+        <div style="background:var(--primary-light); border-radius:10px; padding:16px; margin-bottom:20px;">
+          <div style="font-size:11px; font-weight:700; color:var(--primary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">📊 Ringkasan</div>
+          <div style="font-size:14px; color:var(--text); line-height:1.6;">${r.summary}</div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <div style="font-size:12px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">💡 Insight dari Winner</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            ${r.insights.map(ins => `
+              <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; background:var(--gray-1); border-radius:8px; font-size:13px; line-height:1.5;">
+                <span style="color:var(--success); font-size:16px; flex-shrink:0;">✓</span>
+                <span>${ins}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <div style="font-size:12px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">🚀 Rekomendasi Konten Baru</div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            ${r.recommendations.map((rec, i) => `
+              <div style="border:1px solid var(--gray-3); border-radius:10px; padding:14px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                  <span style="background:var(--primary); color:#fff; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0;">${i+1}</span>
+                  <strong style="font-size:13px;">${rec.title}</strong>
+                  <span class="badge ${rec.type === 'video' ? 'badge-primary' : 'badge-gray'}" style="font-size:10px;">${rec.type === 'video' ? '🎬 Video' : '🖼️ Gambar'}</span>
+                </div>
+                <div style="font-size:13px; color:var(--text); margin-bottom:6px; line-height:1.5;">${rec.description}</div>
+                <div style="font-size:11px; color:var(--text-sub); font-style:italic;">💬 ${rec.why}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        ${r.avoid ? `
+        <div style="background:#FEF3C7; border:1px solid #F59E0B; border-radius:8px; padding:12px; font-size:13px; color:#92400E;">
+          ⚠️ <strong>Hindari:</strong> ${r.avoid}
+        </div>` : ''}
+
+        <div style="margin-top:16px; font-size:11px; color:var(--gray-5); text-align:center;">
+          Analisa berdasarkan ${winners.length} konten dengan performa terbaik
+        </div>`;
+    } catch (err) {
+      document.getElementById('analyze-body').innerHTML = `
+        <div style="text-align:center; padding:30px; color:var(--danger);">
+          ⚠️ Gagal menganalisa: ${err.message}
+        </div>`;
+    }
+  }
 
   init();
 </script>
