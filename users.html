@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kelola User — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="/assets/autopilot.png" style="width:36px;height:36px;object-fit:contain;border-radius:8px;" alt="Adsy" />
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-item" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
+      <div class="nav-item" data-page="products.html"><span class="nav-icon">📦</span> Produk</div>
+      <div class="nav-item active" data-page="users.html" data-admin-only><span class="nav-icon">👥</span> Kelola User</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>Kelola User</h2>
+        <p>Approve pendaftaran dan atur role tim</p>
+      </div>
+      <div class="topbar-right">
+        <select class="form-input form-select" id="filter-status" style="width:auto;">
+          <option value="">Semua Status</option>
+          <option value="pending">Pending</option>
+          <option value="active">Aktif</option>
+          <option value="suspended">Suspend</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- Pending Banner -->
+      <div id="pending-banner" style="display:none; background:#FEF3C7; border:1.5px solid #F59E0B; border-radius:12px; padding:14px 20px; margin-bottom:20px; display:flex; align-items:center; gap:12px;">
+        <span style="font-size:20px;">⏳</span>
+        <div>
+          <strong style="font-size:14px; color:#92400E;">Ada <span id="pending-count">0</span> user menunggu persetujuan</strong>
+          <p style="font-size:12px; color:#92400E; margin-top:2px;">Approve atau tolak pendaftaran mereka di bawah.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>WhatsApp</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Daftar</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="user-table">
+              <tr><td colspan="6" style="text-align:center; padding:40px; color:var(--gray-5);">Memuat data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo, requireAdmin } from './js/auth.js';
+  import { initSidebar, showToast, formatDate } from './js/sidebar.js';
+  import { getSupabase } from './js/supabase.js';
+
+  let sb;
+  let allUsers = [];
+
+  async function init() {
+    sb = await getSupabase();
+    const session = await requireAuth();
+    if (!session) return;
+    const profile = await requireAdmin();
+    if (!profile) return;
+    await renderUserInfo();
+    initSidebar();
+
+    document.getElementById('filter-status').addEventListener('change', filterUsers);
+    await loadUsers();
+  }
+
+  async function loadUsers() {
+    const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
+    if (error) { showToast('Gagal memuat user', 'error'); return; }
+    allUsers = data || [];
+
+    const pendingCount = allUsers.filter(u => u.status === 'pending').length;
+    const banner = document.getElementById('pending-banner');
+    if (pendingCount > 0) {
+      banner.style.display = 'flex';
+      document.getElementById('pending-count').textContent = pendingCount;
+    } else {
+      banner.style.display = 'none';
+    }
+
+    renderUsers(allUsers);
+  }
+
+  function renderUsers(data) {
+    const tbody = document.getElementById('user-table');
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px; color:var(--gray-5);">Tidak ada user</td></tr>`;
+      return;
+    }
+
+    const statusBadge = { active: 'badge-success', pending: 'badge-warning', suspended: 'badge-danger' };
+    const statusLabel = { active: 'Aktif', pending: 'Pending', suspended: 'Suspend' };
+    const roleBadge = { admin: 'badge-primary', superadmin: 'badge-primary', advertiser: 'badge-gray' };
+
+    tbody.innerHTML = data.map(u => `
+      <tr>
+        <td>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#7C3AED);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:13px;flex-shrink:0;">
+              ${u.name ? u.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : '??'}
+            </div>
+            <div>
+              <div style="font-weight:600;font-size:13px;">${u.name || '-'}</div>
+              <div style="font-size:11px;color:var(--gray-5);">${u.email}</div>
+            </div>
+          </div>
+        </td>
+        <td style="font-size:13px;">${u.wa_number || '-'}</td>
+        <td>
+          <select class="form-input form-select" style="width:auto;font-size:12px;padding:5px 8px;"
+            onchange="changeRole('${u.id}', this.value)">
+            <option value="advertiser" ${u.role === 'advertiser' ? 'selected' : ''}>Advertiser</option>
+            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+          </select>
+        </td>
+        <td><span class="badge ${statusBadge[u.status] || 'badge-gray'}">${statusLabel[u.status] || u.status || 'active'}</span></td>
+        <td style="font-size:12px;color:var(--gray-5);">${formatDate ? formatDate(u.created_at) : new Date(u.created_at).toLocaleDateString('id-ID')}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            ${(!u.status || u.status === 'pending') ? `
+              <button class="btn btn-success btn-sm" onclick="approveUser('${u.id}', '${u.name}', '${u.wa_number || ''}')">✓ Approve</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="rejectUser('${u.id}', '${u.name}')">✕ Tolak</button>
+            ` : u.status === 'active' ? `
+              <button class="btn btn-outline btn-sm" style="color:var(--danger);" onclick="suspendUser('${u.id}')">Suspend</button>
+            ` : `
+              <button class="btn btn-outline btn-sm" onclick="activateUser('${u.id}')">Aktifkan</button>
+            `}
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  function filterUsers() {
+    const status = document.getElementById('filter-status').value;
+    const filtered = status ? allUsers.filter(u => (u.status || 'active') === status) : allUsers;
+    renderUsers(filtered);
+  }
+
+  window.approveUser = async function(id, name, waNumber) {
+    await sb.from('profiles').update({ status: 'active' }).eq('id', id);
+    showToast(`${name} berhasil disetujui!`, 'success');
+
+    // Kirim notif WA ke user
+    if (waNumber) {
+      try {
+        await fetch('/api/notify-new-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'approved', wa_number: waNumber, name })
+        });
+      } catch(e) {}
+    }
+    await loadUsers();
+  };
+
+  window.rejectUser = async function(id, name) {
+    if (!confirm(`Tolak pendaftaran ${name}? Akun akan dihapus.`)) return;
+    await sb.from('profiles').delete().eq('id', id);
+    showToast(`Pendaftaran ${name} ditolak`, 'warning');
+    await loadUsers();
+  };
+
+  window.suspendUser = async function(id) {
+    if (!confirm('Suspend user ini?')) return;
+    await sb.from('profiles').update({ status: 'suspended' }).eq('id', id);
+    showToast('User disuspend', 'warning');
+    await loadUsers();
+  };
+
+  window.activateUser = async function(id) {
+    await sb.from('profiles').update({ status: 'active' }).eq('id', id);
+    showToast('User diaktifkan', 'success');
+    await loadUsers();
+  };
+
+  window.changeRole = async function(id, role) {
+    await sb.from('profiles').update({ role }).eq('id', id);
+    showToast('Role diperbarui', 'success');
+  };
+
+  init();
+</script>
+</body>
+</html>

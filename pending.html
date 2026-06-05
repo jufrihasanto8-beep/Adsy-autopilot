@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Menunggu Persetujuan — Adsy Autopilot</title>
+  <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #2563EB; --gray-1: #F8FAFC; --gray-2: #F1F5F9;
+      --gray-3: #E2E8F0; --gray-5: #94A3B8; --gray-6: #64748B;
+      --text: #1A1A2E; --success: #10B981; --radius: 16px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--gray-1);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .login-bg { position: fixed; inset: 0; background: linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 50%, #F0FDF4 100%); z-index: -1; }
+    .blob { position: fixed; border-radius: 50%; filter: blur(60px); opacity: 0.4; }
+    .blob-1 { width: 400px; height: 400px; background: #BFDBFE; top: -100px; left: -100px; }
+    .blob-2 { width: 300px; height: 300px; background: #DDD6FE; bottom: -80px; right: -80px; }
+    .card {
+      background: white; border-radius: var(--radius);
+      box-shadow: var(--shadow); width: 100%; max-width: 420px;
+      padding: 48px 40px; text-align: center;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; justify-content: center; }
+    .logo-icon { width: 44px; height: 44px; background: linear-gradient(135deg, #2563EB, #7C3AED); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .logo-text strong { display: block; font-size: 18px; font-weight: 800; color: var(--text); }
+    .logo-text span { font-size: 12px; color: var(--gray-6); }
+    .icon { font-size: 72px; margin-bottom: 20px; animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+    h1 { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 10px; }
+    p { font-size: 14px; color: var(--gray-6); line-height: 1.7; margin-bottom: 8px; }
+    .info-box {
+      background: #EFF6FF; border-radius: 10px; padding: 16px;
+      margin: 24px 0; text-align: left;
+    }
+    .info-box p { font-size: 13px; color: var(--primary); margin: 0; }
+    .user-info { font-size: 13px; color: var(--gray-6); margin-bottom: 28px; }
+    .user-info strong { color: var(--text); }
+    .btn {
+      width: 100%; padding: 13px; border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: all 0.2s; font-family: inherit;
+    }
+    .btn-outline { background: transparent; color: var(--text); border: 1.5px solid var(--gray-3); }
+    .btn-outline:hover { background: var(--gray-2); }
+    .btn-danger { background: #FEF2F2; color: #EF4444; border: none; margin-top: 10px; font-size: 13px; }
+    .btn-danger:hover { background: #FEE2E2; }
+    .check-status {
+      font-size: 12px; color: var(--gray-5); margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-bg"></div>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon">🚀</div>
+      <div class="logo-text">
+        <strong>Adsy Autopilot</strong>
+        <span>Meta Ads Automation</span>
+      </div>
+    </div>
+
+    <div class="icon">⏳</div>
+    <h1>Menunggu Persetujuan</h1>
+    <p>Akun kamu sudah dibuat dan sedang dalam review oleh admin.</p>
+
+    <div class="user-info" id="user-info">Memuat info akun...</div>
+
+    <div class="info-box">
+      <p>💡 Admin akan mengaktifkan akunmu setelah verifikasi. Kamu akan menerima notifikasi WhatsApp jika nomor sudah terdaftar.</p>
+    </div>
+
+    <button class="btn btn-outline" onclick="checkStatus()">🔄 Cek Status Akun</button>
+    <button class="btn btn-danger" onclick="logout()">Keluar</button>
+
+    <div class="check-status" id="check-msg"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    let sb = null;
+
+    async function init() {
+      const res = await fetch('/api/config');
+      const { supabaseUrl, supabaseKey } = await res.json();
+      const { createClient } = supabase;
+      sb = createClient(supabaseUrl, supabaseKey);
+
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { window.location.href = '/index.html'; return; }
+
+      const { data: profile } = await sb.from('profiles').select('name, email, status').eq('id', session.user.id).single();
+      if (!profile) return;
+
+      if (profile.status === 'active') {
+        window.location.href = '/dashboard.html';
+        return;
+      }
+
+      document.getElementById('user-info').innerHTML =
+        `Terdaftar sebagai <strong>${profile.name || profile.email}</strong>`;
+    }
+
+    async function checkStatus() {
+      const msg = document.getElementById('check-msg');
+      msg.textContent = 'Mengecek status...';
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { window.location.href = '/index.html'; return; }
+      const { data: profile } = await sb.from('profiles').select('status').eq('id', session.user.id).single();
+      if (profile?.status === 'active') {
+        window.location.href = '/dashboard.html';
+      } else {
+        msg.textContent = 'Akun masih dalam review. Harap tunggu notifikasi dari admin.';
+      }
+    }
+
+    async function logout() {
+      await sb.auth.signOut();
+      window.location.href = '/index.html';
+    }
+
+    init();
+  </script>
+</body>
+</html>
