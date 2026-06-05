@@ -192,15 +192,19 @@ export default async function handler(req, res) {
         special_ad_categories: [],
         access_token: token
       };
-      // CBO: budget di campaign level, sharing enabled = false (Meta pakai daily_budget di campaign)
-      // ABO: budget di ad set level, jangan set daily_budget di campaign
+      // CBO: budget di campaign level + sharing enabled
+      // ABO: budget di ad set level, is_adset_budget_sharing_enabled wajib = false
       if (budgetType === 'CBO') {
         campPayloadMeta.daily_budget = dailyBudget;
         campPayloadMeta.bid_strategy = bidStrategy;
+        campPayloadMeta.is_adset_budget_sharing_enabled = true;
         if (bidValue && bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
           if (bidStrategy === 'MINIMUM_ROAS') campPayloadMeta.roas_average_floor = parseFloat(bidValue) * 100;
           else campPayloadMeta.bid_amount = parseInt(bidValue);
         }
+      } else {
+        // ABO — Meta wajib tahu bahwa budget tidak di-share di campaign level
+        campPayloadMeta.is_adset_budget_sharing_enabled = false;
       }
 
       const campRes  = await fetch(`${META_API}/${accountId}/campaigns`, {
