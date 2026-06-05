@@ -286,6 +286,7 @@
   async function loadActionLog(profile, append = false) {
     logProfile = profile;
     let q = sb.from('action_logs').select('*')
+      .neq('action_type', 'create')
       .order('created_at', { ascending: false })
       .range(logPage * LOG_LIMIT, (logPage + 1) * LOG_LIMIT - 1);
     if (profile.role !== 'admin') q = q.eq('user_id', profile.id);
