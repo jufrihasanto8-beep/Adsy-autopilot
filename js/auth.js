@@ -75,10 +75,7 @@ export async function renderUserInfo() {
   }
 
   if (['admin', 'superadmin'].includes(profile.role)) {
-    localStorage.setItem('user_role', profile.role);
     document.querySelectorAll('[data-admin-only]').forEach(el => el.style.removeProperty('display'));
-  } else {
-    localStorage.removeItem('user_role');
   }
 
   return profile;

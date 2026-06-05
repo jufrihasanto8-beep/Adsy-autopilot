@@ -5,12 +5,6 @@ import { getSupabase } from './supabase.js';
 export function initSidebar() {
   const current = window.location.pathname.split('/').pop() || 'dashboard.html';
 
-  // Tampilkan menu admin-only kalau role tersimpan di localStorage
-  const role = localStorage.getItem('user_role');
-  if (role === 'admin' || role === 'superadmin') {
-    document.querySelectorAll('[data-admin-only]').forEach(el => el.style.removeProperty('display'));
-  }
-
   document.querySelectorAll('.nav-item[data-page]').forEach(item => {
     if (item.dataset.page === current) item.classList.add('active');
     item.addEventListener('click', () => { window.location.href = item.dataset.page; });
