@@ -163,15 +163,15 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
     if (!targetCpr) {
       // Tidak ada target CPR → langsung maju
       newPhase = 2;
-    } else if (cpr === null && daysRunning >= 4) {
-      // Tidak ada konversi sama sekali setelah 4 hari → pause permanen
+    } else if (cpr === null) {
+      // Tidak ada konversi sama sekali setelah 3 hari → pause permanen langsung
       await pauseCampaign(camp, token);
       await sb.from('campaigns').update({ autopilot_enabled: false }).eq('id', camp.id);
       const logEntry = {
         user_id: camp.user_id,
         campaign_name: camp.name,
         action_type: 'pause',
-        description: `"${camp.name}" dihentikan permanen — tidak ada konversi setelah ${daysRunning} hari`,
+        description: `"${camp.name}" dihentikan permanen — 0 konversi selama ${daysRunning} hari`,
         status: 'success'
       };
       await sb.from('action_logs').insert(logEntry);
