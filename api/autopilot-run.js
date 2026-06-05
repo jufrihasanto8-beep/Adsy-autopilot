@@ -154,15 +154,54 @@ async function syncCampaignInsights(camp, token) {
 // ── Phase Advancement sesuai DIMENSI blueprint ──
 async function checkPhaseAdvancement(camp, targetCpr, daysRunning, logs) {
   let newPhase = camp.current_phase;
+  const cpr = camp.cpr;
 
-  // Phase 1 → 2: gate tercapai (8k impressions) + min 3 hari
-  if (camp.current_phase === 1 && daysRunning >= 3) {
-    newPhase = 2;
+  // Phase 1 → 2: gate 8k impressions + min 3 hari + seleksi CPR
+  if (camp.current_phase === 1 && daysRunning >= 3 && camp.impressions >= 8000) {
+    if (!targetCpr) {
+      // Tidak ada target CPR → langsung maju
+      newPhase = 2;
+    } else if (cpr !== null && cpr <= targetCpr) {
+      // CPR ≤ target → langsung maju Phase 2
+      newPhase = 2;
+    } else if (cpr !== null && cpr <= targetCpr * 1.1) {
+      // CPR antara target s/d +10% → dapat 1 hari tambahan
+      if (daysRunning >= 4) {
+        newPhase = 2; // Sudah dapat kesempatan 1 hari, maju
+      } else {
+        // Masih hari ke-3, tunggu 1 hari lagi
+        const logEntry = {
+          user_id: camp.user_id,
+          campaign_name: camp.name,
+          action_type: 'phase_hold',
+          description: `"${camp.name}" dapat 1 hari tambahan — CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} (dalam batas +10% dari target)`,
+          status: 'info'
+        };
+        await sb.from('action_logs').insert(logEntry);
+        logs.push(logEntry);
+      }
+    } else if (cpr !== null && cpr > targetCpr * 1.1) {
+      // CPR terlalu jelek setelah 3 hari → pause permanen
+      await sb.from('campaigns').update({
+        status: 'PAUSED',
+        autopilot_enabled: false
+      }).eq('id', camp.id);
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'pause',
+        description: `"${camp.name}" dihentikan permanen — CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} masih > 10% dari target setelah ${daysRunning} hari`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+      return;
+    }
   }
 
   // Phase 2 → 3: 7 hari + CPR ≤ target (baseline sudah ada, siap scale)
   if (camp.current_phase === 2 && daysRunning >= 7) {
-    const cprOk = !targetCpr || (camp.cpr && camp.cpr <= targetCpr);
+    const cprOk = !targetCpr || (cpr && cpr <= targetCpr);
     if (cprOk) newPhase = 3;
   }
 
