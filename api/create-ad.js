@@ -224,69 +224,49 @@ export default async function handler(req, res) {
       const SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
       const { data: globalCfg } = await sb.from('global_settings').select('*').eq('id', SETTINGS_ID).single();
 
-      // Koordinat per provinsi (same as settings.html)
-      const PROVINCE_COORDS = {
-        'DKI Jakarta':        { lat: -6.21,  lng: 106.85, r: 60  },
-        'Jawa Barat':         { lat: -6.92,  lng: 107.61, r: 250 },
-        'Banten':             { lat: -6.40,  lng: 106.10, r: 120 },
-        'Jawa Tengah':        { lat: -7.15,  lng: 110.40, r: 220 },
-        'DI Yogyakarta':      { lat: -7.80,  lng: 110.37, r: 60  },
-        'Jawa Timur':         { lat: -7.54,  lng: 112.24, r: 280 },
-        'Bali':               { lat: -8.41,  lng: 115.19, r: 100 },
-        'Aceh':               { lat:  4.69,  lng:  96.75, r: 320 },
-        'Sumatera Utara':     { lat:  2.12,  lng:  99.54, r: 300 },
-        'Sumatera Barat':     { lat: -0.74,  lng: 100.37, r: 220 },
-        'Riau':               { lat:  0.29,  lng: 101.70, r: 300 },
-        'Kepulauan Riau':     { lat:  3.92,  lng: 108.14, r: 300 },
-        'Jambi':              { lat: -1.61,  lng: 103.62, r: 220 },
-        'Sumatera Selatan':   { lat: -3.31,  lng: 104.06, r: 260 },
-        'Bangka Belitung':    { lat: -2.74,  lng: 106.44, r: 160 },
-        'Bengkulu':           { lat: -3.79,  lng: 102.26, r: 180 },
-        'Lampung':            { lat: -4.56,  lng: 105.41, r: 200 },
-        'Kalimantan Barat':   { lat:  0.13,  lng: 109.34, r: 430 },
-        'Kalimantan Tengah':  { lat: -1.68,  lng: 113.92, r: 430 },
-        'Kalimantan Selatan': { lat: -2.78,  lng: 115.53, r: 250 },
-        'Kalimantan Timur':   { lat:  0.54,  lng: 116.43, r: 370 },
-        'Kalimantan Utara':   { lat:  3.07,  lng: 116.04, r: 300 },
-        'Sulawesi Utara':     { lat:  0.62,  lng: 124.10, r: 220 },
-        'Gorontalo':          { lat:  0.70,  lng: 122.45, r: 120 },
-        'Sulawesi Tengah':    { lat: -1.43,  lng: 121.45, r: 350 },
-        'Sulawesi Barat':     { lat: -2.84,  lng: 119.25, r: 160 },
-        'Sulawesi Selatan':   { lat: -3.66,  lng: 119.97, r: 280 },
-        'Sulawesi Tenggara':  { lat: -4.14,  lng: 122.17, r: 220 },
-        'NTB':                { lat: -8.65,  lng: 117.36, r: 160 },
-        'NTT':                { lat: -8.66,  lng: 121.08, r: 350 },
-        'Maluku':             { lat: -3.24,  lng: 130.14, r: 350 },
-        'Maluku Utara':       { lat:  1.57,  lng: 127.81, r: 280 },
-        'Papua Barat':        { lat: -1.34,  lng: 132.52, r: 380 },
-        'Papua':              { lat: -4.27,  lng: 138.08, r: 550 },
+      // Region key Meta per provinsi Indonesia (dari Meta adgeolocation API)
+      const PROVINCE_KEYS = {
+        'Aceh':               '526108', 'Sumatera Utara':     '526109',
+        'Sumatera Barat':     '526110', 'Riau':               '526111',
+        'Kepulauan Riau':     '526112', 'Jambi':              '526113',
+        'Sumatera Selatan':   '526114', 'Bangka Belitung':    '526115',
+        'Bengkulu':           '526116', 'Lampung':            '526117',
+        'DKI Jakarta':        '526118', 'Jawa Barat':         '526119',
+        'Banten':             '526120', 'Jawa Tengah':        '526121',
+        'DI Yogyakarta':      '526122', 'Jawa Timur':         '526123',
+        'Bali':               '526124', 'NTB':                '526125',
+        'NTT':                '526126', 'Kalimantan Barat':   '526127',
+        'Kalimantan Tengah':  '526128', 'Kalimantan Selatan': '526129',
+        'Kalimantan Timur':   '526130', 'Kalimantan Utara':   '526131',
+        'Sulawesi Utara':     '526132', 'Gorontalo':          '526133',
+        'Sulawesi Tengah':    '526134', 'Sulawesi Barat':     '526135',
+        'Sulawesi Selatan':   '526136', 'Sulawesi Tenggara':  '526137',
+        'Maluku':             '526138', 'Maluku Utara':       '526139',
+        'Papua Barat':        '526140', 'Papua':              '526141',
       };
 
       // Bangun geo_locations dari pilihan provinsi admin
       let geoLocations;
+      let excludedGeoLocations = null;
       const locModeCfg = globalCfg?.ad_location_mode || 'include';
       const selectedProvinces = globalCfg?.ad_selected_provinces || [];
 
       if (selectedProvinces.length > 0) {
-        let targetProvinces;
         if (locModeCfg === 'exclude') {
-          // Kecualikan → include semua provinsi KECUALI yang dipilih
-          targetProvinces = Object.keys(PROVINCE_COORDS).filter(n => !selectedProvinces.includes(n));
-        } else {
-          // Include → hanya provinsi yang dipilih
-          targetProvinces = selectedProvinces.filter(n => PROVINCE_COORDS[n]);
-        }
-
-        if (targetProvinces.length > 0 && targetProvinces.length < 34) {
-          const customLocs = targetProvinces.map(name => ({
-            latitude: PROVINCE_COORDS[name].lat,
-            longitude: PROVINCE_COORDS[name].lng,
-            radius: PROVINCE_COORDS[name].r,
-            distance_unit: 'kilometer'
-          }));
-          geoLocations = { custom_locations: customLocs };
-        } else {
+          // Exclude: target seluruh Indonesia, kecualikan provinsi yang dipilih
           geoLocations = { countries: ['ID'] };
+          const excludeKeys = selectedProvinces
+            .filter(n => PROVINCE_KEYS[n])
+            .map(n => ({ key: PROVINCE_KEYS[n] }));
+          if (excludeKeys.length > 0) excludedGeoLocations = { regions: excludeKeys };
+        } else {
+          // Include: hanya provinsi yang dipilih
+          const includeKeys = selectedProvinces
+            .filter(n => PROVINCE_KEYS[n])
+            .map(n => ({ key: PROVINCE_KEYS[n] }));
+          geoLocations = includeKeys.length > 0
+            ? { regions: includeKeys }
+            : { countries: ['ID'] };
         }
       } else {
         geoLocations = { countries: ['ID'] };
@@ -300,7 +280,8 @@ export default async function handler(req, res) {
         optimization_goal: optimizationGoal,
         targeting: {
           geo_locations: geoLocations,
-          age_min: 21, // Meta: min 21 tahun untuk Indonesia
+          ...(excludedGeoLocations ? { excluded_geo_locations: excludedGeoLocations } : {}),
+          age_min: 21,
           age_max: 65
         },
         status: adStatus,
