@@ -8,6 +8,19 @@ export async function requireAuth() {
     window.location.href = '/index.html';
     return null;
   }
+
+  // Cek status akun — kalau pending, arahkan ke halaman tunggu
+  const { data: profile } = await sb.from('profiles').select('status').eq('id', session.user.id).single();
+  if (profile?.status === 'pending') {
+    window.location.href = '/pending.html';
+    return null;
+  }
+  if (profile?.status === 'suspended') {
+    await sb.auth.signOut();
+    window.location.href = '/index.html?suspended=1';
+    return null;
+  }
+
   return session;
 }
 
