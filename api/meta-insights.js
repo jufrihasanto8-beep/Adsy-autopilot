@@ -5,6 +5,7 @@ const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_K
 const META_API = 'https://graph.facebook.com/v18.0';
 
 export default async function handler(req, res) {
+  if (req.method === 'GET') return await fetchRangeInsights(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
@@ -63,4 +64,74 @@ export default async function handler(req, res) {
     console.error('meta-insights error:', err);
     return res.status(500).json({ error: err.message });
   }
+}
+
+// ── GET: Fetch insights untuk range tanggal tertentu (untuk display, tidak disimpan ke DB) ──
+async function fetchRangeInsights(req, res) {
+  const userId = req.query.user_id;
+  const datePreset = req.query.date_preset || 'today'; // today, yesterday, last_7_days, last_30_days
+  if (!userId) return res.status(400).json({ error: 'user_id required' });
+
+  const { data: config } = await sb.from('app_config').select('meta_token').eq('user_id', userId).single();
+  const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
+  if (!token) return res.status(400).json({ error: 'Token Meta belum dikonfigurasi' });
+
+  const { data: campaigns } = await sb.from('campaigns')
+    .select('id, name, meta_campaign_id, meta_adset_id, current_phase, status, daily_budget')
+    .eq('user_id', userId)
+    .not('meta_campaign_id', 'is', null);
+
+  if (!campaigns?.length) return res.status(200).json({ campaigns: [], totals: { spend: 0, results: 0 } });
+
+  const fields = 'spend,clicks,impressions,ctr,actions';
+  const results = [];
+  let totalSpend = 0;
+  let totalResults = 0;
+
+  for (const camp of campaigns) {
+    try {
+      const targetId = camp.meta_adset_id || camp.meta_campaign_id;
+      const level = camp.meta_adset_id ? 'adset' : 'campaign';
+      const insightRes = await fetch(
+        `${META_API}/${targetId}/insights?fields=${fields}&date_preset=${datePreset}&level=${level}&access_token=${encodeURIComponent(token)}`
+      );
+      const insight = await insightRes.json();
+
+      if (insight.error || !insight.data?.length) {
+        results.push({ ...camp, spend: 0, cpr: null, ctr: null, results_count: 0, impressions: 0 });
+        continue;
+      }
+
+      const d = insight.data[0];
+      const spend = parseFloat(d.spend || 0) * 1000; // USD → IDR approx
+      const clicks = parseInt(d.clicks || 0);
+      const impressions = parseInt(d.impressions || 0);
+      const ctr = parseFloat(d.ctr || 0);
+
+      // Hitung results: priority purchase → lead → link_click
+      const actions = d.actions || [];
+      const getAction = (...types) => {
+        for (const t of types) {
+          const found = actions.find(a => a.action_type === t);
+          if (found) return parseInt(found.value || 0);
+        }
+        return 0;
+      };
+      const resultCount = getAction('offsite_conversion.fb_pixel_purchase', 'lead', 'link_click');
+      const cpr = resultCount > 0 ? Math.round(spend / resultCount) : null;
+
+      totalSpend += spend;
+      totalResults += resultCount;
+
+      results.push({ ...camp, spend, cpr, ctr, results_count: resultCount, impressions, clicks });
+    } catch (e) {
+      results.push({ ...camp, spend: 0, cpr: null, ctr: null, results_count: 0, impressions: 0 });
+    }
+  }
+
+  return res.status(200).json({
+    campaigns: results,
+    totals: { spend: totalSpend, results: totalResults },
+    date_preset: datePreset
+  });
 }
