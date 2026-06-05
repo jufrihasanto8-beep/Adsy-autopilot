@@ -75,7 +75,7 @@ export default async function handler(req, res) {
         }
 
         // ── Phase Advancement ──
-        await checkPhaseAdvancement(fresh, targetCpr, daysRunning, logs);
+        await checkPhaseAdvancement(fresh, targetCpr, daysRunning, token, logs);
 
         // Re-fetch lagi setelah phase advance
         const { data: latest } = await sb.from('campaigns')
@@ -154,7 +154,7 @@ async function syncCampaignInsights(camp, token) {
 }
 
 // ── Phase Advancement sesuai DIMENSI blueprint ──
-async function checkPhaseAdvancement(camp, targetCpr, daysRunning, logs) {
+async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) {
   let newPhase = camp.current_phase;
   const cpr = camp.cpr;
 
