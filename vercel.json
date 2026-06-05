@@ -4,12 +4,8 @@
   ],
   "crons": [
     {
-      "path": "/api/autopilot-run",
-      "schedule": "0 6 * * *"
-    },
-    {
       "path": "/api/meta-insights",
-      "schedule": "0 7 * * *"
+      "schedule": "0 */2 * * *"
     }
   ],
   "headers": [
