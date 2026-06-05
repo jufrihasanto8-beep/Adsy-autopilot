@@ -431,6 +431,9 @@ export default async function handler(req, res) {
       });
     } catch (e) { console.error('action_logs insert failed (non-fatal):', e.message); }
 
+    // Kirim WA notif ke user (non-blocking)
+    sendWANotif(userId, finalCampaignName, headline, adStatus).catch(() => {});
+
     if (file?.filepath) fs.unlink(file.filepath, () => {});
 
     return res.status(200).json({
@@ -445,6 +448,44 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('create-ad error:', err);
     return res.status(500).json({ error: err.message });
+  }
+}
+
+async function sendWANotif(userId, campaignName, headline, status) {
+  try {
+    // Ambil fonnte token dari admin (siapapun yang punya fonnte_token)
+    let fonnteToken = process.env.FONNTE_TOKEN;
+    if (!fonnteToken) {
+      const { data: adminCfg } = await sb.from('app_config')
+        .select('fonnte_token').not('fonnte_token', 'is', null).limit(1).single();
+      fonnteToken = adminCfg?.fonnte_token;
+    }
+    if (!fonnteToken) return;
+
+    // Ambil wa_target + notif_create preference user
+    const [{ data: cfg }, { data: notif }] = await Promise.all([
+      sb.from('app_config').select('wa_target').eq('user_id', userId).single(),
+      sb.from('notif_settings').select('notif_create').eq('user_id', userId).maybeSingle()
+    ]);
+
+    if (!cfg?.wa_target) return;
+    if (notif?.notif_create === false) return; // user matikan notif create
+
+    const now = new Date().toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+    });
+    const statusLabel = status === 'ACTIVE' ? '🟢 Langsung aktif' : '⏸️ Status Paused';
+
+    const message = `🚀 *Iklan Baru Dipublish!*\n📅 ${now} WIB\n\n*Kampanye:* ${campaignName}\n*Iklan:* ${headline}\n*Status:* ${statusLabel}\n\n_Cek dashboard untuk detail_`;
+
+    await fetch('https://api.fonnte.com/send', {
+      method: 'POST',
+      headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target: cfg.wa_target, message })
+    });
+  } catch (err) {
+    console.error('sendWANotif error:', err.message);
   }
 }
 
