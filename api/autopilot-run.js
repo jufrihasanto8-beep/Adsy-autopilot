@@ -562,6 +562,14 @@ async function createPhase2bCampaign(camp, token, product, logs) {
   if (!token || !camp.meta_campaign_id) return;
 
   try {
+    // 0. Cek duplikat — jangan buat ulang kalau sudah ada
+    const { data: existing2b } = await sb.from('campaigns')
+      .select('id')
+      .eq('user_id', camp.user_id)
+      .ilike('name', `${camp.name} — Phase 2b%`)
+      .maybeSingle();
+    if (existing2b) return;
+
     // 1. Ambil account_id + objective dari kampanye Phase 1
     const campInfoRes = await fetch(
       `${META_API}/${camp.meta_campaign_id}?fields=account_id,objective&access_token=${encodeURIComponent(token)}`
@@ -569,6 +577,7 @@ async function createPhase2bCampaign(camp, token, product, logs) {
     const campInfo = await campInfoRes.json();
     const accountId = campInfo.account_id;
     if (!accountId) throw new Error('Tidak bisa ambil account_id');
+    const objective = campInfo.objective || 'OUTCOME_SALES';
 
     // 2. Ambil creative dari ads Phase 1
     const adsRes = await fetch(
@@ -577,19 +586,44 @@ async function createPhase2bCampaign(camp, token, product, logs) {
     const adsData = await adsRes.json();
     const creativeId = adsData.data?.[0]?.creative?.id;
 
-    // 3. Generate keyword per kategori via Claude
+    // 3. Ambil pixel_id + page_id dari ad_accounts untuk promoted_object
+    const { data: adAcc } = await sb.from('ad_accounts')
+      .select('pixel_id, page_id')
+      .eq('user_id', camp.user_id)
+      .maybeSingle();
+    const pixelId = adAcc?.pixel_id;
+    const pageId  = adAcc?.page_id;
+
+    // optimization_goal & promoted_object sesuai objective
+    const optimizationGoalMap = {
+      'OUTCOME_SALES':      'OFFSITE_CONVERSIONS',
+      'OUTCOME_LEADS':      'LEAD_GENERATION',
+      'OUTCOME_ENGAGEMENT': 'POST_ENGAGEMENT',
+      'OUTCOME_AWARENESS':  'REACH',
+      'OUTCOME_TRAFFIC':    'LINK_CLICKS'
+    };
+    const optimizationGoal = optimizationGoalMap[objective] || 'OFFSITE_CONVERSIONS';
+
+    let promotedObject = null;
+    if (objective === 'OUTCOME_SALES' && pixelId) {
+      promotedObject = { pixel_id: pixelId, custom_event_type: 'PURCHASE' };
+    } else if (pageId) {
+      promotedObject = { page_id: pageId };
+    }
+
+    // 4. Generate keyword per kategori via Claude
     const keywords = await generateInterestKeywords(product);
 
-    // 4. Cari interest di Meta per kategori
+    // 5. Cari interest di Meta per kategori
     const interests = await searchInterestsPerCategory(keywords, token);
 
-    // 5. Buat campaign ABO
+    // 6. Buat campaign ABO
     const newCampRes = await fetch(`${META_API}/act_${accountId}/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: camp.name + ' — Phase 2b',
-        objective: campInfo.objective || 'OUTCOME_SALES',
+        objective,
         status: 'ACTIVE',
         access_token: token
       })
@@ -598,7 +632,7 @@ async function createPhase2bCampaign(camp, token, product, logs) {
     const newCampaignId = newCampData.id;
     if (!newCampaignId) throw new Error('Gagal buat campaign: ' + JSON.stringify(newCampData));
 
-    // 6. Buat 3 adset dengan interest berbeda
+    // 7. Buat 3 adset dengan interest berbeda
     const categories = [
       { key: 'manfaat', label: 'Manfaat' },
       { key: 'perilaku', label: 'Perilaku Belanja' },
@@ -624,9 +658,10 @@ async function createPhase2bCampaign(camp, token, product, logs) {
           campaign_id: newCampaignId,
           daily_budget: 50000,
           billing_event: 'IMPRESSIONS',
-          optimization_goal: 'OFFSITE_CONVERSIONS',
+          optimization_goal: optimizationGoal,
           status: 'ACTIVE',
           targeting,
+          ...(promotedObject ? { promoted_object: promotedObject } : {}),
           access_token: token
         })
       });
