@@ -219,22 +219,129 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
     if (cprOk) newPhase = 3;
   }
 
-  if (newPhase !== camp.current_phase) {
+  if (newPhase === 2 && camp.current_phase === 1) {
+    // Cek apakah Phase 2 sudah pernah dibuat untuk kampanye ini
+    const { data: existing } = await sb.from('campaigns')
+      .select('id')
+      .eq('user_id', camp.user_id)
+      .eq('name', camp.name + ' — Phase 2')
+      .maybeSingle();
+
+    if (!existing) {
+      // Buat kampanye Phase 2 baru, Phase 1 tetap jalan dengan autopilot aktif
+      await createPhase2Campaign(camp, token, logs);
+
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'phase_advance',
+        description: `"${camp.name}" lolos Phase 1 → kampanye Phase 2 dibuat`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+    }
+    // Phase 1 tidak diubah apapun — tetap jalan dengan autopilot aktif
+  }
+
+  if (newPhase === 3 && camp.current_phase === 2) {
     await sb.from('campaigns').update({
-      current_phase: newPhase,
+      current_phase: 3,
       phase_started_at: new Date().toISOString()
     }).eq('id', camp.id);
 
-    const label = { 2: 'Evaluasi', 3: 'Scale' };
     const logEntry = {
       user_id: camp.user_id,
       campaign_name: camp.name,
       action_type: 'phase_advance',
-      description: `"${camp.name}" maju ke Phase ${newPhase} — ${label[newPhase]}`,
+      description: `"${camp.name}" maju ke Phase 3 — Scale`,
       status: 'success'
     };
     await sb.from('action_logs').insert(logEntry);
     logs.push(logEntry);
+  }
+}
+
+// ── Buat kampanye Phase 2 di Meta (duplikat dari Phase 1) ──
+async function createPhase2Campaign(camp, token, logs) {
+  if (!camp.meta_campaign_id || !token) return;
+
+  try {
+    // 1. Copy kampanye Phase 1 di Meta (deep copy termasuk adset + ads)
+    const copyRes = await fetch(`${META_API}/${camp.meta_campaign_id}/copies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deep_copy: true, access_token: token })
+    });
+    const copyData = await copyRes.json();
+    const newCampaignId = copyData.copied_campaign_id;
+    if (!newCampaignId) throw new Error('Gagal copy kampanye: ' + JSON.stringify(copyData));
+
+    // 2. Ambil adset dari kampanye baru
+    const adsetsRes = await fetch(
+      `${META_API}/${newCampaignId}/adsets?fields=id&access_token=${encodeURIComponent(token)}`
+    );
+    const adsetsData = await adsetsRes.json();
+    const newAdsetId = adsetsData.data?.[0]?.id;
+
+    // 3. Hitung bid amount = CPR Phase 1 + 10%
+    const bidAmount = camp.cpr ? Math.round(camp.cpr * 1.1) : null;
+
+    // 4. Update adset: budget 5jt + COST_CAP bid strategy
+    if (newAdsetId) {
+      const updateBody = { daily_budget: 5000000, access_token: token };
+      if (bidAmount) {
+        updateBody.bid_strategy = 'COST_CAP';
+        updateBody.bid_amount = bidAmount;
+      }
+      await fetch(`${META_API}/${newAdsetId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateBody)
+      });
+    }
+
+    // 5. Aktifkan kampanye baru
+    await fetch(`${META_API}/${newCampaignId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'ACTIVE', access_token: token })
+    });
+
+    // 6. Simpan kampanye Phase 2 ke Supabase
+    await sb.from('campaigns').insert({
+      user_id: camp.user_id,
+      name: camp.name + ' — Phase 2',
+      status: 'ACTIVE',
+      current_phase: 2,
+      phase_started_at: new Date().toISOString(),
+      autopilot_enabled: true,
+      product_id: camp.product_id,
+      daily_budget: 5000000,
+      meta_campaign_id: newCampaignId,
+      meta_adset_id: newAdsetId || null,
+      days_running: 0
+    });
+
+    const logEntry = {
+      user_id: camp.user_id,
+      campaign_name: camp.name + ' — Phase 2',
+      action_type: 'create',
+      description: `Kampanye Phase 2 dibuat — Budget Rp 5.000.000, Target CPR Rp ${bidAmount ? bidAmount.toLocaleString('id-ID') : '-'} (CPR Phase 1 + 10%)`,
+      status: 'success'
+    };
+    await sb.from('action_logs').insert(logEntry);
+    logs.push(logEntry);
+
+  } catch (err) {
+    console.error('createPhase2Campaign error:', err.message);
+    await sb.from('action_logs').insert({
+      user_id: camp.user_id,
+      campaign_name: camp.name,
+      action_type: 'create',
+      description: `Gagal buat kampanye Phase 2: ${err.message}`,
+      status: 'error'
+    }).catch(() => {});
   }
 }
 
@@ -319,19 +426,54 @@ async function runBlueprintRules(camp, targetCpr, targetRoas, token, logs) {
     }
   }
 
-  // Phase 2: Evaluasi — pause kalau CPR jauh di atas target
-  if (currentPhase === 2 && cpr !== null && cpr > targetCpr * 1.5) {
-    await pauseCampaign(camp, token);
-    const logEntry = {
-      user_id: camp.user_id,
-      campaign_name: camp.name,
-      action_type: 'pause',
-      description: `"${camp.name}" di-pause di Phase 2 — CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} (${Math.round(cpr/targetCpr*100)}% dari target, terlalu mahal)`,
-      status: 'success'
-    };
-    await sb.from('action_logs').insert(logEntry);
-    logs.push(logEntry);
-    return true;
+  // Phase 2: skema sama Phase 1 — pause/naik/turun budget
+  if (currentPhase === 2 && cpr !== null) {
+    // CPR > 2.5× target → pause (hidup lagi jam 3 pagi)
+    if (cpr > targetCpr * 2.5) {
+      await pauseCampaign(camp, token);
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'pause',
+        description: `"${camp.name}" di-pause di Phase 2 — CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} (> 2.5× target)`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+      return true;
+    }
+
+    // CPR ≤ target → naik budget 3%
+    if (cpr <= targetCpr) {
+      const newBudget = Math.floor(budget * (1 + SCALE_PCT / 100));
+      await updateBudget(camp, newBudget, token);
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'increase_budget',
+        description: `"${camp.name}" budget naik ${SCALE_PCT}% → Rp ${newBudget.toLocaleString('id-ID')} (CPR ≤ target)`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+      return true;
+    }
+
+    // CPR > target (tapi ≤ 2.5×) → turun budget 3%
+    if (cpr > targetCpr) {
+      const newBudget = Math.max(Math.floor(budget * (1 - SCALE_PCT / 100)), 10000);
+      await updateBudget(camp, newBudget, token);
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'decrease_budget',
+        description: `"${camp.name}" budget turun ${SCALE_PCT}% → Rp ${newBudget.toLocaleString('id-ID')} (CPR > target)`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+      return true;
+    }
   }
 
   return false;

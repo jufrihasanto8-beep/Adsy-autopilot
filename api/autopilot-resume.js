@@ -23,11 +23,11 @@ export default async function handler(req, res) {
   const logs = [];
 
   try {
-    // Ambil semua kampanye Phase 1 yang sedang pause + autopilot aktif
+    // Ambil semua kampanye Phase 1 & 2 yang sedang pause + autopilot aktif
     const { data: campaigns } = await sb.from('campaigns')
       .select('*')
       .eq('status', 'PAUSED')
-      .eq('current_phase', 1)
+      .in('current_phase', [1, 2])
       .eq('autopilot_enabled', true);
 
     if (!campaigns?.length) {
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
           user_id: camp.user_id,
           campaign_name: camp.name,
           action_type: 'resume',
-          description: `"${camp.name}" dihidupkan kembali jam 3 pagi — Phase 1 hari ke-${camp.days_running}`,
+          description: `"${camp.name}" dihidupkan kembali jam 3 pagi — Phase ${camp.current_phase} hari ke-${camp.days_running}`,
           status: 'success'
         };
         await sb.from('action_logs').insert(logEntry);
