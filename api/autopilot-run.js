@@ -12,7 +12,17 @@ const SCALE_PCT = 3;       // % naik/turun per hari
 const MAX_SCALE_PCT = 30;  // batas maksimal kenaikan per hari
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  // Security: cek secret key (dari cron-job.org header atau query param)
+  const CRON_SECRET = process.env.CRON_SECRET;
+  if (CRON_SECRET) {
+    const headerSecret = req.headers['x-cron-secret'];
+    const querySecret  = req.query?.secret;
+    if (headerSecret !== CRON_SECRET && querySecret !== CRON_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  }
 
   let actionsTaken = 0;
   const logs = [];
