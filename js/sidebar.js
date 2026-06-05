@@ -5,6 +5,12 @@ import { getSupabase } from './supabase.js';
 export function initSidebar() {
   const current = window.location.pathname.split('/').pop() || 'dashboard.html';
 
+  // Tampilkan menu admin-only kalau role tersimpan di localStorage
+  const role = localStorage.getItem('user_role');
+  if (role === 'admin' || role === 'superadmin') {
+    document.querySelectorAll('[data-admin-only]').forEach(el => el.style.removeProperty('display'));
+  }
+
   document.querySelectorAll('.nav-item[data-page]').forEach(item => {
     if (item.dataset.page === current) item.classList.add('active');
     item.addEventListener('click', () => { window.location.href = item.dataset.page; });
@@ -198,7 +204,7 @@ export function showToast(msg, type = 'default', duration = 3000) {
 // ── FORMAT HELPERS ──
 export function formatRupiah(n) {
   if (!n && n !== 0) return '-';
-  return 'Rp ' + Number(n).toLocaleString('id-ID');
+  return 'Rp ' + Math.round(Number(n)).toLocaleString('id-ID');
 }
 
 export function formatNumber(n) {

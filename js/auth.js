@@ -10,6 +10,7 @@ export async function requireAuth() {
   }
 
   // Cek status akun — kalau pending, arahkan ke halaman tunggu
+  // NULL = user lama sebelum fitur ini → dianggap active
   const { data: profile } = await sb.from('profiles').select('status').eq('id', session.user.id).single();
   if (profile?.status === 'pending') {
     window.location.href = '/pending.html';
@@ -74,7 +75,10 @@ export async function renderUserInfo() {
   }
 
   if (['admin', 'superadmin'].includes(profile.role)) {
-    document.querySelectorAll('[data-admin-only]').forEach(el => el.style.display = 'block');
+    localStorage.setItem('user_role', profile.role);
+    document.querySelectorAll('[data-admin-only]').forEach(el => el.style.removeProperty('display'));
+  } else {
+    localStorage.removeItem('user_role');
   }
 
   return profile;
