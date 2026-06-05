@@ -329,21 +329,25 @@
 
       <!-- ADMIN SECTION: TIM -->
       <div data-admin-only style="margin-top:32px;">
+        <div id="pending-banner" style="display:none; background:#FEF3C7; border:1px solid #F59E0B; border-radius:10px; padding:12px 16px; margin-bottom:12px; font-size:13px; color:#92400E; align-items:center; gap:10px;">
+          <span>⏳</span>
+          <span id="pending-banner-text">Ada user menunggu persetujuan</span>
+        </div>
         <div class="card">
           <div class="card-header">
             <div>
               <div class="card-title">👥 Manajemen Tim</div>
-              <div class="card-sub">Kelola user & hak akses</div>
+              <div class="card-sub">Kelola user, role & status akun</div>
             </div>
             <button class="btn btn-primary btn-sm" id="btn-invite-user">+ Undang User</button>
           </div>
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr>
+                <tr><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th></tr>
               </thead>
               <tbody id="user-table">
-                <tr><td colspan="4" style="text-align:center; padding:40px; color:var(--gray-5);">Memuat...</td></tr>
+                <tr><td colspan="5" style="text-align:center; padding:40px; color:var(--gray-5);">Memuat...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1236,18 +1240,51 @@
   async function loadUsers() {
     const { data } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
     const tbody = document.getElementById('user-table');
-    if (!data?.length) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--gray-5);">Belum ada user</td></tr>`; return; }
+    if (!data?.length) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-5);">Belum ada user</td></tr>`; return; }
+
+    const pendingCount = data.filter(u => u.status === 'pending').length;
+    const banner = document.getElementById('pending-banner');
+    if (pendingCount > 0) {
+      banner.style.display = 'flex'; banner.style.alignItems = 'center';
+      document.getElementById('pending-banner-text').textContent = `${pendingCount} user menunggu persetujuan`;
+    } else {
+      banner.style.display = 'none';
+    }
+
     const roleBadge = { admin: 'badge-dark', advertiser: 'badge-primary', viewer: 'badge-gray', superadmin: 'badge-danger' };
-    tbody.innerHTML = data.map(u => `
+    const statusBadge = { active: 'badge-success', pending: 'badge-warning', suspended: 'badge-danger' };
+    const statusLabel = { active: 'Aktif', pending: 'Menunggu', suspended: 'Ditangguhkan' };
+
+    tbody.innerHTML = data.map(u => {
+      const status = u.status || 'active';
+      const isSelf = u.id === currentProfile.id;
+      const actionBtns = [];
+
+      if (status === 'pending') {
+        actionBtns.push(`<button class="btn btn-sm" style="background:#D1FAE5;color:#065F46;border:none;" onclick="approveUser('${u.id}')">✓ Setujui</button>`);
+        actionBtns.push(`<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="rejectUser('${u.id}')">✕ Tolak</button>`);
+      } else if (status === 'active' && !isSelf) {
+        actionBtns.push(`<button class="btn btn-ghost btn-sm" onclick="editRole('${u.id}','${u.role}')">Edit Role</button>`);
+        actionBtns.push(`<button class="btn btn-ghost btn-sm" style="color:#92400E;" onclick="suspendUser('${u.id}')">Tangguhkan</button>`);
+      } else if (status === 'suspended') {
+        actionBtns.push(`<button class="btn btn-ghost btn-sm" style="color:var(--primary);" onclick="activateUser('${u.id}')">Aktifkan</button>`);
+      } else if (!isSelf) {
+        actionBtns.push(`<button class="btn btn-ghost btn-sm" onclick="editRole('${u.id}','${u.role}')">Edit Role</button>`);
+      }
+
+      if (!isSelf && status !== 'pending') {
+        actionBtns.push(`<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeUser('${u.id}')">Hapus</button>`);
+      }
+
+      return `
       <tr>
         <td><strong>${u.name || '-'}</strong></td>
-        <td>${u.email || '-'}</td>
+        <td style="font-size:12px;">${u.email || '-'}</td>
         <td><span class="badge ${roleBadge[u.role] || 'badge-gray'}">${u.role}</span></td>
-        <td>
-          <button class="btn btn-ghost btn-sm" onclick="editRole('${u.id}','${u.role}')">Edit Role</button>
-          ${u.id !== currentProfile.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeUser('${u.id}')">Hapus</button>` : ''}
-        </td>
-      </tr>`).join('');
+        <td><span class="badge ${statusBadge[status] || 'badge-gray'}">${statusLabel[status] || status}</span></td>
+        <td style="white-space:nowrap;">${actionBtns.join(' ')}</td>
+      </tr>`;
+    }).join('');
   }
 
   async function createUser() {
@@ -1271,6 +1308,34 @@
       btn.disabled = false; btn.textContent = 'Buat Akun';
     }
   }
+
+  window.approveUser = async function(id) {
+    await sb.from('profiles').update({ status: 'active' }).eq('id', id);
+    showToast('User disetujui, akun aktif!', 'success');
+    // Kirim notif WA ke user via API
+    try { await fetch('/api/notify-new-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'approved', userId: id }) }); } catch {}
+    await loadUsers();
+  };
+
+  window.rejectUser = async function(id) {
+    if (!confirm('Tolak & hapus akun user ini?')) return;
+    await sb.from('profiles').delete().eq('id', id);
+    showToast('Akun ditolak & dihapus', 'success');
+    await loadUsers();
+  };
+
+  window.suspendUser = async function(id) {
+    if (!confirm('Tangguhkan user ini? Mereka tidak bisa login.')) return;
+    await sb.from('profiles').update({ status: 'suspended' }).eq('id', id);
+    showToast('User ditangguhkan', 'success');
+    await loadUsers();
+  };
+
+  window.activateUser = async function(id) {
+    await sb.from('profiles').update({ status: 'active' }).eq('id', id);
+    showToast('Akun diaktifkan kembali', 'success');
+    await loadUsers();
+  };
 
   window.editRole = async function(id, currentRole) {
     const newRole = prompt(`Edit role (admin/advertiser/viewer):\nRole sekarang: ${currentRole}`);
