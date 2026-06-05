@@ -58,6 +58,12 @@
       </div>
       <div class="topbar-right">
         <span id="last-updated" style="font-size:12px; color:var(--gray-5);"></span>
+        <select id="date-preset" class="form-input form-select" style="width:auto; font-size:13px; padding:7px 12px;">
+          <option value="today">Hari Ini</option>
+          <option value="yesterday">Kemarin</option>
+          <option value="last_7_days">7 Hari</option>
+          <option value="last_30_days">30 Hari</option>
+        </select>
         <button class="btn btn-outline" id="btn-sync">🔄 Refresh</button>
         <button class="btn btn-primary" id="btn-new-campaign">+ Kampanye Baru</button>
       </div>
@@ -306,7 +312,12 @@
     const phaseLabel = { 1: 'Testing', 2: 'Evaluasi', 3: 'Scale' };
     const phaseBadge = { 1: 'badge-warning', 2: 'badge-primary', 3: 'badge-success' };
 
-    tbody.innerHTML = data.map(c => `
+    tbody.innerHTML = data.map(c => {
+      const ins = insightsMap[c.id] || {};
+      const spend = ins.spend ?? c.spend_today;
+      const cpr = ins.cpr ?? c.cpr;
+      const ctr = ins.ctr ?? c.ctr;
+      return `
       <tr>
         <td>
           <strong>${c.name}</strong>
@@ -318,9 +329,9 @@
           </span>
         </td>
         <td>${formatRupiah(c.daily_budget)}</td>
-        <td>${formatRupiah(c.spend_today)}</td>
-        <td>${c.cpr ? formatRupiah(c.cpr) : '-'}</td>
-        <td>${c.ctr ? c.ctr.toFixed(2) + '%' : '-'}</td>
+        <td>${formatRupiah(spend)}</td>
+        <td>${cpr ? formatRupiah(cpr) : '-'}</td>
+        <td>${ctr ? parseFloat(ctr).toFixed(2) + '%' : '-'}</td>
         <td>
           <span class="badge ${c.status === 'ACTIVE' ? 'badge-success' : c.status === 'PAUSED' ? 'badge-warning' : 'badge-gray'}">
             <span class="badge-dot"></span>
@@ -337,7 +348,8 @@
             <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteCampaign('${c.id}', '${c.meta_campaign_id}', '${c.name}')">Hapus</button>
           </div>
         </td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   }
 
   async function loadLibraryOptions() {
@@ -393,25 +405,35 @@
     }
   }
 
+  let insightsMap = {}; // meta_campaign_id → insight data
+
   async function syncMeta() {
     const btn = document.getElementById('btn-sync');
-    btn.disabled = true; btn.textContent = '🔄 Syncing...';
+    btn.disabled = true; btn.textContent = '🔄 Loading...';
     try {
-      // Sync performa (insights)
-      await fetch('/api/meta-insights', { method: 'POST' });
-      // Sync daftar kampanye dari Meta
-      const res = await fetch('/api/meta-campaigns?user_id=' + currentProfile.id);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Sync gagal');
-      showToast(`Sync selesai! ${data.synced || 0} kampanye diperbarui.`, 'success');
+      const datePreset = document.getElementById('date-preset').value;
+      // Fetch insights dari Meta untuk range yang dipilih
+      const insightRes = await fetch(`/api/meta-insights?user_id=${currentProfile.id}&date_preset=${datePreset}`);
+      const insightData = await insightRes.json();
+      // Buat map meta_campaign_id → data performa
+      insightsMap = {};
+      for (const c of (insightData.campaigns || [])) {
+        insightsMap[c.id] = c;
+      }
+      // Reload campaign list dari Supabase
       await loadCampaigns();
       setLastUpdated();
+      showToast('Data diperbarui!', 'success');
     } catch (err) {
-      showToast('Sync gagal: ' + err.message, 'error');
+      showToast('Gagal refresh: ' + err.message, 'error');
     } finally {
       btn.disabled = false; btn.textContent = '🔄 Refresh';
     }
   }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('date-preset')?.addEventListener('change', () => syncMeta());
+  });
 
   window.toggleStatus = async function(id, metaCampaignId, status) {
     try {

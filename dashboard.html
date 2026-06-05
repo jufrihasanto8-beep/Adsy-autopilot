@@ -59,6 +59,12 @@
       <div class="topbar-right">
         <div style="display:flex; align-items:center; gap:10px;">
           <span id="last-updated" style="font-size:12px; color:var(--gray-5);"></span>
+          <select id="date-preset" class="form-input form-select" style="width:auto; font-size:13px; padding:7px 12px;">
+            <option value="today">Hari Ini</option>
+            <option value="yesterday">Kemarin</option>
+            <option value="last_7_days">7 Hari</option>
+            <option value="last_30_days">30 Hari</option>
+          </select>
           <button class="btn btn-outline btn-sm" id="btn-refresh" onclick="refreshData()">🔄 Refresh</button>
         </div>
         <div class="topbar-icon-btn" title="Notifikasi">🔔</div>
@@ -191,10 +197,15 @@
     btn.disabled = true;
     btn.textContent = '🔄 Loading...';
     try {
-      await fetch('/api/meta-insights', { method: 'POST' });
+      const datePreset = document.getElementById('date-preset').value;
+      const res = await fetch(`/api/meta-insights?user_id=${currentDashProfile.id}&date_preset=${datePreset}`);
+      const data = await res.json();
+      if (data.totals) {
+        document.getElementById('stat-spend').textContent = formatRupiah(data.totals.spend);
+      }
+      if (data.campaigns) renderDashCampaigns(data.campaigns);
       await Promise.all([
         loadStats(currentDashProfile),
-        loadCampaigns(currentDashProfile),
         loadActionLog(currentDashProfile),
       ]);
       setLastUpdated();
@@ -206,6 +217,10 @@
       btn.textContent = '🔄 Refresh';
     }
   };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('date-preset')?.addEventListener('change', () => refreshData());
+  });
 
   async function init() {
     sb = await getSupabase();
@@ -244,17 +259,21 @@
     let q = sb.from('campaigns').select('*').eq('status', 'ACTIVE').limit(5).order('created_at', { ascending: false });
     if (profile.role !== 'admin') q = q.eq('user_id', profile.id);
     const { data } = await q;
+    renderDashCampaigns(data || []);
+  }
+
+  function renderDashCampaigns(data) {
     const tbody = document.getElementById('campaign-table');
     if (!data || data.length === 0) {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-5);">Belum ada campaign aktif</td></tr>`;
       return;
     }
     const phaseLabels = { 1: 'Testing', 2: 'Evaluasi', 3: 'Scale' };
-    tbody.innerHTML = data.map(c => `
+    tbody.innerHTML = data.slice(0, 5).map(c => `
       <tr onclick="window.location.href='campaigns.html'" style="cursor:pointer">
         <td><strong>${c.name}</strong></td>
         <td><span class="badge badge-primary">Phase ${c.current_phase || 1}: ${phaseLabels[c.current_phase] || 'Testing'}</span></td>
-        <td>${formatRupiah(c.spend_today)}</td>
+        <td>${formatRupiah(c.spend || c.spend_today)}</td>
         <td>${c.cpr ? formatRupiah(c.cpr) : '-'}</td>
         <td><span class="badge badge-success"><span class="badge-dot"></span> Aktif</span></td>
       </tr>`).join('');
