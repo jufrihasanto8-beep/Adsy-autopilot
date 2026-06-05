@@ -289,11 +289,14 @@ export default async function handler(req, res) {
         if (pl.includes('an_classic'))     anPositions.push('classic');
         if (pl.includes('an_video'))       anPositions.push('instream_video');
 
-        adsetPayload.targeting.publisher_platforms = publisherPlatforms;
-        if (fbPositions.length)  adsetPayload.targeting.facebook_positions = fbPositions;
-        if (igPositions.length)  adsetPayload.targeting.instagram_positions = igPositions;
-        if (msgPositions.length) adsetPayload.targeting.messenger_positions = msgPositions;
-        if (anPositions.length)  adsetPayload.targeting.audience_network_positions = anPositions;
+        // Hanya tambah platform kalau ada posisi yang dipilih
+        const finalPlatforms = [];
+        if (fbPositions.length)  { finalPlatforms.push('facebook');  adsetPayload.targeting.facebook_positions = fbPositions; }
+        if (igPositions.length)  { finalPlatforms.push('instagram'); adsetPayload.targeting.instagram_positions = igPositions; }
+        if (msgPositions.length) { finalPlatforms.push('messenger'); adsetPayload.targeting.messenger_positions = msgPositions; }
+        if (anPositions.length)  { finalPlatforms.push('audience_network'); adsetPayload.targeting.audience_network_positions = anPositions; }
+        if (pl.includes('plt_threads') && finalPlatforms.length) finalPlatforms.push('threads');
+        if (finalPlatforms.length) adsetPayload.targeting.publisher_platforms = finalPlatforms;
       }
       // Jika AUTO: tidak set publisher_platforms → Meta pakai Advantage+ Placement
       // ABO: budget + bid di ad set level
@@ -377,7 +380,7 @@ export default async function handler(req, res) {
       await sb.from('action_logs').insert({
         user_id: userId, campaign_name: finalCampaignName,
         action_type: 'create',
-        description: `Iklan "${headline}" dipublish ke Meta (Campaign: ${metaCampaignId})`,
+        description: `Iklan "${headline}" berhasil dipublish`,
         status: 'success'
       });
     } catch (e) { console.error('action_logs insert failed (non-fatal):', e.message); }
@@ -442,25 +445,49 @@ async function sendWANotif(userId, campaignName, headline, status) {
   }
 }
 
-// Fetch region key dari Meta API per nama provinsi
+// Mapping nama provinsi Indonesia → query yang cocok di Meta
+const PROVINCE_SEARCH = {
+  'NTB':            'Nusa Tenggara Barat',
+  'NTT':            'Nusa Tenggara Timur',
+  'DKI Jakarta':    'Jakarta',
+  'DI Yogyakarta':  'Yogyakarta',
+  'Papua Barat':    'West Papua',
+  'Papua':          'Papua',
+  'Maluku Utara':   'North Maluku',
+  'Sulawesi Utara': 'North Sulawesi',
+  'Sulawesi Tengah':'Central Sulawesi',
+  'Sulawesi Selatan':'South Sulawesi',
+  'Sulawesi Tenggara':'Southeast Sulawesi',
+  'Sulawesi Barat': 'West Sulawesi',
+  'Kalimantan Barat':'West Kalimantan',
+  'Kalimantan Tengah':'Central Kalimantan',
+  'Kalimantan Selatan':'South Kalimantan',
+  'Kalimantan Timur':'East Kalimantan',
+  'Kalimantan Utara':'North Kalimantan',
+  'Sumatera Utara': 'North Sumatra',
+  'Sumatera Barat': 'West Sumatra',
+  'Sumatera Selatan':'South Sumatra',
+  'Jawa Barat':     'West Java',
+  'Jawa Tengah':    'Central Java',
+  'Jawa Timur':     'East Java',
+};
+
+// Fetch region key dari Meta API per nama provinsi (parallel)
 async function resolveProvinceKeys(provinceNames, token) {
-  const keys = [];
-  for (const name of provinceNames) {
+  const results = await Promise.all(provinceNames.map(async (name) => {
     try {
-      const res = await fetch(
-        `${META_API}/search?type=adgeolocation&q=${encodeURIComponent(name)}&location_types=["region"]&country_codes=["ID"]&access_token=${encodeURIComponent(token)}`
-      );
+      const query = PROVINCE_SEARCH[name] || name;
+      const url = `${META_API}/search?type=adgeolocation&q=${encodeURIComponent(query)}&location_types[0]=region&country_codes[0]=ID&access_token=${encodeURIComponent(token)}`;
+      const res = await fetch(url);
       const data = await res.json();
-      const match = data.data?.find(r =>
-        r.type === 'region' && r.country_code === 'ID' &&
-        r.name.toLowerCase().includes(name.toLowerCase().split(' ')[0])
-      );
-      if (match) keys.push({ key: match.key });
+      const match = data.data?.find(r => r.type === 'region' && r.country_code === 'ID');
+      return match ? { key: match.key } : null;
     } catch (e) {
       console.warn('resolveProvinceKeys error for', name, e.message);
+      return null;
     }
-  }
-  return keys;
+  }));
+  return results.filter(Boolean);
 }
 
 function getPromotedObject(objective, pageId, pixelId) {
