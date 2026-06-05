@@ -431,8 +431,10 @@ export default async function handler(req, res) {
       });
     } catch (e) { console.error('action_logs insert failed (non-fatal):', e.message); }
 
-    // Kirim WA notif ke user (non-blocking)
-    sendWANotif(userId, finalCampaignName, headline, adStatus).catch(() => {});
+    // Kirim WA notif hanya saat file pertama (campaign baru dibuat), bukan file ke-2 dst
+    if (!existingMetaCampaignId) {
+      sendWANotif(userId, finalCampaignName, headline, adStatus).catch(() => {});
+    }
 
     if (file?.filepath) fs.unlink(file.filepath, () => {});
 
