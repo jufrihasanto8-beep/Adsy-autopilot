@@ -224,8 +224,6 @@ export default async function handler(req, res) {
       const SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
       const { data: globalCfg } = await sb.from('global_settings').select('*').eq('id', SETTINGS_ID).single();
 
-      // Geo targeting: selalu Indonesia — batasan wilayah dihandle dari Meta Business Manager
-      const geoLocations = { countries: ['ID'] };
 
       const { optimizationGoal, billingEvent } = objectiveConfig(objective);
       const adsetPayload = {
@@ -234,7 +232,7 @@ export default async function handler(req, res) {
         billing_event: billingEvent,
         optimization_goal: optimizationGoal,
         targeting: {
-          geo_locations: geoLocations,
+          geo_locations: { countries: ['ID'] },
           age_min: 21,
           age_max: 65
         },
