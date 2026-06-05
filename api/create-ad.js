@@ -262,8 +262,8 @@ export default async function handler(req, res) {
         if (pl.includes('fb_feed'))        fbPositions.push('feed');
         if (pl.includes('fb_story'))       fbPositions.push('story');
         if (pl.includes('fb_marketplace')) fbPositions.push('marketplace');
-        if (pl.includes('fb_video_feeds')) fbPositions.push('video_feeds');
         if (pl.includes('fb_search'))      fbPositions.push('search');
+        // fb_video_feeds dihapus — sudah tidak didukung Meta API v18+
         if (pl.includes('ig_stream'))      igPositions.push('stream');
         if (pl.includes('ig_story'))       igPositions.push('story');
         if (pl.includes('ig_reels'))       igPositions.push('reels');
