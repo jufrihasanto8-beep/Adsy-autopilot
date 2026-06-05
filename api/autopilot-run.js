@@ -66,6 +66,9 @@ export default async function handler(req, res) {
         const daysRunning = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
         await sb.from('campaigns').update({ days_running: daysRunning }).eq('id', fresh.id);
 
+        // ── Winner Detection — cek sebelum rules lain ──
+        await checkWinner(fresh, targetCpr, token, logs);
+
         // ── Blueprint Rules (pause/budget) — jalan tanpa nunggu impressions ──
         const acted = await runBlueprintRules(fresh, targetCpr, targetRoas, token, logs);
         if (acted) actionsTaken++;
@@ -434,6 +437,49 @@ async function createPhase2Campaign(camp, token, logs) {
       description: `Gagal buat kampanye Phase 2: ${err.message}`,
       status: 'error'
     }).catch(() => {});
+  }
+}
+
+// ── Winner Detection ──
+// Tandai campaign sebagai winner kalau CPR <= target AND spend >= minimum threshold
+async function checkWinner(camp, targetCpr, token, logs) {
+  if (!targetCpr || camp.is_winner) return; // Sudah winner atau tidak ada target
+  const cpr = camp.cpr;
+  const spend = camp.spend_today || 0;
+  const MIN_SPEND = 30000; // Minimal Rp 30.000 spend sebelum bisa dianggap winner
+
+  if (cpr !== null && cpr > 0 && cpr <= targetCpr && spend >= MIN_SPEND) {
+    await sb.from('campaigns').update({
+      is_winner: true,
+      winner_at: new Date().toISOString()
+    }).eq('id', camp.id);
+
+    const logEntry = {
+      user_id: camp.user_id,
+      campaign_name: camp.name,
+      action_type: 'winner',
+      description: `🏆 "${camp.name}" jadi WINNER! CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} ≤ target Rp ${Math.round(targetCpr).toLocaleString('id-ID')}`,
+      status: 'success'
+    };
+    await sb.from('action_logs').insert(logEntry);
+    logs.push(logEntry);
+
+    // WA Notif winner
+    try {
+      const { data: cfg } = await sb.from('app_config').select('fonnte_token, wa_number').eq('user_id', camp.user_id).single();
+      if (cfg?.fonnte_token && cfg?.wa_number) {
+        await fetch('https://api.fonnte.com/send', {
+          method: 'POST',
+          headers: { 'Authorization': cfg.fonnte_token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            target: cfg.wa_number,
+            message: `🏆 *WINNER DETECTED!*\n\nKampanye: *${camp.name}*\nCPR: Rp ${Math.round(cpr).toLocaleString('id-ID')}\nTarget: Rp ${Math.round(targetCpr).toLocaleString('id-ID')}\n\nIklan ini performa di atas target! Pertimbangkan untuk scale budget. 🚀`
+          })
+        });
+      }
+    } catch (e) {
+      console.error('WA winner notif error:', e.message);
+    }
   }
 }
 

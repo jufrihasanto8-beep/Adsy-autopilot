@@ -181,7 +181,7 @@ export default async function handler(req, res) {
     let metaAdsetId    = existingMetaAdsetId;
     let sbCampaignId   = existingSbCampaignId || null;
 
-    const { data: product } = await sb.from('products').select('name').eq('id', productId).single();
+    const { data: product } = await sb.from('products').select('name, target_cpr').eq('id', productId).single();
     const finalCampaignName = campaignNameInput || `${product?.name || 'Iklan'} - ${new Date().toLocaleDateString('id-ID')}`;
 
     if (!metaCampaignId) {
@@ -358,6 +358,7 @@ export default async function handler(req, res) {
           daily_budget: dailyBudget
         };
         if (productId) campPayload.product_id = productId;
+        if (product?.target_cpr) campPayload.target_cpr = product.target_cpr;
 
         const { data: camp, error: campErr } = await sb.from('campaigns').insert(campPayload).select('id').single();
         if (campErr) console.error('campaigns insert error (non-fatal):', campErr.message);
