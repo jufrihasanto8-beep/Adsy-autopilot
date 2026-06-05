@@ -28,6 +28,9 @@ export default async function handler(req, res) {
   const logs = [];
 
   try {
+    // ── Sync status kampanye dari Meta (pause/delete) sebelum rules engine jalan ──
+    await syncAllCampaignsFromMeta();
+
     // Ambil semua kampanye aktif dengan autopilot, join ke products untuk target CPR
     const { data: campaigns } = await sb.from('campaigns')
       .select('*, products(target_cpr, target_roas)')
@@ -101,6 +104,72 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('autopilot-run error:', err);
     return res.status(500).json({ error: err.message });
+  }
+}
+
+// ── Sync status semua kampanye dari Meta (pause/delete) ──
+async function syncAllCampaignsFromMeta() {
+  try {
+    // Ambil semua user yang punya kampanye dengan meta_campaign_id
+    const { data: userRows } = await sb.from('campaigns')
+      .select('user_id, ad_account_id')
+      .not('meta_campaign_id', 'is', null);
+    if (!userRows?.length) return;
+
+    // Group by user_id + ad_account_id (unique pairs)
+    const pairs = [...new Map(userRows.map(r => [`${r.user_id}|${r.ad_account_id}`, r])).values()];
+
+    for (const { user_id, ad_account_id } of pairs) {
+      try {
+        const { data: config } = await sb.from('app_config')
+          .select('meta_token').eq('user_id', user_id).single();
+        const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
+        if (!token) continue;
+
+        const fields = 'id,name,status';
+        const metaRes = await fetch(
+          `https://graph.facebook.com/v18.0/${ad_account_id}/campaigns?fields=${fields}&effective_status=["ACTIVE","PAUSED","ARCHIVED","DELETED"]&limit=500&access_token=${encodeURIComponent(token)}`
+        );
+        const metaData = await metaRes.json();
+        if (metaData.error || !metaData.data) continue;
+
+        const metaIds = new Set(metaData.data.map(c => c.id));
+
+        for (const camp of metaData.data) {
+          const isDeleted = camp.status === 'DELETED' || camp.status === 'ARCHIVED';
+          if (isDeleted) {
+            const { data: existing } = await sb.from('campaigns')
+              .select('id').eq('meta_campaign_id', camp.id).single();
+            if (existing) {
+              await sb.from('ad_copies').delete().eq('campaign_id', existing.id);
+              await sb.from('campaigns').delete().eq('id', existing.id);
+            }
+          } else {
+            await sb.from('campaigns').update({ status: camp.status, name: camp.name })
+              .eq('meta_campaign_id', camp.id);
+          }
+        }
+
+        // Hapus kampanye di Supabase yang tidak ada lagi di Meta
+        const { data: sbCamps } = await sb.from('campaigns')
+          .select('id, meta_campaign_id')
+          .eq('user_id', user_id)
+          .eq('ad_account_id', ad_account_id)
+          .not('meta_campaign_id', 'is', null);
+
+        for (const sbCamp of (sbCamps || [])) {
+          if (!metaIds.has(sbCamp.meta_campaign_id)) {
+            await sb.from('ad_copies').delete().eq('campaign_id', sbCamp.id);
+            await sb.from('campaigns').delete().eq('id', sbCamp.id);
+          }
+        }
+
+      } catch (e) {
+        console.error('syncAllCampaignsFromMeta error for', ad_account_id, e.message);
+      }
+    }
+  } catch (e) {
+    console.error('syncAllCampaignsFromMeta error:', e.message);
   }
 }
 
