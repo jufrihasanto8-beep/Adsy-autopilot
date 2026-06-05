@@ -119,6 +119,92 @@
         <div id="accounts-list"></div>
       </div>
 
+      <!-- NOTIFIKASI WHATSAPP (semua user) -->
+      <div class="card" style="margin-top:28px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">💬 Notifikasi WhatsApp</div>
+            <div class="card-sub">Terima notif otomatis setiap ada perubahan di kampanye kamu</div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-save-notif">Simpan</button>
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px;">
+          <label class="form-label">Nomor WhatsApp</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span style="padding:0 12px; height:40px; display:flex; align-items:center; background:var(--gray-1); border:1.5px solid var(--gray-3); border-radius:8px; font-size:13px; font-weight:600; color:var(--text-sub); flex-shrink:0;">🇮🇩 +62</span>
+            <input type="tel" class="form-input" id="wa-number" placeholder="81234567890" style="flex:1;" />
+          </div>
+          <div class="form-hint">Tanpa angka 0 di depan. Contoh: 81234567890</div>
+        </div>
+
+        <div style="font-size:13px; font-weight:600; margin-bottom:12px; color:var(--text);">Jenis Notifikasi</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <label style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--gray-1); border-radius:8px; cursor:pointer;">
+            <input type="checkbox" id="notif-pause" style="width:16px; height:16px; flex-shrink:0;" />
+            <div>
+              <div style="font-size:13px; font-weight:600;">⏸️ Pause & Aktifkan</div>
+              <div style="font-size:11px; color:var(--text-sub);">Kampanye di-pause atau dihidupkan</div>
+            </div>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--gray-1); border-radius:8px; cursor:pointer;">
+            <input type="checkbox" id="notif-scale" style="width:16px; height:16px; flex-shrink:0;" />
+            <div>
+              <div style="font-size:13px; font-weight:600;">📈 Budget Naik</div>
+              <div style="font-size:11px; color:var(--text-sub);">Budget dinaikkan otomatis</div>
+            </div>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--gray-1); border-radius:8px; cursor:pointer;">
+            <input type="checkbox" id="notif-budget" style="width:16px; height:16px; flex-shrink:0;" />
+            <div>
+              <div style="font-size:13px; font-weight:600;">📉 Budget Turun</div>
+              <div style="font-size:11px; color:var(--text-sub);">Budget diturunkan otomatis</div>
+            </div>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--gray-1); border-radius:8px; cursor:pointer;">
+            <input type="checkbox" id="notif-create" style="width:16px; height:16px; flex-shrink:0;" />
+            <div>
+              <div style="font-size:13px; font-weight:600;">🚀 Kampanye Baru</div>
+              <div style="font-size:11px; color:var(--text-sub);">Phase 2a / 2b dibuat</div>
+            </div>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--gray-1); border-radius:8px; cursor:pointer;">
+            <input type="checkbox" id="notif-winner" style="width:16px; height:16px; flex-shrink:0;" />
+            <div>
+              <div style="font-size:13px; font-weight:600;">🏆 Lolos Phase</div>
+              <div style="font-size:11px; color:var(--text-sub);">Kampanye maju ke phase berikutnya</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- ADMIN SECTION: FONNTE TOKEN -->
+      <div data-admin-only style="margin-top:28px;">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">📡 Fonnte (WhatsApp Gateway)</div>
+              <div class="card-sub">Token ini dipakai untuk kirim WA ke semua advertiser</div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-save-fonnte">Simpan</button>
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-end;">
+            <div class="form-group" style="flex:1; margin-bottom:0;">
+              <label class="form-label">Fonnte API Token</label>
+              <div style="position:relative;">
+                <input type="password" class="form-input" id="fonnte-token" placeholder="Masukkan token dari app.fonnte.com" style="padding-right:40px;" />
+                <button type="button"
+                  style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:16px; color:var(--gray-5); padding:0;"
+                  onclick="const i=document.getElementById('fonnte-token'); i.type=i.type==='password'?'text':'password'; this.textContent=i.type==='password'?'👁️':'🙈';">
+                  👁️
+                </button>
+              </div>
+              <div class="form-hint">Daftar di <a href="https://app.fonnte.com" target="_blank" style="color:var(--primary);">app.fonnte.com</a> → Device → Token</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ADMIN SECTION: AD DEFAULTS -->
       <div data-admin-only style="margin-top:32px;">
         <div class="card">
@@ -419,13 +505,89 @@
     setupEvents();
     await loadToken();
     await loadAccounts();
+    await loadNotifSettings();
     if (['admin','superadmin'].includes(currentProfile?.role)) {
       // Paksa tampilkan semua elemen admin-only di halaman ini
       document.querySelectorAll('[data-admin-only]').forEach(el => el.style.display = 'block');
       loadUsers();
       loadAdDefaults();
       setupAdDefaultsEvents();
+      loadFonnteToken();
     }
+  }
+
+  // ── NOTIFIKASI WA ──
+  async function loadNotifSettings() {
+    const [{ data: config }, { data: notif }] = await Promise.all([
+      sb.from('app_config').select('wa_target').eq('user_id', currentProfile.id).single(),
+      sb.from('notif_settings').select('*').eq('user_id', currentProfile.id).maybeSingle()
+    ]);
+
+    // Isi nomor WA (strip prefix 62)
+    if (config?.wa_target) {
+      const num = config.wa_target.replace(/^62/, '');
+      document.getElementById('wa-number').value = num;
+    }
+
+    // Isi toggle (default semua aktif)
+    document.getElementById('notif-pause').checked  = notif?.notif_pause  !== false;
+    document.getElementById('notif-scale').checked  = notif?.notif_scale  !== false;
+    document.getElementById('notif-budget').checked = notif?.notif_budget !== false;
+    document.getElementById('notif-create').checked = notif?.notif_create !== false;
+    document.getElementById('notif-winner').checked = notif?.notif_winner !== false;
+  }
+
+  async function saveNotifSettings() {
+    const rawNum = document.getElementById('wa-number').value.trim().replace(/\D/g, '');
+    const waTarget = rawNum ? '62' + rawNum.replace(/^0/, '') : null;
+
+    const btn = document.getElementById('btn-save-notif');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    // Simpan wa_target ke app_config
+    const { error: e1 } = await sb.from('app_config').upsert({
+      user_id: currentProfile.id,
+      wa_target: waTarget
+    }, { onConflict: 'user_id' });
+
+    // Simpan notif toggles ke notif_settings
+    const { error: e2 } = await sb.from('notif_settings').upsert({
+      user_id: currentProfile.id,
+      notif_pause:  document.getElementById('notif-pause').checked,
+      notif_scale:  document.getElementById('notif-scale').checked,
+      notif_budget: document.getElementById('notif-budget').checked,
+      notif_create: document.getElementById('notif-create').checked,
+      notif_winner: document.getElementById('notif-winner').checked
+    }, { onConflict: 'user_id' });
+
+    btn.disabled = false; btn.textContent = 'Simpan';
+    if (e1 || e2) return showToast('Gagal simpan: ' + (e1||e2).message, 'error');
+    showToast('Pengaturan notifikasi disimpan!', 'success');
+  }
+
+  // ── FONNTE TOKEN (admin only) ──
+  async function loadFonnteToken() {
+    const { data } = await sb.from('app_config').select('fonnte_token').eq('user_id', currentProfile.id).single();
+    if (data?.fonnte_token) {
+      document.getElementById('fonnte-token').value = data.fonnte_token;
+    }
+  }
+
+  async function saveFonnteToken() {
+    const token = document.getElementById('fonnte-token').value.trim();
+    if (!token) return showToast('Token tidak boleh kosong', 'warning');
+
+    const btn = document.getElementById('btn-save-fonnte');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    const { error } = await sb.from('app_config').upsert({
+      user_id: currentProfile.id,
+      fonnte_token: token
+    }, { onConflict: 'user_id' });
+
+    btn.disabled = false; btn.textContent = 'Simpan';
+    if (error) return showToast('Gagal simpan: ' + error.message, 'error');
+    showToast('Fonnte token disimpan!', 'success');
   }
 
   // ── TOKEN ──
@@ -760,6 +922,8 @@
     document.getElementById('btn-save-url').addEventListener('click', saveUrl);
     document.getElementById('btn-invite-user')?.addEventListener('click', () => openModal('modal-invite'));
     document.getElementById('btn-create-user')?.addEventListener('click', createUser);
+    document.getElementById('btn-save-notif').addEventListener('click', saveNotifSettings);
+    document.getElementById('btn-save-fonnte')?.addEventListener('click', saveFonnteToken);
   }
 
   async function saveAccount() {
