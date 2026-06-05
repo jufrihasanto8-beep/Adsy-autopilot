@@ -130,14 +130,18 @@ async function syncCampaignInsights(camp, token) {
       x.action_type === 'post_engagement'
     );
     const results = parseInt(resultAction?.value || 0);
-    const cpr = results > 0 ? Math.round(spend / results) : null;
+    // cpr = null kalau spend ada tapi konversi 0 (bukan sekadar belum ada data)
+    // undefined = jangan update DB (spend 0 = belum ada data hari ini)
+    const cpr = results > 0
+      ? Math.round(spend / results)
+      : (spend > 0 ? null : undefined);
 
     await sb.from('campaigns').update({
       impressions,
       spend_today: spend,
       ctr,
       results_today: results,
-      ...(cpr !== null ? { cpr } : {})
+      ...(cpr !== undefined ? { cpr } : {})
     }).eq('id', camp.id);
 
   } catch (err) {
@@ -521,8 +525,12 @@ async function runBlueprintRules(camp, targetCpr, targetRoas, token, logs) {
 
   // Phase 2: skema sama Phase 1 — pause/naik/turun budget
   if (currentPhase === 2 && cpr !== null) {
-    // CPR > 2.5× target → pause (hidup lagi jam 3 pagi)
-    if (cpr > targetCpr * 2.5) {
+    // Hitung days running untuk Phase 2 (hindari double-action di hari ke-7)
+    const phase2Start = camp.phase_started_at ? new Date(camp.phase_started_at) : new Date(camp.created_at);
+    const phase2Days = Math.floor((new Date() - phase2Start) / (1000 * 60 * 60 * 24));
+
+    // CPR > 2.5× target → pause sementara (skip kalau hari ke-7+, checkPhaseAdvancement yang handle)
+    if (cpr > targetCpr * 2.5 && phase2Days < 7) {
       await pauseCampaign(camp, token);
       const logEntry = {
         user_id: camp.user_id,
