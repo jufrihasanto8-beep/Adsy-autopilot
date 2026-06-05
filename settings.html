@@ -1309,40 +1309,61 @@
     }
   }
 
+  async function updateUser(userId, updates) {
+    const res = await fetch('/api/update-user-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, ...updates })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Gagal update');
+  }
+
   window.approveUser = async function(id) {
-    await sb.from('profiles').update({ status: 'active' }).eq('id', id);
-    showToast('User disetujui, akun aktif!', 'success');
-    // Kirim notif WA ke user via API
-    try { await fetch('/api/notify-new-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'approved', userId: id }) }); } catch {}
-    await loadUsers();
+    try {
+      await updateUser(id, { status: 'active' });
+      showToast('User disetujui, akun aktif!', 'success');
+      try { await fetch('/api/notify-new-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'approved', userId: id }) }); } catch {}
+      await loadUsers();
+    } catch (err) { showToast('Error: ' + err.message, 'error'); }
   };
 
   window.rejectUser = async function(id) {
     if (!confirm('Tolak & hapus akun user ini?')) return;
-    await sb.from('profiles').delete().eq('id', id);
-    showToast('Akun ditolak & dihapus', 'success');
-    await loadUsers();
+    try {
+      const res = await fetch('/api/update-user-status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: id, status: 'rejected' }) });
+      await sb.auth.admin?.deleteUser?.(id).catch(() => {});
+      await sb.from('profiles').delete().eq('id', id);
+      showToast('Akun ditolak & dihapus', 'success');
+      await loadUsers();
+    } catch (err) { showToast('Error: ' + err.message, 'error'); }
   };
 
   window.suspendUser = async function(id) {
     if (!confirm('Tangguhkan user ini? Mereka tidak bisa login.')) return;
-    await sb.from('profiles').update({ status: 'suspended' }).eq('id', id);
-    showToast('User ditangguhkan', 'success');
-    await loadUsers();
+    try {
+      await updateUser(id, { status: 'suspended' });
+      showToast('User ditangguhkan', 'success');
+      await loadUsers();
+    } catch (err) { showToast('Error: ' + err.message, 'error'); }
   };
 
   window.activateUser = async function(id) {
-    await sb.from('profiles').update({ status: 'active' }).eq('id', id);
-    showToast('Akun diaktifkan kembali', 'success');
-    await loadUsers();
+    try {
+      await updateUser(id, { status: 'active' });
+      showToast('Akun diaktifkan kembali', 'success');
+      await loadUsers();
+    } catch (err) { showToast('Error: ' + err.message, 'error'); }
   };
 
   window.editRole = async function(id, currentRole) {
     const newRole = prompt(`Edit role (admin/advertiser/viewer):\nRole sekarang: ${currentRole}`);
     if (!newRole || !['admin','advertiser','viewer'].includes(newRole)) return;
-    await sb.from('profiles').update({ role: newRole }).eq('id', id);
-    showToast('Role diperbarui', 'success');
-    await loadUsers();
+    try {
+      await updateUser(id, { role: newRole });
+      showToast('Role diperbarui', 'success');
+      await loadUsers();
+    } catch (err) { showToast('Error: ' + err.message, 'error'); }
   };
 
   window.removeUser = async function(id) {
