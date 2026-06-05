@@ -149,7 +149,8 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
   const cpr = camp.cpr;
 
   // Phase 1 → 2: gate 8k impressions + min 3 hari + seleksi CPR
-  if (camp.current_phase === 1 && daysRunning >= 3 && camp.impressions >= 8000) {
+  // Skip kalau Phase 1 sudah winning (initial_budget tersimpan) — dikelola oleh runBlueprintRules
+  if (camp.current_phase === 1 && daysRunning >= 3 && camp.impressions >= 8000 && !camp.initial_budget) {
     if (!targetCpr) {
       // Tidak ada target CPR → langsung maju
       newPhase = 2;
@@ -349,9 +350,6 @@ async function runBlueprintRules(camp, targetCpr, targetRoas, token, logs) {
   const currentPhase = camp.current_phase;
   const today       = new Date().toISOString().slice(0, 10);
 
-  // Cegah multiple budget change dalam satu hari
-  if (camp.last_budget_change_date === today) return false;
-
   // Phase 1: Testing
   if (currentPhase === 1 && cpr !== null && cpr !== undefined) {
 
@@ -359,8 +357,40 @@ async function runBlueprintRules(camp, targetCpr, targetRoas, token, logs) {
     if (camp.initial_budget) {
       const resultsToday = camp.results_today || 0;
       const lastResults  = camp.last_results || 0;
+      const cprHistory   = Array.isArray(camp.cpr_history) ? camp.cpr_history : [];
 
-      // CPR > 2× target → pause, reset budget ke awal jam 3 pagi
+      // Catat CPR hari ini ke history (sekali per hari)
+      const lastRecordedDate = cprHistory.length > 0 ? cprHistory[cprHistory.length - 1]?.date : null;
+      if (lastRecordedDate !== today && cpr !== null) {
+        const updatedHistory = [...cprHistory, { date: today, cpr }];
+        await sb.from('campaigns').update({ cpr_history: updatedHistory }).eq('id', camp.id);
+        camp.cpr_history = updatedHistory; // update local reference
+      }
+
+      // ── Evaluasi hari ke-7: rata-rata CPR ──
+      const winningDays = Math.floor((new Date() - new Date(camp.phase_started_at || camp.created_at)) / (1000 * 60 * 60 * 24));
+      if (winningDays >= 7 && camp.cpr_history?.length >= 3) {
+        const avgCpr = camp.cpr_history.reduce((sum, d) => sum + d.cpr, 0) / camp.cpr_history.length;
+
+        if (avgCpr > targetCpr * 1.1) {
+          // Rata-rata CPR > +10% target → pause permanen
+          await pauseCampaign(camp, token);
+          await sb.from('campaigns').update({ autopilot_enabled: false }).eq('id', camp.id);
+          const logEntry = {
+            user_id: camp.user_id,
+            campaign_name: camp.name,
+            action_type: 'pause',
+            description: `"${camp.name}" dihentikan permanen setelah 7 hari — rata-rata CPR Rp ${Math.round(avgCpr).toLocaleString('id-ID')} > +10% target`,
+            status: 'success'
+          };
+          await sb.from('action_logs').insert(logEntry);
+          logs.push(logEntry);
+          return true;
+        }
+        // Rata-rata CPR ≤ +10% target → tetap jalan terus (tidak ada aksi)
+      }
+
+      // CPR > 2× target → pause sementara, hidup jam 3 pagi + budget reset
       if (cpr > targetCpr * 2) {
         await pauseCampaign(camp, token);
         const logEntry = {
@@ -410,6 +440,9 @@ async function runBlueprintRules(camp, targetCpr, targetRoas, token, logs) {
       return true;
     }
   }
+
+  // Cegah multiple budget change dalam satu hari (Phase 2 & 3 saja)
+  if (camp.last_budget_change_date === today) return false;
 
   // Phase 3: Scale mode — naik/turun budget 3%/hari
   if (currentPhase === 3 && cpr !== null && cpr !== undefined) {
