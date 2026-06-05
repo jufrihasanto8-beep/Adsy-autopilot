@@ -914,13 +914,78 @@ async function executeAction(camp, rule, token, userId, logs) {
 
 async function sendWASummary(count, logs) {
   try {
-    const { data: configs } = await sb.from('app_config')
-      .select('fonnte_token, wa_target').not('fonnte_token', 'is', null);
-    for (const config of (configs || [])) {
-      if (!config.fonnte_token || !config.wa_target) continue;
-      const summary = logs.filter(l => l.status !== 'skipped').slice(0, 5)
-        .map(l => `• ${l.description}`).join('\n');
-      const message = `🤖 *Adsy Autopilot*\n\n${count} aksi dijalankan:\n${summary}\n\nCek dashboard untuk detail lengkap.`;
+    // Kelompokkan logs per user_id
+    const byUser = {};
+    for (const log of logs) {
+      if (!log.user_id || log.status === 'error') continue;
+      if (!byUser[log.user_id]) byUser[log.user_id] = [];
+      byUser[log.user_id].push(log);
+    }
+
+    for (const [userId, userLogs] of Object.entries(byUser)) {
+      // Ambil fonnte config + notif settings secara paralel
+      const [{ data: config }, { data: notif }] = await Promise.all([
+        sb.from('app_config').select('fonnte_token, wa_target').eq('user_id', userId).single(),
+        sb.from('notif_settings').select('*').eq('user_id', userId).maybeSingle()
+      ]);
+
+      if (!config?.fonnte_token || !config?.wa_target) continue;
+
+      // Filter logs berdasarkan notif_settings (default semua aktif kalau belum diset)
+      const filteredLogs = userLogs.filter(log => {
+        if (!notif) return true; // belum ada setting = semua aktif
+        switch (log.action_type) {
+          case 'pause':          return notif.notif_pause !== false;
+          case 'increase_budget': return notif.notif_scale !== false || notif.notif_budget !== false;
+          case 'decrease_budget': return notif.notif_budget !== false;
+          case 'create':         return notif.notif_create !== false;
+          case 'phase_advance':  return notif.notif_winner !== false;
+          default: return true;
+        }
+      });
+
+      if (!filteredLogs.length) continue;
+
+      // Kelompokkan per kampanye untuk format yang rapi
+      const byCampaign = {};
+      for (const log of filteredLogs) {
+        const key = log.campaign_name || 'Unknown';
+        if (!byCampaign[key]) byCampaign[key] = [];
+        byCampaign[key].push(log);
+      }
+
+      // Emoji per action type
+      const actionEmoji = {
+        pause: '⏸️',
+        increase_budget: '📈',
+        decrease_budget: '📉',
+        create: '🚀',
+        phase_advance: '🏆',
+        phase_hold: 'ℹ️'
+      };
+
+      const now = new Date().toLocaleString('id-ID', {
+        timeZone: 'Asia/Jakarta',
+        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+      });
+
+      let lines = [`🤖 *Adsy Autopilot*`, `📅 ${now} WIB`, ``];
+
+      for (const [campName, campLogs] of Object.entries(byCampaign)) {
+        lines.push(`*${campName}*`);
+        for (const log of campLogs) {
+          const emoji = actionEmoji[log.action_type] || '▸';
+          // Ambil bagian penting dari description (potong nama kampanye di awal)
+          const desc = log.description?.replace(/^"[^"]*"\s*/, '') || log.action_type;
+          lines.push(`  ${emoji} ${desc}`);
+        }
+        lines.push('');
+      }
+
+      lines.push(`_Total ${filteredLogs.length} aksi • Cek dashboard untuk detail_`);
+
+      const message = lines.join('\n');
+
       await fetch('https://api.fonnte.com/send', {
         method: 'POST',
         headers: { 'Authorization': config.fonnte_token, 'Content-Type': 'application/json' },
