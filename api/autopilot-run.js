@@ -190,6 +190,23 @@ async function runBlueprintRules(camp, targetCpr, targetRoas, token, logs) {
   // Cegah multiple budget change dalam satu hari
   if (camp.last_budget_change_date === today) return false;
 
+  // Phase 1: Testing — pause kalau CPR > 2.5x target
+  if (currentPhase === 1 && cpr !== null && cpr !== undefined) {
+    if (cpr > targetCpr * 2.5) {
+      await pauseCampaign(camp, token);
+      const logEntry = {
+        user_id: camp.user_id,
+        campaign_name: camp.name,
+        action_type: 'pause',
+        description: `"${camp.name}" di-pause di Phase 1 — CPR Rp ${Math.round(cpr).toLocaleString('id-ID')} (${Math.round(cpr/targetCpr*100)}% dari target, > 2.5× target)`,
+        status: 'success'
+      };
+      await sb.from('action_logs').insert(logEntry);
+      logs.push(logEntry);
+      return true;
+    }
+  }
+
   // Phase 3: Scale mode — naik/turun budget 3%/hari
   if (currentPhase === 3 && cpr !== null && cpr !== undefined) {
 
