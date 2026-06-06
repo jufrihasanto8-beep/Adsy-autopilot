@@ -816,21 +816,28 @@
         const formData = new FormData();
 
         // Video: upload langsung dari browser ke Meta (bypass Vercel 4.5MB limit)
+        // Thumbnail di-extract dari browser pakai Canvas → upload paralel dengan video
         if (item.type === 'video') {
           btn.innerHTML = `<div class="loading-spinner"></div> Upload video ke Meta...`;
+
           const videoForm = new FormData();
           videoForm.append('file', item.file, item.file.name);
-          const videoRes = await fetch(
-            `https://graph.facebook.com/v18.0/${metaAccountId}/advideos?access_token=${encodeURIComponent(metaToken)}`,
-            { method: 'POST', body: videoForm }
-          );
-          const videoData = await videoRes.json();
+
+          // Upload video + extract & upload thumbnail secara paralel
+          const [videoData, thumbnailHash] = await Promise.all([
+            fetch(`https://graph.facebook.com/v18.0/${metaAccountId}/advideos?access_token=${encodeURIComponent(metaToken)}`,
+              { method: 'POST', body: videoForm }
+            ).then(r => r.json()),
+            extractAndUploadThumbnail(item.file, metaAccountId, metaToken)
+          ]);
+
           if (videoData.error) {
             const e = videoData.error;
             throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code})`);
           }
           formData.append('video_id', videoData.id);
           formData.append('file_type', 'video');
+          if (thumbnailHash) formData.append('thumbnail_image_hash', thumbnailHash);
           btn.innerHTML = `<div class="loading-spinner"></div> Publishing...`;
         } else {
           formData.append('file', item.file);
@@ -933,6 +940,40 @@
 
   function escHtml(str) {
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Extract frame dari video pakai Canvas, upload sebagai adimage ke Meta → dapat image_hash
+  async function extractAndUploadThumbnail(videoFile, accountId, token) {
+    try {
+      const blob = await new Promise((resolve) => {
+        const video = document.createElement('video');
+        const canvas = document.createElement('canvas');
+        const url = URL.createObjectURL(videoFile);
+        video.onloadedmetadata = () => { video.currentTime = Math.min(1, video.duration * 0.1); };
+        video.onseeked = () => {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          canvas.getContext('2d').drawImage(video, 0, 0);
+          canvas.toBlob(b => { URL.revokeObjectURL(url); resolve(b); }, 'image/jpeg', 0.85);
+        };
+        video.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        video.src = url;
+        video.load();
+      });
+      if (!blob) return null;
+
+      const thumbForm = new FormData();
+      thumbForm.append('thumbnail.jpg', blob, 'thumbnail.jpg');
+      const res = await fetch(
+        `https://graph.facebook.com/v18.0/${accountId}/adimages?access_token=${encodeURIComponent(token)}`,
+        { method: 'POST', body: thumbForm }
+      );
+      const data = await res.json();
+      return Object.values(data.images || {})[0]?.hash || null;
+    } catch (e) {
+      console.warn('extractAndUploadThumbnail gagal:', e.message);
+      return null;
+    }
   }
 
   init();
