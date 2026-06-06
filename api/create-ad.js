@@ -98,27 +98,33 @@ export default async function handler(req, res) {
         call_to_action: { type: ctaMap(cta), value: { link: destUrl } }
       };
 
-      // Ambil thumbnail dari Meta — retry 3x karena video butuh waktu diproses
+      // Ambil thumbnail dari Meta — retry 6x karena video butuh waktu diproses
+      // Coba field `picture` dulu (lebih cepat tersedia), lalu `thumbnails`
       let thumbnailUrl = null;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 6; attempt++) {
         try {
-          if (attempt > 0) await new Promise(r => setTimeout(r, 3000));
-          const thumbRes  = await fetch(`${META_API}/${metaVideoId}?fields=thumbnails&access_token=${encodeURIComponent(token)}`);
+          if (attempt > 0) await new Promise(r => setTimeout(r, 5000));
+          const thumbRes  = await fetch(`${META_API}/${metaVideoId}?fields=picture,thumbnails&access_token=${encodeURIComponent(token)}`);
           const thumbData = await thumbRes.json();
-          const thumbs    = thumbData?.thumbnails?.data || [];
-          const midIdx    = Math.floor(thumbs.length / 2);
-          thumbnailUrl    = thumbs[midIdx]?.uri || thumbs[0]?.uri || null;
+          // Coba picture field dulu (tersedia lebih cepat)
+          thumbnailUrl = thumbData?.picture || null;
+          // Fallback ke thumbnails array
+          if (!thumbnailUrl) {
+            const thumbs = thumbData?.thumbnails?.data || [];
+            const midIdx = Math.floor(thumbs.length / 2);
+            thumbnailUrl = thumbs[midIdx]?.uri || thumbs[0]?.uri || null;
+          }
           if (thumbnailUrl) break;
         } catch (e) {
           console.warn(`Thumbnail attempt ${attempt + 1} gagal:`, e.message);
         }
       }
 
-      // Kalau thumbnail tersedia, set. Kalau tidak, biarkan Meta auto-generate dari video.
-      // (jangan upload 1x1 pixel — Meta render itu jadi thumbnail kuning/blank)
-      if (thumbnailUrl) {
-        videoDataPayload.image_url = thumbnailUrl;
+      // Thumbnail wajib ada — Meta tidak bisa auto-generate saat buat creative
+      if (!thumbnailUrl) {
+        throw new Error('Thumbnail video belum siap di Meta. Coba beberapa detik lagi lalu publish ulang.');
       }
+      videoDataPayload.image_url = thumbnailUrl;
 
       const creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
