@@ -250,12 +250,15 @@
             </div>
             <div class="form-group" style="margin:0;">
               <label class="form-label">Nomor WhatsApp Tujuan <span>*</span></label>
-              <div style="display:flex; align-items:center; gap:6px;">
+              <!-- Dropdown kalau Page punya banyak nomor WA -->
+              <select class="form-input form-select" id="pub-wa-select" style="display:none;"></select>
+              <!-- Input fallback / manual -->
+              <div id="pub-wa-input-wrap" style="display:flex; align-items:center; gap:6px;">
                 <span style="font-size:13px; font-weight:600; color:var(--text);">+</span>
                 <input type="text" class="form-input" id="pub-wa-number"
-                  placeholder="628123456789 (format internasional, tanpa +)" />
+                  placeholder="Otomatis setelah pilih Ad Account" />
               </div>
-              <div class="form-hint">Contoh: 628123456789 — tanpa tanda + di depan</div>
+              <div id="wa-number-hint" class="form-hint">Pilih Ad Account dulu — nomor WA otomatis diambil dari Page</div>
             </div>
           </div>
 
@@ -433,6 +436,95 @@
     }
     sel.innerHTML = `<option value="">Pilih Ad Account</option>` +
       userAdAccounts.map(a => `<option value="${a.id}">${a.label} (${a.account_id})</option>`).join('');
+
+    sel.addEventListener('change', () => fetchWaNumberFromPage(sel.value));
+  }
+
+  async function fetchWaNumberFromPage(accDbId) {
+    const waSelect   = document.getElementById('pub-wa-select');
+    const waInputWrap= document.getElementById('pub-wa-input-wrap');
+    const waInput    = document.getElementById('pub-wa-number');
+    const waHint     = document.getElementById('wa-number-hint');
+
+    // Reset
+    waSelect.style.display = 'none';
+    waInputWrap.style.display = 'flex';
+    waInput.value = '';
+
+    if (!accDbId) {
+      waHint.textContent = 'Pilih Ad Account dulu — nomor WA otomatis diambil dari Business Manager';
+      return;
+    }
+
+    const acc = userAdAccounts.find(a => a.id === accDbId);
+    waHint.innerHTML = '<span style="color:#25D366;">⏳ Mengambil nomor WA dari Business Manager...</span>';
+
+    try {
+      const { data: cfg } = await sb.from('app_config').select('meta_token').eq('user_id', currentProfile.id).single();
+      const token = cfg?.meta_token;
+      if (!token) { waHint.textContent = 'Meta token belum dikonfigurasi — isi manual'; return; }
+
+      if (!acc?.page_id) {
+        waHint.textContent = 'Page ID belum diset di Pengaturan — isi manual';
+        return;
+      }
+
+      // Step 1: Ambil WA Business Account yang ter-link ke Page
+      const pageRes  = await fetch(`https://graph.facebook.com/v18.0/${acc.page_id}?fields=name,whatsapp_accounts&access_token=${encodeURIComponent(token)}`);
+      const pageData = await pageRes.json();
+      const pageName = pageData.name || acc.page_id;
+      const wabaList = pageData.whatsapp_accounts?.data || [];
+
+      let waNumbers = [];
+
+      if (wabaList.length > 0) {
+        // Step 2: Ambil semua phone numbers dari setiap WA Business Account
+        for (const waba of wabaList) {
+          const phoneRes  = await fetch(`https://graph.facebook.com/v18.0/${waba.id}/phone_numbers?fields=display_phone_number,verified_name&access_token=${encodeURIComponent(token)}`);
+          const phoneData = await phoneRes.json();
+          for (const phone of (phoneData.data || [])) {
+            const clean = phone.display_phone_number?.replace(/[\s\-\+\(\)]/g, '') || '';
+            if (clean) waNumbers.push({
+              label: `+${clean}${phone.verified_name ? ' — ' + phone.verified_name : ''}`,
+              value: clean
+            });
+          }
+        }
+      }
+
+      // Fallback: coba whatsapp_number langsung dari Page
+      if (waNumbers.length === 0) {
+        const fallbackRes  = await fetch(`https://graph.facebook.com/v18.0/${acc.page_id}?fields=whatsapp_number&access_token=${encodeURIComponent(token)}`);
+        const fallbackData = await fallbackRes.json();
+        if (fallbackData.whatsapp_number) {
+          const clean = fallbackData.whatsapp_number.replace(/[\s\-\+]/g, '');
+          waNumbers.push({ label: `+${clean}`, value: clean });
+        }
+      }
+
+      if (waNumbers.length === 0) {
+        waHint.innerHTML = `<span style="color:var(--warning);">Tidak ada nomor WA ditemukan di Page "${pageName}" — link nomor WA dulu di Facebook Page → Settings → WhatsApp</span>`;
+        return;
+      }
+
+      if (waNumbers.length === 1) {
+        // 1 nomor → auto-fill input
+        waSelect.style.display = 'none';
+        waInputWrap.style.display = 'flex';
+        waInput.value = waNumbers[0].value;
+        waHint.innerHTML = `<span style="color:#15803d;">✓ Dari Page "${pageName}": +${waNumbers[0].value}</span>`;
+      } else {
+        // Banyak nomor → dropdown
+        waSelect.innerHTML = '<option value="">-- Pilih Nomor WA --</option>' +
+          waNumbers.map(n => `<option value="${n.value}">${n.label}</option>`).join('');
+        waSelect.style.display = '';
+        waInputWrap.style.display = 'none';
+        waHint.innerHTML = `<span style="color:#15803d;">✓ ${waNumbers.length} nomor ditemukan di Page "${pageName}" — pilih yang mau dipakai</span>`;
+      }
+
+    } catch (e) {
+      waHint.textContent = 'Gagal fetch dari Page — isi manual';
+    }
   }
 
   async function handleFiles(files) {
@@ -657,7 +749,9 @@
     if (!selectedProduct) return showToast('Pilih produk dulu', 'warning');
 
     const accDbId = document.getElementById('pub-account').value;
-    const waNumber = document.getElementById('pub-wa-number').value.trim().replace(/\D/g, '');
+    const waSelect = document.getElementById('pub-wa-select');
+    const waRaw    = waSelect.style.display !== 'none' ? waSelect.value : document.getElementById('pub-wa-number').value;
+    const waNumber = waRaw.trim().replace(/\D/g, '');
     const budget = document.getElementById('pub-budget').value;
     const startTime = document.getElementById('pub-start').value;
     const endTime = document.getElementById('pub-end').value;
