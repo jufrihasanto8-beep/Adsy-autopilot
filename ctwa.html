@@ -2,9 +2,8 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Buat Iklan — Adsy Autopilot</title>
+  <title>Buat Iklan CTWA — Adsy Autopilot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
   <link rel="stylesheet" href="css/style.css" />
@@ -21,8 +20,8 @@
       background: var(--gray-1);
     }
     .upload-zone:hover, .upload-zone.dragover {
-      border-color: var(--primary);
-      background: var(--primary-light);
+      border-color: #25D366;
+      background: #f0fdf4;
     }
     .upload-zone .upload-icon { font-size: 40px; margin-bottom: 12px; }
     .upload-zone h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
@@ -36,7 +35,7 @@
       margin-bottom: 16px;
       transition: var(--transition);
     }
-    .content-item.generating { border-color: var(--primary); }
+    .content-item.generating { border-color: #25D366; }
     .content-item.ready { border-color: var(--success); }
 
     .content-item-header {
@@ -49,53 +48,26 @@
       cursor: pointer;
       user-select: none;
     }
-    .content-item.collapsed .content-item-header {
-      border-bottom: none;
-    }
+    .content-item.collapsed .content-item-header { border-bottom: none; }
     .content-item.collapsed .content-item-body,
-    .content-item.collapsed .generating-overlay {
-      display: none !important;
-    }
-    .collapse-toggle {
-      font-size: 14px;
-      color: var(--text-sub);
-      transition: transform 0.2s;
-      flex-shrink: 0;
-    }
+    .content-item.collapsed .generating-overlay { display: none !important; }
+    .collapse-toggle { font-size: 14px; color: var(--text-sub); transition: transform 0.2s; flex-shrink: 0; }
     .content-item.collapsed .collapse-toggle { transform: rotate(-90deg); }
     .content-preview {
-      width: 80px;
-      height: 60px;
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--gray-3);
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
+      width: 80px; height: 60px; border-radius: 8px; overflow: hidden;
+      background: var(--gray-3); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 24px;
     }
-    .content-preview img, .content-preview video {
-      width: 100%; height: 100%; object-fit: cover;
-    }
+    .content-preview img, .content-preview video { width: 100%; height: 100%; object-fit: cover; }
     .content-item-info { flex: 1; min-width: 0; }
-    .content-item-name {
-      font-size: 13px; font-weight: 600;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
+    .content-item-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .content-item-meta { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
-
-    .content-item-body {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0;
-    }
-
+    .content-item-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
     .copy-fields { padding: 16px; border-right: 1px solid var(--gray-3); }
     .ad-preview-wrap { padding: 16px; background: var(--gray-1); }
 
-    /* Facebook Ad Preview */
-    .fb-preview {
+    /* WA Ad Preview */
+    .wa-preview {
       background: white;
       border: 1px solid #ddd;
       border-radius: 8px;
@@ -103,75 +75,43 @@
       font-family: 'Helvetica Neue', Arial, sans-serif;
       overflow: hidden;
     }
-    .fb-preview-header {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px;
-    }
-    .fb-page-avatar {
-      width: 40px; height: 40px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--primary), #7C3AED);
+    .wa-preview-header { display: flex; align-items: center; gap: 10px; padding: 12px; }
+    .wa-page-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: linear-gradient(135deg, #25D366, #128C7E);
       display: flex; align-items: center; justify-content: center;
       color: white; font-weight: 700; font-size: 14px;
     }
-    .fb-page-name { font-size: 13px; font-weight: 700; line-height: 1.3; }
-    .fb-sponsored { font-size: 11px; color: #65676B; }
-    .fb-primary-text {
-      padding: 0 12px 12px;
-      font-size: 13px;
-      color: #1C1E21;
-      line-height: 1.5;
-      white-space: pre-line;
-      max-height: 80px;
-      overflow: hidden;
-    }
-    .fb-media {
-      width: 100%;
-      aspect-ratio: 1;
-      background: var(--gray-3);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 48px;
-      overflow: hidden;
-    }
-    .fb-media img, .fb-media video { width: 100%; height: 100%; object-fit: cover; }
-    .fb-caption-bar {
-      background: #F0F2F5;
-      padding: 10px 12px;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .fb-caption-text { flex: 1; }
-    .fb-headline { font-size: 13px; font-weight: 700; color: #1C1E21; }
-    .fb-description { font-size: 12px; color: #65676B; margin-top: 2px; }
-    .fb-cta-btn {
-      background: #E4E6EB;
-      border: none;
-      padding: 7px 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 700;
-      color: #1C1E21;
-      cursor: pointer;
-      flex-shrink: 0;
-      margin-left: 10px;
+    .wa-page-name { font-size: 13px; font-weight: 700; line-height: 1.3; }
+    .wa-sponsored { font-size: 11px; color: #65676B; }
+    .wa-primary-text { padding: 0 12px 12px; font-size: 13px; color: #1C1E21; line-height: 1.5; white-space: pre-line; max-height: 80px; overflow: hidden; }
+    .wa-media { width: 100%; aspect-ratio: 1; background: var(--gray-3); display: flex; align-items: center; justify-content: center; font-size: 48px; overflow: hidden; }
+    .wa-media img, .wa-media video { width: 100%; height: 100%; object-fit: cover; }
+    .wa-caption-bar { background: #F0F2F5; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; }
+    .wa-caption-text { flex: 1; }
+    .wa-headline { font-size: 13px; font-weight: 700; color: #1C1E21; }
+    .wa-description { font-size: 12px; color: #65676B; margin-top: 2px; }
+    .wa-cta-btn {
+      background: #25D366;
+      border: none; padding: 7px 14px; border-radius: 6px;
+      font-size: 13px; font-weight: 700; color: white;
+      cursor: pointer; flex-shrink: 0; margin-left: 10px;
     }
 
-    .generating-overlay {
-      display: flex; align-items: center; justify-content: center;
-      gap: 10px; padding: 24px;
-      color: var(--primary); font-size: 13px; font-weight: 500;
+    .generating-overlay { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 24px; color: #25D366; font-size: 13px; font-weight: 500; }
+
+    .ctwa-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #f0fdf4; border: 1.5px solid #25D366;
+      color: #15803d; font-size: 12px; font-weight: 600;
+      padding: 6px 12px; border-radius: 20px;
     }
 
     .publish-bar {
-      position: sticky;
-      bottom: 0;
-      background: white;
-      border-top: 1px solid var(--gray-3);
-      padding: 16px 32px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      z-index: 50;
-      box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+      position: sticky; bottom: 0; background: white;
+      border-top: 1px solid var(--gray-3); padding: 16px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 50; box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
     }
     .publish-info { font-size: 13px; color: var(--text-sub); }
     .publish-info strong { color: var(--text); font-size: 15px; display: block; }
@@ -188,14 +128,13 @@
     <nav class="sidebar-nav">
       <div class="nav-section-label">Menu</div>
       <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
-      <div class="nav-item active" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
-      <div class="nav-item" data-page="ctwa.html"><span class="nav-icon">💬</span> Buat Iklan CTWA</div>
+      <div class="nav-item" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
+      <div class="nav-item active" data-page="ctwa.html"><span class="nav-icon">💬</span> Buat Iklan CTWA</div>
       <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
       <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
       <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
       <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
       <div class="nav-item" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
-      
       <div class="nav-item" data-page="products.html"><span class="nav-icon">📦</span> Produk</div>
     </nav>
     <div class="autopilot-status">
@@ -221,9 +160,10 @@
   <main class="main-content" style="padding-bottom:80px;">
     <header class="topbar">
       <div class="topbar-left">
-        <h2>Buat Iklan</h2>
-        <p>Upload konten, AI generate copy, publish ke Meta</p>
+        <h2>Buat Iklan CTWA</h2>
+        <p>Upload konten, AI generate copy, publish iklan Click to WhatsApp ke Meta</p>
       </div>
+      <div class="ctwa-badge">💬 Click to WhatsApp</div>
     </header>
 
     <div class="page-content">
@@ -233,7 +173,7 @@
         <div class="card-header">
           <div>
             <div class="card-title">1. Pilih Produk & Brief</div>
-            <div class="card-sub">AI akan generate copy berdasarkan product knowledge</div>
+            <div class="card-sub">AI akan generate copy yang mendorong orang untuk chat via WhatsApp</div>
           </div>
         </div>
         <div class="form-row">
@@ -246,13 +186,11 @@
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Tambahan / Brief Hari Ini</label>
             <input type="text" class="form-input" id="input-brief"
-              placeholder="Misal: fokus promo lebaran, stok terbatas, dll" />
+              placeholder="Misal: stok terbatas, promo khusus hari ini, dll" />
           </div>
         </div>
-
-        <!-- Product Knowledge Preview -->
-        <div id="product-preview" style="display:none; margin-top:16px; padding:14px; background:var(--primary-light); border-radius:var(--radius-sm); border-left:3px solid var(--primary);">
-          <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Product Knowledge</div>
+        <div id="product-preview" style="display:none; margin-top:16px; padding:14px; background:#f0fdf4; border-radius:var(--radius-sm); border-left:3px solid #25D366;">
+          <div style="font-size:11px; font-weight:700; color:#15803d; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Product Knowledge</div>
           <div id="product-preview-content" style="font-size:13px; color:var(--text); line-height:1.6;"></div>
         </div>
       </div>
@@ -266,14 +204,12 @@
           </div>
           <button class="btn btn-outline btn-sm" id="btn-add-more" style="display:none;">+ Tambah File</button>
         </div>
-
         <div class="upload-zone" id="upload-zone">
-          <div class="upload-icon">📁</div>
+          <div class="upload-icon">💬</div>
           <h3>Drop file di sini atau klik untuk pilih</h3>
           <p>Gambar & video bisa sekaligus · Max 200MB per file</p>
           <input type="file" id="file-input" multiple accept="image/*,video/*" style="display:none;" />
         </div>
-
         <div id="content-list" style="margin-top:16px;"></div>
       </div>
 
@@ -282,7 +218,7 @@
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
           <div>
             <h3 style="font-size:16px; font-weight:700;">3. Generate & Edit Copy</h3>
-            <p style="font-size:13px; color:var(--text-sub); margin-top:2px;">AI sudah generate copy untuk setiap konten — klik item untuk edit</p>
+            <p style="font-size:13px; color:var(--text-sub); margin-top:2px;">AI generate copy yang mendorong chat WA — klik item untuk edit</p>
           </div>
           <div style="display:flex; gap:8px;">
             <button class="btn btn-ghost btn-sm" id="btn-collapse-all">↕ Collapse Semua</button>
@@ -293,7 +229,7 @@
       </div>
     </div>
 
-    <!-- PUBLISH PANEL (settings + sticky bar, dipisah) -->
+    <!-- PUBLISH PANEL -->
     <div id="publish-bar" style="display:none;">
       <!-- Section 4: Pengaturan Kampanye -->
       <div style="padding:0 32px 24px;">
@@ -301,25 +237,25 @@
           <div class="card-header">
             <div>
               <div class="card-title">4. Pengaturan Kampanye</div>
-              <div class="card-sub">Objective, budget, bid strategy, dan jadwal</div>
+              <div class="card-sub">Budget, bid strategy, dan jadwal</div>
             </div>
+            <div class="ctwa-badge">💬 Objective: Click to WhatsApp</div>
           </div>
 
-          <!-- Row 1: Nama + Objective -->
+          <!-- Row 1: Nama Kampanye + Nomor WhatsApp -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
             <div class="form-group" style="margin:0;">
               <label class="form-label">Nama Kampanye</label>
               <input type="text" class="form-input" id="pub-campaign-name" placeholder="Otomatis dari nama produk jika kosong" />
             </div>
             <div class="form-group" style="margin:0;">
-              <label class="form-label">Tujuan Kampanye (Objective)</label>
-              <select class="form-input form-select" id="pub-objective">
-                <option value="OUTCOME_TRAFFIC">Traffic — Kunjungan website / WA</option>
-                <option value="OUTCOME_LEADS">Leads — Form / DM</option>
-                <option value="OUTCOME_SALES">Sales — Konversi pembelian</option>
-                <option value="OUTCOME_ENGAGEMENT">Engagement — Like, komentar</option>
-                <option value="OUTCOME_AWARENESS">Awareness — Jangkauan luas</option>
-              </select>
+              <label class="form-label">Nomor WhatsApp Tujuan <span>*</span></label>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:13px; font-weight:600; color:var(--text);">+</span>
+                <input type="text" class="form-input" id="pub-wa-number"
+                  placeholder="628123456789 (format internasional, tanpa +)" />
+              </div>
+              <div class="form-hint">Contoh: 628123456789 — tanpa tanda + di depan</div>
             </div>
           </div>
 
@@ -328,7 +264,7 @@
             <div class="form-group" style="margin:0;">
               <label class="form-label">Tipe Budget</label>
               <div style="display:flex; border:1.5px solid var(--gray-3); border-radius:8px; overflow:hidden;">
-                <button type="button" class="budget-type-btn active" id="btn-abo" onclick="setBudgetType('ABO')" style="flex:1; padding:8px; font-size:12px; font-weight:600; border:none; cursor:pointer; background:var(--primary); color:white;">ABO</button>
+                <button type="button" class="budget-type-btn active" id="btn-abo" onclick="setBudgetType('ABO')" style="flex:1; padding:8px; font-size:12px; font-weight:600; border:none; cursor:pointer; background:#25D366; color:white;">ABO</button>
                 <button type="button" class="budget-type-btn" id="btn-cbo" onclick="setBudgetType('CBO')" style="flex:1; padding:8px; font-size:12px; font-weight:600; border:none; cursor:pointer; background:white; color:var(--text-sub);">CBO</button>
               </div>
               <div class="form-hint" id="budget-type-hint">Budget per Ad Set</div>
@@ -346,13 +282,12 @@
                 <option value="LOWEST_COST_WITHOUT_CAP">Lowest Cost (default)</option>
                 <option value="LOWEST_COST_WITH_BID_CAP">Bid Cap</option>
                 <option value="COST_CAP">Cost Cap</option>
-                <option value="MINIMUM_ROAS">Minimum ROAS</option>
               </select>
             </div>
-            <div class="form-group" style="margin:0;" id="bid-value-wrap" style="display:none;">
+            <div class="form-group" style="margin:0; display:none;" id="bid-value-wrap">
               <label class="form-label" id="bid-value-label">Nilai Bid</label>
               <div style="display:flex; align-items:center; gap:6px;">
-                <span style="font-size:13px; font-weight:600; color:var(--text);" id="bid-value-prefix">Rp</span>
+                <span style="font-size:13px; font-weight:600; color:var(--text);">Rp</span>
                 <input type="number" class="form-input" id="pub-bid-value" placeholder="0" min="0" step="1000" />
               </div>
             </div>
@@ -361,7 +296,7 @@
           <!-- Row 3: Jadwal -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
             <div class="form-group" style="margin:0;">
-              <label class="form-label">Mulai Tayang <span style="font-weight:400; color:var(--text-sub);">(opsional, default sekarang)</span></label>
+              <label class="form-label">Mulai Tayang <span style="font-weight:400; color:var(--text-sub);">(opsional)</span></label>
               <input type="datetime-local" class="form-input" id="pub-start" />
             </div>
             <div class="form-group" style="margin:0;">
@@ -374,32 +309,28 @@
           <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--gray-3); display:flex; align-items:center; justify-content:space-between;">
             <div>
               <div style="font-size:13px; font-weight:600;">Langsung aktifkan setelah publish</div>
-              <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">Jika off, iklan dibuat dalam status Paused — aktifkan manual di Ads Manager atau via Autopilot</div>
+              <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">Jika off, iklan dibuat dalam status Paused</div>
             </div>
             <label class="switch">
               <input type="checkbox" id="pub-auto-activate" />
               <span class="switch-slider"></span>
             </label>
           </div>
-
         </div>
       </div>
     </div>
 
-    <!-- STICKY PUBLISH BAR (selalu di bawah) -->
+    <!-- STICKY PUBLISH BAR -->
     <div class="publish-bar" id="sticky-publish-bar" style="display:none;">
       <div class="publish-info">
         <strong id="publish-count">0 iklan siap dipublish</strong>
-        1 kampanye · semua konten dalam 1 ad set
+        1 kampanye · Click to WhatsApp
       </div>
       <div style="display:flex; gap:10px; align-items:center;">
-        <select class="form-input form-select" id="pub-account" style="width:200px;">
+        <select class="form-input form-select" id="pub-account" style="width:220px;">
           <option value="">Pilih Ad Account</option>
         </select>
-        <select class="form-input form-select" id="pub-url" style="width:170px;">
-          <option value="">Pilih URL Tujuan</option>
-        </select>
-        <button class="btn btn-dark" id="btn-publish">🚀 Publish ke Meta</button>
+        <button class="btn btn-sm" id="btn-publish" style="background:#25D366; color:white; border:none;">💬 Publish ke Meta</button>
       </div>
     </div>
   </main>
@@ -416,24 +347,7 @@
   let sb;
   let currentProfile = null;
   let selectedProduct = null;
-  let adItems = []; // { file, preview, type, headline, primaryText, description, cta, status, collapsed }
-
-  const CTA_OPTIONS = [
-    { value: 'LEARN_MORE',    label: 'Pelajari Lebih Lanjut' },
-    { value: 'SHOP_NOW',      label: 'Belanja Sekarang' },
-    { value: 'ORDER_NOW',     label: 'Pesan Sekarang' },
-    { value: 'GET_OFFER',     label: 'Ambil Penawaran' },
-    { value: 'CONTACT_US',    label: 'Hubungi Kami' },
-    { value: 'SEND_MESSAGE',  label: 'Kirim Pesan' },
-    { value: 'CALL_NOW',      label: 'Telepon Sekarang' },
-    { value: 'SIGN_UP',       label: 'Daftar Sekarang' },
-    { value: 'SUBSCRIBE',     label: 'Berlangganan' },
-    { value: 'DOWNLOAD',      label: 'Unduh' },
-    { value: 'GET_QUOTE',     label: 'Minta Penawaran' },
-    { value: 'APPLY_NOW',     label: 'Lamar Sekarang' },
-    { value: 'WATCH_MORE',    label: 'Tonton Selengkapnya' },
-    { value: 'BOOK_NOW',      label: 'Pesan Sekarang (Travel)' },
-  ];
+  let adItems = [];
 
   async function init() {
     sb = await getSupabase();
@@ -446,7 +360,6 @@
     setupUpload();
     setupEvents();
 
-    // Auto-select product from URL param
     const params = new URLSearchParams(window.location.search);
     const productId = params.get('product');
     if (productId) {
@@ -510,7 +423,7 @@
   let userAdAccounts = [];
 
   async function loadAdAccounts() {
-    const { data } = await sb.from('ad_accounts').select('*, ad_urls(*)').eq('user_id', currentProfile.id).order('created_at');
+    const { data } = await sb.from('ad_accounts').select('*').eq('user_id', currentProfile.id).order('created_at');
     userAdAccounts = data || [];
 
     const sel = document.getElementById('pub-account');
@@ -520,35 +433,23 @@
     }
     sel.innerHTML = `<option value="">Pilih Ad Account</option>` +
       userAdAccounts.map(a => `<option value="${a.id}">${a.label} (${a.account_id})</option>`).join('');
-
-    sel.addEventListener('change', () => {
-      const acc = userAdAccounts.find(a => a.id === sel.value);
-      const urlSel = document.getElementById('pub-url');
-      const urls = acc?.ad_urls || [];
-      urlSel.innerHTML = urls.length
-        ? urls.map(u => `<option value="${u.id}" ${u.is_default ? 'selected' : ''}>${u.label}</option>`).join('')
-        : `<option value="">Belum ada URL — isi di Pengaturan</option>`;
-    });
   }
 
   async function handleFiles(files) {
     if (!files.length) return;
 
-    // Show upload zone as mini after first upload
     document.getElementById('upload-zone').style.display = 'none';
     document.getElementById('btn-add-more').style.display = '';
 
     for (const file of files) {
       const isVideo = file.type.startsWith('video/');
       const previewUrl = URL.createObjectURL(file);
-      const defaultCta = selectedProduct?.cta || 'LEARN_MORE';
       const item = {
         id: crypto.randomUUID(),
         file, previewUrl,
         type: isVideo ? 'video' : 'image',
         headline: '', primaryText: '', description: '',
-        cta: defaultCta,
-        status: 'pending', // pending | generating | ready
+        status: 'pending',
         collapsed: false
       };
       adItems.push(item);
@@ -556,7 +457,6 @@
 
     renderAdItems();
 
-    // Auto-generate if product selected
     if (selectedProduct) {
       document.getElementById('generate-section').style.display = '';
       await generateAllCopies();
@@ -572,13 +472,7 @@
     const list = document.getElementById('ad-items-list');
     if (!adItems.length) { list.innerHTML = ''; return; }
 
-    const ctaOptionsHtml = CTA_OPTIONS.map(o =>
-      `<option value="${o.value}">${o.label}</option>`
-    ).join('');
-
-    list.innerHTML = adItems.map(item => {
-      const ctaLabel = CTA_OPTIONS.find(o => o.value === item.cta)?.label || item.cta;
-      return `
+    list.innerHTML = adItems.map(item => `
       <div class="content-item ${item.status}${item.collapsed ? ' collapsed' : ''}" id="item-${item.id}">
         <div class="content-item-header" onclick="toggleCollapse('${item.id}')">
           <div class="content-preview">
@@ -603,8 +497,8 @@
 
         ${item.status === 'generating' ? `
           <div class="generating-overlay">
-            <div class="loading-spinner" style="border-color:var(--gray-3);border-top-color:var(--primary);width:20px;height:20px;border-width:3px;"></div>
-            Claude AI sedang menulis copy...
+            <div class="loading-spinner" style="border-color:var(--gray-3);border-top-color:#25D366;width:20px;height:20px;border-width:3px;"></div>
+            Claude AI sedang menulis copy CTWA...
           </div>` : `
         <div class="content-item-body">
           <div class="copy-fields">
@@ -612,7 +506,7 @@
               <label class="form-label" style="font-size:11px;">Judul (Headline)</label>
               <input type="text" class="form-input" value="${escHtml(item.headline)}"
                 oninput="updateField('${item.id}','headline',this.value)"
-                placeholder="Judul iklan yang menarik..." />
+                placeholder="Judul yang bikin orang penasaran chat..." />
             </div>
             <div class="form-group">
               <label class="form-label" style="font-size:11px;">Teks Utama (Primary Text)</label>
@@ -620,49 +514,41 @@
                 oninput="updateField('${item.id}','primaryText',this.value)"
                 placeholder="Body copy iklan...">${escHtml(item.primaryText)}</textarea>
             </div>
-            <div class="form-row" style="margin-bottom:0;">
-              <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="font-size:11px;">Deskripsi</label>
-                <input type="text" class="form-input" value="${escHtml(item.description)}"
-                  oninput="updateField('${item.id}','description',this.value)"
-                  placeholder="Deskripsi singkat..." />
-              </div>
-              <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="font-size:11px;">Tombol CTA</label>
-                <select class="form-input form-select" onchange="updateField('${item.id}','cta',this.value)">
-                  ${CTA_OPTIONS.map(o => `<option value="${o.value}"${o.value === item.cta ? ' selected' : ''}>${o.label}</option>`).join('')}
-                </select>
-              </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:11px;">Deskripsi</label>
+              <input type="text" class="form-input" value="${escHtml(item.description)}"
+                oninput="updateField('${item.id}','description',this.value)"
+                placeholder="Deskripsi singkat..." />
             </div>
           </div>
           <div class="ad-preview-wrap">
             <div style="font-size:11px; font-weight:600; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Preview Iklan</div>
-            <div class="fb-preview" id="preview-${item.id}">
-              <div class="fb-preview-header">
-                <div class="fb-page-avatar">A</div>
+            <div class="wa-preview" id="preview-${item.id}">
+              <div class="wa-preview-header">
+                <div class="wa-page-avatar">A</div>
                 <div>
-                  <div class="fb-page-name">${selectedProduct?.name || 'Nama Page'}</div>
-                  <div class="fb-sponsored">Iklan · <span style="color:#1877F2;">ℹ</span></div>
+                  <div class="wa-page-name">${selectedProduct?.name || 'Nama Page'}</div>
+                  <div class="wa-sponsored">Iklan · <span style="color:#25D366;">ℹ</span></div>
                 </div>
               </div>
-              <div class="fb-primary-text">${escHtml(item.primaryText) || '<span style="color:#aaa;">Teks utama iklan...</span>'}</div>
-              <div class="fb-media">
+              <div class="wa-primary-text">${escHtml(item.primaryText) || '<span style="color:#aaa;">Teks utama iklan...</span>'}</div>
+              <div class="wa-media">
                 ${item.type === 'video'
                   ? `<video src="${item.previewUrl}" style="width:100%;height:100%;object-fit:cover;" muted></video>`
                   : `<img src="${item.previewUrl}" alt="ad" style="width:100%;height:100%;object-fit:cover;" />`}
               </div>
-              <div class="fb-caption-bar">
-                <div class="fb-caption-text">
-                  <div class="fb-headline">${escHtml(item.headline) || 'Judul iklan...'}</div>
-                  <div class="fb-description">${escHtml(item.description) || ''}</div>
+              <div class="wa-caption-bar">
+                <div class="wa-caption-text">
+                  <div class="wa-headline">${escHtml(item.headline) || 'Judul iklan...'}</div>
+                  <div class="wa-description">${escHtml(item.description) || ''}</div>
                 </div>
-                <button class="fb-cta-btn" id="cta-btn-${item.id}">${ctaLabel}</button>
+                <button class="wa-cta-btn">Chat di WA</button>
               </div>
             </div>
           </div>
         </div>`}
-      </div>`;
-    }).join('');
+      </div>`
+    ).join('');
   }
 
   async function generateAllCopies() {
@@ -676,6 +562,9 @@
       renderAdItems();
 
       try {
+        const extraBrief = document.getElementById('input-brief').value;
+        const ctwaContext = 'Iklan ini adalah CTWA (Click to WhatsApp). Tulis copy yang mendorong audiens untuk langsung chat via WhatsApp. CTA harus mengarahkan ke chat WA, bukan ke website.';
+
         const res = await fetch('/api/ai-copy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -684,11 +573,11 @@
             benefit: selectedProduct.benefits,
             audience: selectedProduct.target_audience,
             tone: selectedProduct.tone,
-            cta: selectedProduct.cta,
+            cta: 'Chat via WhatsApp',
             promo: selectedProduct.promo,
             restrictions: selectedProduct.restrictions,
             notes: selectedProduct.notes,
-            extra_brief: document.getElementById('input-brief').value,
+            extra_brief: [ctwaContext, extraBrief].filter(Boolean).join('. '),
             content_type: item.type,
             single_variant: true
           })
@@ -702,7 +591,7 @@
         item.primaryText = copy.primary_text || '';
         item.description = copy.description || '';
         item.status = 'ready';
-        item.collapsed = true; // auto-collapse setelah generate
+        item.collapsed = true;
       } catch (err) {
         item.status = 'pending';
         showToast(`Gagal generate copy untuk ${item.file.name}: ${err.message}`, 'error');
@@ -719,25 +608,19 @@
     const item = adItems.find(i => i.id === id);
     if (!item) return;
     item[field] = value;
-    // Update preview live
     const preview = document.getElementById(`preview-${id}`);
     if (!preview) return;
     if (field === 'primaryText') {
-      const el = preview.querySelector('.fb-primary-text');
+      const el = preview.querySelector('.wa-primary-text');
       if (el) el.textContent = value || 'Teks utama iklan...';
     }
     if (field === 'headline') {
-      const el = preview.querySelector('.fb-headline');
+      const el = preview.querySelector('.wa-headline');
       if (el) el.textContent = value || 'Judul iklan...';
     }
     if (field === 'description') {
-      const el = preview.querySelector('.fb-description');
+      const el = preview.querySelector('.wa-description');
       if (el) el.textContent = value || '';
-    }
-    if (field === 'cta') {
-      const btn = document.getElementById(`cta-btn-${id}`);
-      const label = CTA_OPTIONS.find(o => o.value === value)?.label || value;
-      if (btn) btn.textContent = label;
     }
   };
 
@@ -774,9 +657,8 @@
     if (!selectedProduct) return showToast('Pilih produk dulu', 'warning');
 
     const accDbId = document.getElementById('pub-account').value;
-    const urlId = document.getElementById('pub-url').value;
+    const waNumber = document.getElementById('pub-wa-number').value.trim().replace(/\D/g, '');
     const budget = document.getElementById('pub-budget').value;
-    const objective = document.getElementById('pub-objective').value;
     const startTime = document.getElementById('pub-start').value;
     const endTime = document.getElementById('pub-end').value;
     const campaignNameInput = document.getElementById('pub-campaign-name').value.trim();
@@ -784,14 +666,14 @@
     const bidValue = document.getElementById('pub-bid-value').value;
 
     if (!accDbId) return showToast('Pilih Ad Account dulu', 'warning');
-    if (!urlId) return showToast('Pilih URL tujuan dulu', 'warning');
+    if (!waNumber) return showToast('Nomor WhatsApp tujuan wajib diisi', 'warning');
     if (!budget || parseFloat(budget) < 10000) return showToast('Budget minimal Rp 10.000/hari', 'warning');
 
     const btn = document.getElementById('btn-publish');
     btn.disabled = true;
-    btn.innerHTML = '<div class="loading-spinner"></div> Publishing...';
+    btn.innerHTML = '<div class="loading-spinner" style="border-top-color:white;"></div> Publishing...';
 
-    // Pre-fetch Meta token & account ID sekali — dipakai untuk direct video upload
+    // Pre-fetch Meta token untuk video upload langsung dari browser
     let metaToken = null;
     let metaAccountId = null;
     const hasVideoItems = readyItems.some(i => i.type === 'video');
@@ -800,7 +682,7 @@
       metaToken = cfg?.meta_token;
       if (!metaToken) {
         btn.disabled = false;
-        btn.innerHTML = '🚀 Publish ke Meta';
+        btn.innerHTML = '💬 Publish ke Meta';
         return showToast('Meta token belum dikonfigurasi — isi di Pengaturan', 'error');
       }
       const acc = userAdAccounts.find(a => a.id === accDbId);
@@ -816,15 +698,12 @@
       try {
         const formData = new FormData();
 
-        // Video: upload langsung dari browser ke Meta (bypass Vercel 4.5MB limit)
-        // Thumbnail di-extract dari browser pakai Canvas → upload paralel dengan video
         if (item.type === 'video') {
-          btn.innerHTML = `<div class="loading-spinner"></div> Upload video ke Meta...`;
+          btn.innerHTML = `<div class="loading-spinner" style="border-top-color:white;"></div> Upload video ke Meta...`;
 
           const videoForm = new FormData();
           videoForm.append('file', item.file, item.file.name);
 
-          // Upload video + extract & upload thumbnail secara paralel
           const [videoData, thumbnailHash] = await Promise.all([
             fetch(`https://graph.facebook.com/v18.0/${metaAccountId}/advideos?access_token=${encodeURIComponent(metaToken)}`,
               { method: 'POST', body: videoForm }
@@ -839,31 +718,31 @@
           formData.append('video_id', videoData.id);
           formData.append('file_type', 'video');
           if (thumbnailHash) formData.append('thumbnail_image_hash', thumbnailHash);
-          btn.innerHTML = `<div class="loading-spinner"></div> Publishing...`;
+          btn.innerHTML = `<div class="loading-spinner" style="border-top-color:white;"></div> Publishing...`;
         } else {
           formData.append('file', item.file);
           formData.append('file_type', item.type);
         }
 
+        formData.append('ad_type', 'ctwa');
+        formData.append('wa_number', waNumber);
         formData.append('headline', item.headline);
         formData.append('primary_text', item.primaryText);
         formData.append('description', item.description || '');
         formData.append('product_id', selectedProduct.id);
         formData.append('ad_account_db_id', accDbId);
-        formData.append('url_id', urlId);
-        formData.append('cta', item.cta || selectedProduct.cta || 'LEARN_MORE');
+        formData.append('cta', 'WHATSAPP_MESSAGE');
         formData.append('user_id', currentProfile.id);
-        formData.append('objective', objective);
+        formData.append('objective', 'OUTCOME_ENGAGEMENT');
         formData.append('daily_budget', budget);
         formData.append('budget_type', budgetType);
         formData.append('bid_strategy', bidStrategy);
         if (bidValue) formData.append('bid_value', bidValue);
-        formData.append('campaign_name', campaignNameInput || `${selectedProduct.name} - ${new Date().toLocaleDateString('id-ID')}`);
+        formData.append('campaign_name', campaignNameInput || `CTWA ${selectedProduct.name} - ${new Date().toLocaleDateString('id-ID')}`);
         formData.append('auto_activate', document.getElementById('pub-auto-activate').checked ? '1' : '0');
         if (startTime) formData.append('start_time', new Date(startTime).toISOString());
         if (endTime) formData.append('end_time', new Date(endTime).toISOString());
 
-        // Reuse campaign & adset dari item pertama yang sukses
         if (metaCampaignId) formData.append('meta_campaign_id', metaCampaignId);
         if (metaAdsetId) formData.append('meta_adset_id', metaAdsetId);
         if (sbCampaignId) formData.append('sb_campaign_id', sbCampaignId);
@@ -872,7 +751,6 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
 
-        // Simpan ID dari item pertama untuk dipakai item berikutnya
         if (!metaCampaignId && data.meta_campaign_id) metaCampaignId = data.meta_campaign_id;
         if (!metaAdsetId && data.meta_adset_id) metaAdsetId = data.meta_adset_id;
         if (!sbCampaignId && data.campaign_id) sbCampaignId = data.campaign_id;
@@ -885,54 +763,35 @@
     }
 
     btn.disabled = false;
-    btn.innerHTML = '🚀 Publish ke Meta';
+    btn.innerHTML = '💬 Publish ke Meta';
 
     if (successCount > 0) {
-      showToast(`${successCount} iklan berhasil dipublish ke Meta!`, 'success');
+      showToast(`${successCount} iklan CTWA berhasil dipublish ke Meta!`, 'success');
       setTimeout(() => window.location.href = 'campaigns.html', 2000);
     }
   }
 
-  // ── Budget type toggle ──
   let budgetType = 'ABO';
   window.setBudgetType = function(type) {
     budgetType = type;
-    document.getElementById('btn-abo').style.background = type === 'ABO' ? 'var(--primary)' : 'white';
+    document.getElementById('btn-abo').style.background = type === 'ABO' ? '#25D366' : 'white';
     document.getElementById('btn-abo').style.color = type === 'ABO' ? 'white' : 'var(--text-sub)';
-    document.getElementById('btn-cbo').style.background = type === 'CBO' ? 'var(--primary)' : 'white';
+    document.getElementById('btn-cbo').style.background = type === 'CBO' ? '#25D366' : 'white';
     document.getElementById('btn-cbo').style.color = type === 'CBO' ? 'white' : 'var(--text-sub)';
     document.getElementById('budget-type-hint').textContent = type === 'CBO' ? 'Budget di level Campaign' : 'Budget per Ad Set';
   };
 
-  // ── Bid strategy conditional input ──
   window.onBidStrategyChange = function() {
     const strategy = document.getElementById('pub-bid-strategy').value;
     const wrap = document.getElementById('bid-value-wrap');
     const label = document.getElementById('bid-value-label');
-    const prefix = document.getElementById('bid-value-prefix');
-    const input = document.getElementById('pub-bid-value');
-
     if (strategy === 'LOWEST_COST_WITHOUT_CAP') {
       wrap.style.display = 'none';
     } else {
       wrap.style.display = '';
-      if (strategy === 'LOWEST_COST_WITH_BID_CAP') {
-        label.textContent = 'Bid Cap (per klik/impresi)';
-        prefix.textContent = 'Rp'; input.placeholder = 'Misal: 500';
-      } else if (strategy === 'COST_CAP') {
-        label.textContent = 'Cost Cap (target CPR)';
-        prefix.textContent = 'Rp'; input.placeholder = 'Misal: 30000';
-      } else if (strategy === 'MINIMUM_ROAS') {
-        label.textContent = 'Minimum ROAS';
-        prefix.textContent = '×'; input.placeholder = 'Misal: 3';
-      }
+      label.textContent = strategy === 'COST_CAP' ? 'Cost Cap (target CPR)' : 'Bid Cap';
     }
   };
-
-  // Init: hide bid value
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('bid-value-wrap').style.display = 'none';
-  });
 
   function formatFileSize(bytes) {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
@@ -943,7 +802,6 @@
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // Extract frame dari video pakai Canvas, upload sebagai adimage ke Meta → dapat image_hash
   async function extractAndUploadThumbnail(videoFile, accountId, token) {
     try {
       const blob = await new Promise((resolve) => {

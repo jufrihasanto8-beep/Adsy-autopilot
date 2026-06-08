@@ -285,22 +285,6 @@
         <div class="form-hint">Untuk menerima notifikasi autopilot</div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Role / Jabatan <span>*</span></label>
-        <div class="role-grid">
-          <div class="role-card selected" data-role="advertiser" onclick="selectRole('advertiser')">
-            <div class="role-icon">📣</div>
-            <strong>Advertiser</strong>
-            <span>Kelola iklan</span>
-          </div>
-          <div class="role-card" data-role="admin" onclick="selectRole('admin')">
-            <div class="role-icon">⚙️</div>
-            <strong>Admin</strong>
-            <span>Kelola semua</span>
-          </div>
-        </div>
-      </div>
-
       <div style="display:flex; gap:10px;">
         <button class="btn btn-outline" onclick="goStep(1)" style="flex:1; margin-top:8px;">← Kembali</button>
         <button class="btn btn-primary" id="btn-step2" style="flex:2;">Buat Akun →</button>
@@ -308,18 +292,14 @@
       <div class="error-msg" id="err-2"></div>
     </div>
 
-    <!-- STEP 3: SUKSES -->
+    <!-- STEP 3: MENUNGGU PERSETUJUAN -->
     <div id="step-3" style="display:none;">
       <div class="success-screen" style="display:block;">
-        <div class="big-icon">🎉</div>
-        <h1>Akun Berhasil Dibuat!</h1>
-        <p>Selamat datang di Adsy Autopilot.<br>Kamu sudah bisa mulai pakai dashboard.</p>
-        <button class="btn btn-primary" onclick="window.location.href='dashboard.html'">
-          Ke Dashboard →
-        </button>
-        <div class="or-divider">atau</div>
-        <button class="btn btn-outline" onclick="window.location.href='settings.html'">
-          Setup API Keys dulu
+        <div class="big-icon">⏳</div>
+        <h1>Menunggu Persetujuan</h1>
+        <p>Akun kamu sudah dibuat dan sedang menunggu persetujuan admin.<br><br>Kamu akan mendapat notifikasi setelah akun diaktifkan.</p>
+        <button class="btn btn-outline" onclick="window.location.href='index.html'">
+          Kembali ke Login
         </button>
       </div>
     </div>
@@ -344,20 +324,12 @@
 
     initSupabase();
 
-    let selectedRole = 'advertiser';
     let currentStep = 1;
 
     // Password toggle
     function togglePass(id) {
       const el = document.getElementById(id);
       el.type = el.type === 'password' ? 'text' : 'password';
-    }
-
-    // Role select
-    function selectRole(role) {
-      selectedRole = role;
-      document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
-      document.querySelector(`[data-role="${role}"]`).classList.add('selected');
     }
 
     // Password strength
@@ -448,14 +420,24 @@
         const { data, error } = await sb.auth.signUp({ email, password: pass });
         if (error) throw error;
 
-        // Update profile
+        // Update profile — role default advertiser, status pending (menunggu acc admin)
         await sb.from('profiles').upsert({
           id: data.user.id,
           name: fullName,
           email,
-          role: selectedRole,
+          role: 'advertiser',
+          status: 'pending',
           wa_number: wa || null
         }, { onConflict: 'id' });
+
+        // Notif WA ke admin
+        try {
+          await fetch('/api/notify-new-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: fullName, email })
+          });
+        } catch(e) { /* non-fatal */ }
 
         goStep(3);
         document.getElementById('steps-indicator').style.display = 'none';
