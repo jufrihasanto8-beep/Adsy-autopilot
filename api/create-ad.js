@@ -24,6 +24,8 @@ export default async function handler(req, res) {
     const adAccountDbId= fields.ad_account_db_id?.[0];
     const urlId        = fields.url_id?.[0];
     const cta          = fields.cta?.[0] || 'LEARN_MORE';
+    const adType    = fields.ad_type?.[0] || 'standard';
+    const waNumber  = fields.wa_number?.[0];
     const userId       = fields.user_id?.[0];
     const objective    = fields.objective?.[0] || 'OUTCOME_TRAFFIC';
     const dailyBudget  = parseInt(fields.daily_budget?.[0] || '50000');
@@ -55,14 +57,16 @@ export default async function handler(req, res) {
       .select('account_id, page_id, pixel_id').eq('id', adAccountDbId).single();
     if (!accData) throw new Error('Ad account tidak ditemukan');
 
-    const { data: urlData } = await sb.from('ad_urls').select('url').eq('id', urlId).single();
+    const { data: urlData } = urlId ? await sb.from('ad_urls').select('url').eq('id', urlId).single() : { data: null };
     const { data: cfgData } = await sb.from('app_config').select('meta_token').eq('user_id', userId).single();
 
     const token     = cfgData?.meta_token || process.env.META_ACCESS_TOKEN;
     const accountId = accData.account_id;
     const pageId    = accData.page_id;
     const pixelId   = accData.pixel_id || null;
-    const destUrl   = urlData?.url || 'https://wa.me/';
+    const destUrl   = adType === 'ctwa'
+      ? 'https://wa.me/' + (waNumber || '')
+      : (urlData?.url || 'https://wa.me/');
 
     if (!token) throw new Error('Meta access token belum dikonfigurasi di Pengaturan');
 
@@ -96,7 +100,9 @@ export default async function handler(req, res) {
         video_id: metaVideoId,
         title: headline,
         message: primaryText,
-        call_to_action: { type: ctaMap(cta), value: { link: destUrl } }
+        call_to_action: adType === 'ctwa'
+          ? { type: 'WHATSAPP_MESSAGE', value: { app_destination: 'WHATSAPP' } }
+          : { type: ctaMap(cta), value: { link: destUrl } }
       };
 
       // Thumbnail: pakai image_hash dari browser (paling cepat, no-wait)
@@ -163,7 +169,9 @@ export default async function handler(req, res) {
 
       const linkData = {
         image_hash: imageHash, link: destUrl, message: primaryText, name: headline,
-        call_to_action: { type: ctaMap(cta), value: { link: destUrl } }
+        call_to_action: adType === 'ctwa'
+          ? { type: 'WHATSAPP_MESSAGE', value: { app_destination: 'WHATSAPP' } }
+          : { type: ctaMap(cta), value: { link: destUrl } }
       };
       if (description) linkData.description = description;
 
@@ -249,7 +257,9 @@ export default async function handler(req, res) {
         }
       }
 
-      const { optimizationGoal, billingEvent } = objectiveConfig(objective);
+      const { optimizationGoal, billingEvent } = adType === 'ctwa'
+        ? { optimizationGoal: 'CONVERSATIONS', billingEvent: 'IMPRESSIONS' }
+        : objectiveConfig(objective);
       const adsetPayload = {
         name: `${finalCampaignName} - Ad Set`,
         campaign_id: metaCampaignId,
@@ -317,8 +327,11 @@ export default async function handler(req, res) {
       }
 
       // promoted_object — wajib untuk beberapa objective
-      const promotedObject = getPromotedObject(objective, pageId, pixelId);
+      const promotedObject = adType === 'ctwa'
+        ? (pageId ? { page_id: pageId } : null)
+        : getPromotedObject(objective, pageId, pixelId);
       if (promotedObject) adsetPayload.promoted_object = promotedObject;
+      if (adType === 'ctwa') adsetPayload.destination_type = 'WHATSAPP';
 
       if (startTime) adsetPayload.start_time = startTime;
       if (endTime) adsetPayload.end_time = endTime;
@@ -362,7 +375,8 @@ export default async function handler(req, res) {
           current_phase: 1, autopilot_enabled: true,
           meta_campaign_id: metaCampaignId,
           meta_adset_id: metaAdsetId,
-          daily_budget: dailyBudget
+          daily_budget: dailyBudget,
+          campaign_type: adType
         };
         if (productId) campPayload.product_id = productId;
         if (product?.target_cpr) campPayload.target_cpr = product.target_cpr;
