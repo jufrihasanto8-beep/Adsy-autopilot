@@ -469,57 +469,23 @@
         return;
       }
 
-      // Step 1: Ambil WA Business Account yang ter-link ke Page
-      const pageRes  = await fetch(`https://graph.facebook.com/v18.0/${acc.page_id}?fields=name,whatsapp_accounts&access_token=${encodeURIComponent(token)}`);
+      // Ambil whatsapp_number langsung dari Page (field dasar, tidak butuh permission khusus)
+      const pageRes  = await fetch(`https://graph.facebook.com/v18.0/${acc.page_id}?fields=name,whatsapp_number&access_token=${encodeURIComponent(token)}`);
       const pageData = await pageRes.json();
       const pageName = pageData.name || acc.page_id;
-      const wabaList = pageData.whatsapp_accounts?.data || [];
 
-      let waNumbers = [];
-
-      if (wabaList.length > 0) {
-        // Step 2: Ambil semua phone numbers dari setiap WA Business Account
-        for (const waba of wabaList) {
-          const phoneRes  = await fetch(`https://graph.facebook.com/v18.0/${waba.id}/phone_numbers?fields=display_phone_number,verified_name&access_token=${encodeURIComponent(token)}`);
-          const phoneData = await phoneRes.json();
-          for (const phone of (phoneData.data || [])) {
-            const clean = phone.display_phone_number?.replace(/[\s\-\+\(\)]/g, '') || '';
-            if (clean) waNumbers.push({
-              label: `+${clean}${phone.verified_name ? ' — ' + phone.verified_name : ''}`,
-              value: clean
-            });
-          }
-        }
-      }
-
-      // Fallback: coba whatsapp_number langsung dari Page
-      if (waNumbers.length === 0) {
-        const fallbackRes  = await fetch(`https://graph.facebook.com/v18.0/${acc.page_id}?fields=whatsapp_number&access_token=${encodeURIComponent(token)}`);
-        const fallbackData = await fallbackRes.json();
-        if (fallbackData.whatsapp_number) {
-          const clean = fallbackData.whatsapp_number.replace(/[\s\-\+]/g, '');
-          waNumbers.push({ label: `+${clean}`, value: clean });
-        }
-      }
-
-      if (waNumbers.length === 0) {
-        waHint.innerHTML = `<span style="color:var(--warning);">Tidak ada nomor WA ditemukan di Page "${pageName}" — link nomor WA dulu di Facebook Page → Settings → WhatsApp</span>`;
-        return;
-      }
-
-      if (waNumbers.length === 1) {
-        // 1 nomor → auto-fill input
+      if (pageData.whatsapp_number) {
+        const clean = pageData.whatsapp_number.replace(/[\s\-\+\(\)]/g, '');
         waSelect.style.display = 'none';
         waInputWrap.style.display = 'flex';
-        waInput.value = waNumbers[0].value;
-        waHint.innerHTML = `<span style="color:#15803d;">✓ Dari Page "${pageName}": +${waNumbers[0].value}</span>`;
+        waInput.value = clean;
+        waHint.innerHTML = `<span style="color:#15803d;">✓ Dari Page "${pageName}": +${clean}</span>`;
       } else {
-        // Banyak nomor → dropdown
-        waSelect.innerHTML = '<option value="">-- Pilih Nomor WA --</option>' +
-          waNumbers.map(n => `<option value="${n.value}">${n.label}</option>`).join('');
-        waSelect.style.display = '';
-        waInputWrap.style.display = 'none';
-        waHint.innerHTML = `<span style="color:#15803d;">✓ ${waNumbers.length} nomor ditemukan di Page "${pageName}" — pilih yang mau dipakai</span>`;
+        // Field tidak tersedia → tunjukkan manual input dengan hint jelas
+        waSelect.style.display = 'none';
+        waInputWrap.style.display = 'flex';
+        waInput.value = '';
+        waHint.innerHTML = `<span style="color:var(--text-sub);">Isi manual — nomor WA tidak terbaca dari Page (mungkin butuh Page Token)</span>`;
       }
 
     } catch (e) {
