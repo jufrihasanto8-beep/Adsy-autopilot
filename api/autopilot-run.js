@@ -406,6 +406,7 @@ async function createPhase2Campaign(camp, token, logs) {
     // 6. Simpan kampanye Phase 2 ke Supabase
     await sb.from('campaigns').insert({
       user_id: camp.user_id,
+      ad_account_id: camp.ad_account_id,
       name: camp.name + ' — Phase 2',
       status: 'ACTIVE',
       current_phase: 2,
@@ -825,6 +826,7 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       // Simpan ke Supabase (1 row per adset)
       await sb.from('campaigns').insert({
         user_id: camp.user_id,
+        ad_account_id: camp.ad_account_id,
         name: `${camp.name} — Phase 2b ${cat.label}`,
         status: 'ACTIVE',
         current_phase: 2,
