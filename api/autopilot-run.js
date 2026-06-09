@@ -881,6 +881,15 @@ async function createPhase2bCampaign(camp, token, product, logs) {
     // 5. Cari interest di Meta per kategori
     const interests = await searchInterestsPerCategory(keywords, token);
 
+    // Log interests yang ditemukan supaya bisa debug
+    const interestSummary = Object.entries(interests).map(([k, v]) => `${k}: ${v.length} (${v.slice(0,2).map(i=>i.name).join(', ')})`).join(' | ');
+    console.log('Phase 2b interests found:', interestSummary);
+    try { await sb.from('action_logs').insert({
+      user_id: camp.user_id, campaign_name: camp.name, action_type: 'create',
+      description: `Phase 2b interests: ${interestSummary || 'semua kosong — pakai broad targeting'}`,
+      status: 'info'
+    }); } catch(e) {}
+
     // 6. Buat campaign ABO
     const newCampRes = await fetch(`${META_API}/act_${accountId}/campaigns`, {
       method: 'POST',
@@ -909,7 +918,6 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       { key: 'hobi', label: 'Hobi' }
     ];
 
-    let adsetCreated = 0;
     for (const cat of categories) {
       const catInterests = interests[cat.key] || [];
 
@@ -942,21 +950,11 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       const adsetData = await adsetRes.json();
       if (adsetData.error) {
         const e = adsetData.error;
-        const errMsg = (e.error_user_msg || e.message) + ` (code: ${e.code})`;
-        console.error(`Phase 2b adset ${cat.label} error:`, errMsg);
-        try { await sb.from('action_logs').insert({
-          user_id: camp.user_id,
-          campaign_name: camp.name,
-          action_type: 'create',
-          description: `Phase 2b adset ${cat.label} gagal: ${errMsg}`,
-          status: 'error'
-        }); } catch(e) {}
-        continue;
+        const errMsg = `Adset ${cat.label}: ` + (e.error_user_msg || e.message) + ` (code: ${e.code})`;
+        throw new Error(errMsg); // langsung throw supaya kelihatan di toast
       }
       const newAdsetId = adsetData.id;
       if (!newAdsetId) continue;
-      adsetCreated++;
-
       // Buat ad dengan creative yang sama dari Phase 1
       if (creativeId) {
         await fetch(`${META_API}/act_${accountId}/ads`, {
@@ -990,13 +988,11 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       });
     }
 
-    if (adsetCreated === 0) throw new Error('Semua adset Phase 2b gagal dibuat — cek action_logs untuk detail error');
-
     const logEntry = {
       user_id: camp.user_id,
       campaign_name: camp.name + ' — Phase 2b',
       action_type: 'create',
-      description: `Kampanye Phase 2b dibuat — ${adsetCreated}/3 adset berhasil (Manfaat, Perilaku, Hobi) @ Rp 50.000/adset`,
+      description: `Kampanye Phase 2b dibuat — 3 adset (Manfaat, Perilaku, Hobi) @ Rp 50.000/adset`,
       status: 'success'
     };
     await sb.from('action_logs').insert(logEntry);
