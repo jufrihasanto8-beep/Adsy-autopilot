@@ -377,17 +377,50 @@ async function createPhase2Campaign(camp, token, logs) {
     const rawAccountId = campInfo.account_id;
     if (!rawAccountId) throw new Error('Tidak bisa ambil account_id dari kampanye Phase 1');
     const accountId = rawAccountId.startsWith('act_') ? rawAccountId : `act_${rawAccountId}`;
-    const objective = campInfo.objective || 'OUTCOME_SALES';
+
+    // Normalisasi objective: Meta kadang return format lama (CONVERSIONS, LINK_CLICKS, dll)
+    const objectiveMap = {
+      'LINK_CLICKS': 'OUTCOME_TRAFFIC',
+      'CONVERSIONS': 'OUTCOME_SALES',
+      'LEAD_GENERATION': 'OUTCOME_LEADS',
+      'POST_ENGAGEMENT': 'OUTCOME_ENGAGEMENT',
+      'BRAND_AWARENESS': 'OUTCOME_AWARENESS',
+      'REACH': 'OUTCOME_AWARENESS',
+      'VIDEO_VIEWS': 'OUTCOME_ENGAGEMENT',
+      'APP_INSTALLS': 'OUTCOME_APP_PROMOTION',
+    };
+    const rawObjective = campInfo.objective || 'OUTCOME_SALES';
+    const objective = objectiveMap[rawObjective] || rawObjective;
 
     // 2. Ambil targeting dari adset Phase 1
-    const adsetInfoRes = await fetch(
-      `${META_API}/${camp.meta_adset_id}?fields=targeting,promoted_object,optimization_goal,billing_event&access_token=${encodeURIComponent(token)}`
-    );
-    const adsetInfo = await adsetInfoRes.json();
-    const targeting = adsetInfo.targeting || { age_min: 21, geo_locations: { countries: ['ID'] } };
-    const promotedObject = adsetInfo.promoted_object || null;
-    const optimizationGoal = adsetInfo.optimization_goal || 'OFFSITE_CONVERSIONS';
-    const billingEvent = adsetInfo.billing_event || 'IMPRESSIONS';
+    let targeting = { age_min: 21, geo_locations: { countries: ['ID'] } };
+    let promotedObject = null;
+    let optimizationGoal = 'OFFSITE_CONVERSIONS';
+    let billingEvent = 'IMPRESSIONS';
+
+    if (camp.meta_adset_id) {
+      const adsetInfoRes = await fetch(
+        `${META_API}/${camp.meta_adset_id}?fields=targeting,promoted_object,optimization_goal,billing_event&access_token=${encodeURIComponent(token)}`
+      );
+      const adsetInfo = await adsetInfoRes.json();
+      if (!adsetInfo.error) {
+        // Bersihkan targeting dari field deprecated/read-only yang tidak bisa dikirim ulang ke Meta
+        if (adsetInfo.targeting) {
+          const t = adsetInfo.targeting;
+          targeting = {
+            ...(t.age_min && { age_min: t.age_min }),
+            ...(t.age_max && { age_max: t.age_max }),
+            ...(t.genders && { genders: t.genders }),
+            ...(t.geo_locations && { geo_locations: t.geo_locations }),
+            ...(t.flexible_spec && { flexible_spec: t.flexible_spec }),
+            ...(t.exclusions && { exclusions: t.exclusions }),
+          };
+        }
+        promotedObject = adsetInfo.promoted_object || null;
+        optimizationGoal = adsetInfo.optimization_goal || 'OFFSITE_CONVERSIONS';
+        billingEvent = adsetInfo.billing_event || 'IMPRESSIONS';
+      }
+    }
 
     // 3. Ambil creative dari ads Phase 1
     const adsRes = await fetch(
@@ -410,22 +443,25 @@ async function createPhase2Campaign(camp, token, logs) {
         name: camp.name + ' — Phase 2a',
         objective,
         status: 'PAUSED',
-        special_ad_categories: [],
         access_token: token
       })
     });
     const newCampData = await newCampRes.json();
-    if (newCampData.error) throw new Error('Gagal buat campaign: ' + newCampData.error.message);
+    if (newCampData.error) {
+      const e = newCampData.error;
+      throw new Error('Gagal buat campaign: ' + (e.error_user_msg || e.message) + ` (code: ${e.code})`);
+    }
     const newCampaignId = newCampData.id;
 
     // 6. Buat adset dengan COST_CAP + budget 5jt
+    // COST_CAP wajib punya bid_amount — fallback ke LOWEST_COST_WITHOUT_CAP kalau tidak ada
     const adsetBody = {
       name: camp.name + ' — Phase 2a',
       campaign_id: newCampaignId,
       daily_budget: 5000000,
       billing_event: billingEvent,
       optimization_goal: optimizationGoal,
-      bid_strategy: 'COST_CAP',
+      bid_strategy: bidAmount ? 'COST_CAP' : 'LOWEST_COST_WITHOUT_CAP',
       targeting,
       status: 'PAUSED',
       access_token: token
@@ -439,12 +475,16 @@ async function createPhase2Campaign(camp, token, logs) {
       body: JSON.stringify(adsetBody)
     });
     const newAdsetData = await newAdsetRes.json();
-    if (newAdsetData.error) throw new Error('Gagal buat adset: ' + newAdsetData.error.message);
+    if (newAdsetData.error) {
+      const e = newAdsetData.error;
+      throw new Error('Gagal buat adset: ' + (e.error_user_msg || e.message) + ` (code: ${e.code})`);
+    }
     const newAdsetId = newAdsetData.id;
 
     // 7. Buat ad dengan creative yang sama dari Phase 1
+    let newAdId = null;
     if (creativeId) {
-      await fetch(`${META_API}/${accountId}/ads`, {
+      const adRes = await fetch(`${META_API}/${accountId}/ads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -455,19 +495,28 @@ async function createPhase2Campaign(camp, token, logs) {
           access_token: token
         })
       });
+      const adData = await adRes.json();
+      newAdId = adData.id || null;
     }
 
-    // 8. Aktifkan campaign
-    await fetch(`${META_API}/${newCampaignId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'ACTIVE', access_token: token })
-    });
-    await fetch(`${META_API}/${newAdsetId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'ACTIVE', access_token: token })
-    });
+    // 8. Aktifkan campaign + adset + ad sekaligus
+    await Promise.all([
+      fetch(`${META_API}/${newCampaignId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ACTIVE', access_token: token })
+      }),
+      fetch(`${META_API}/${newAdsetId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ACTIVE', access_token: token })
+      }),
+      ...(newAdId ? [fetch(`${META_API}/${newAdId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ACTIVE', access_token: token })
+      })] : [])
+    ]);
 
     // 9. Simpan ke Supabase
     await sb.from('campaigns').insert({
@@ -782,9 +831,15 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       `${META_API}/${camp.meta_campaign_id}?fields=account_id,objective&access_token=${encodeURIComponent(token)}`
     );
     const campInfo = await campInfoRes.json();
+    if (campInfo.error) throw new Error('Gagal ambil info kampanye: ' + campInfo.error.message);
     const accountId = campInfo.account_id;
     if (!accountId) throw new Error('Tidak bisa ambil account_id');
-    const objective = campInfo.objective || 'OUTCOME_SALES';
+    const objectiveMapB = {
+      'LINK_CLICKS': 'OUTCOME_TRAFFIC', 'CONVERSIONS': 'OUTCOME_SALES',
+      'LEAD_GENERATION': 'OUTCOME_LEADS', 'POST_ENGAGEMENT': 'OUTCOME_ENGAGEMENT',
+      'BRAND_AWARENESS': 'OUTCOME_AWARENESS', 'REACH': 'OUTCOME_AWARENESS',
+    };
+    const objective = objectiveMapB[campInfo.objective] || campInfo.objective || 'OUTCOME_SALES';
 
     // 2. Ambil creative dari ads Phase 1
     const adsRes = await fetch(
@@ -836,8 +891,12 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       })
     });
     const newCampData = await newCampRes.json();
+    if (newCampData.error) {
+      const e = newCampData.error;
+      throw new Error('Gagal buat campaign 2b: ' + (e.error_user_msg || e.message) + ` (code: ${e.code})`);
+    }
     const newCampaignId = newCampData.id;
-    if (!newCampaignId) throw new Error('Gagal buat campaign: ' + JSON.stringify(newCampData));
+    if (!newCampaignId) throw new Error('Gagal buat campaign 2b: ID tidak ada di response');
 
     // 7. Buat 3 adset dengan interest berbeda
     const categories = [
@@ -873,6 +932,11 @@ async function createPhase2bCampaign(camp, token, product, logs) {
         })
       });
       const adsetData = await adsetRes.json();
+      if (adsetData.error) {
+        const e = adsetData.error;
+        console.error(`Phase 2b adset ${cat.label} error:`, e.error_user_msg || e.message);
+        continue;
+      }
       const newAdsetId = adsetData.id;
       if (!newAdsetId) continue;
 
