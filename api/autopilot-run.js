@@ -944,13 +944,13 @@ async function createPhase2bCampaign(camp, token, product, logs) {
         const e = adsetData.error;
         const errMsg = (e.error_user_msg || e.message) + ` (code: ${e.code})`;
         console.error(`Phase 2b adset ${cat.label} error:`, errMsg);
-        await sb.from('action_logs').insert({
+        try { await sb.from('action_logs').insert({
           user_id: camp.user_id,
           campaign_name: camp.name,
           action_type: 'create',
           description: `Phase 2b adset ${cat.label} gagal: ${errMsg}`,
           status: 'error'
-        }).catch(() => {});
+        }); } catch(e) {}
         continue;
       }
       const newAdsetId = adsetData.id;
