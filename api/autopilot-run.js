@@ -374,9 +374,10 @@ async function createPhase2Campaign(camp, token, logs) {
     );
     const campInfo = await campInfoRes.json();
     if (campInfo.error) throw new Error('Gagal ambil info kampanye: ' + campInfo.error.message);
-    const accountId = campInfo.account_id;
+    const rawAccountId = campInfo.account_id;
+    if (!rawAccountId) throw new Error('Tidak bisa ambil account_id dari kampanye Phase 1');
+    const accountId = rawAccountId.startsWith('act_') ? rawAccountId : `act_${rawAccountId}`;
     const objective = campInfo.objective || 'OUTCOME_SALES';
-    if (!accountId) throw new Error('Tidak bisa ambil account_id dari kampanye Phase 1');
 
     // 2. Ambil targeting dari adset Phase 1
     const adsetInfoRes = await fetch(
