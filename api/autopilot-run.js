@@ -1017,23 +1017,29 @@ async function createPhase2bCampaign(camp, token, product, logs) {
 
 // ── Generate keyword interest per kategori via Claude ──
 async function generateInterestKeywords(product) {
-  if (!product) return { manfaat: [], perilaku: ['belanja online', 'e-commerce', 'shopee', 'tokopedia'], hobi: [] };
+  const fallback = {
+    manfaat: product?.name ? [product.name] : [],
+    perilaku: ['Online shopping', 'E-commerce', 'Shopee', 'Tokopedia', 'Lazada'],
+    hobi: ['Health and wellness', 'Beauty', 'Fashion', 'Lifestyle']
+  };
+
+  if (!product) return fallback;
 
   try {
-    const prompt = `Kamu adalah ahli Meta Ads Indonesia. Berdasarkan produk berikut, berikan keyword untuk mencari interest di Meta Ads:
+    const prompt = `You are a Meta Ads expert for Indonesia. Based on the product below, provide interest keywords to search in Meta Ads interest library.
 
-Nama: ${product.name}
+Product name: ${product.name}
 Tagline: ${product.tagline || '-'}
-Manfaat: ${product.benefits || '-'}
+Benefits: ${product.benefits || '-'}
 
-Berikan dalam format JSON dengan 3 kategori, masing-masing 5 keyword dalam bahasa Indonesia:
+Return JSON with 3 categories, 5 keywords each. Use ENGLISH keywords (Meta interest library is mostly in English):
 {
-  "manfaat": ["keyword masalah/kondisi yang diselesaikan produk ini"],
-  "perilaku": ["keyword perilaku belanja online yang relevan dengan target pembeli"],
-  "hobi": ["keyword hobi/aktivitas yang relevan dengan target pembeli produk ini"]
+  "manfaat": ["health condition or problem this product solves"],
+  "perilaku": ["online shopping behavior relevant to buyers of this product"],
+  "hobi": ["hobby or lifestyle interest relevant to buyers of this product"]
 }
 
-Hanya kembalikan JSON, tanpa penjelasan lain.`;
+Return only JSON, no explanation.`;
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -1052,11 +1058,19 @@ Hanya kembalikan JSON, tanpa penjelasan lain.`;
     const data = await res.json();
     const text = data.content?.[0]?.text || '{}';
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return jsonMatch ? JSON.parse(jsonMatch[0]) : { manfaat: [product.name], perilaku: ['belanja online'], hobi: [] };
+    if (!jsonMatch) return fallback;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    // Merge dengan fallback supaya tiap kategori punya minimal beberapa keyword
+    return {
+      manfaat: [...(parsed.manfaat || []), ...(product.name ? [product.name] : [])].slice(0, 6),
+      perilaku: [...(parsed.perilaku || []), 'Online shopping', 'E-commerce'].slice(0, 6),
+      hobi: [...(parsed.hobi || []), 'Lifestyle', 'Health and wellness'].slice(0, 6),
+    };
 
   } catch (err) {
     console.error('generateInterestKeywords error:', err.message);
-    return { manfaat: [product.name], perilaku: ['belanja online', 'e-commerce'], hobi: [] };
+    return fallback;
   }
 }
 
@@ -1067,8 +1081,9 @@ async function searchInterestsPerCategory(keywords, token) {
   for (const [cat, terms] of Object.entries(keywords)) {
     if (!terms?.length) continue;
 
+    // Coba tanpa locale dulu (lebih banyak hasil), fallback per-term
     const fetches = terms.map(term =>
-      fetch(`${META_API}/search?type=adinterest&q=${encodeURIComponent(term)}&limit=15&locale=id_ID&access_token=${encodeURIComponent(token)}`)
+      fetch(`${META_API}/search?type=adinterest&q=${encodeURIComponent(term)}&limit=20&access_token=${encodeURIComponent(token)}`)
         .then(r => r.json()).catch(() => ({ data: [] }))
     );
     const results = await Promise.all(fetches);
@@ -1077,8 +1092,8 @@ async function searchInterestsPerCategory(keywords, token) {
     results.forEach(r => {
       (r.data || []).forEach(item => {
         if (!item.id || !item.name) return;
-        const key = item.name.toLowerCase();
-        if (!seen.has(key) && (item.audience_size || 0) > 10000) {
+        const key = item.id; // pakai id bukan name supaya tidak ada duplikat hidden
+        if (!seen.has(key)) {
           seen.add(key);
           result[cat].push({ id: item.id, name: item.name, audience_size: item.audience_size || 0 });
         }
