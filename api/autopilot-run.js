@@ -1093,10 +1093,15 @@ async function searchInterestsPerCategory(keywords, token) {
 
 // ── Manual Advance Phase (dipanggil dari UI) ──
 async function manualAdvancePhase(req, res) {
-  const { campaign_id, user_id } = req.body;
+  const { campaign_id, user_id, product_id } = req.body;
   if (!campaign_id || !user_id) return res.status(400).json({ error: 'campaign_id dan user_id wajib' });
 
   try {
+    // Kalau product_id dikirim dari frontend (kampanye lama yang belum terhubung produk), update dulu
+    if (product_id) {
+      await sb.from('campaigns').update({ product_id }).eq('id', campaign_id).eq('user_id', user_id);
+    }
+
     const { data: camp } = await sb.from('campaigns')
       .select('*, products(target_cpr, name, tagline, benefits)')
       .eq('id', campaign_id)
