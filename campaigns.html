@@ -214,6 +214,30 @@
   </div>
 </div>
 
+<!-- MODAL ADVANCE PHASE -->
+<div class="modal-overlay hidden" id="modal-advance">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <h3>→ Advance ke Phase 2</h3>
+      <div class="modal-close" onclick="closeModal('modal-advance')">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;" id="advance-camp-name"></p>
+      <div class="form-group" id="advance-product-group">
+        <label class="form-label">Pilih Produk <span style="color:var(--danger)">*</span></label>
+        <p style="font-size:12px;color:var(--gray-5);margin-bottom:8px;">Kampanye ini belum terhubung ke produk. Pilih produk agar interest targeting Phase 2b sesuai dengan produk kamu.</p>
+        <select class="form-input form-select" id="advance-product-select">
+          <option value="">-- Pilih Produk --</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-advance')">Batal</button>
+      <button class="btn btn-primary" id="btn-advance-confirm">Buat Phase 2</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL KAMPANYE BARU -->
 <div class="modal-overlay hidden" id="modal-campaign">
   <div class="modal" style="max-width: 580px;">
@@ -613,15 +637,41 @@
   };
 
   window.advancePhase = async function(id, name) {
-    if (!confirm(`Advance "${name}" ke Phase 2 sekarang?\n\nSistem akan membuat kampanye Phase 2a (COST_CAP) dan Phase 2b (ABO 3 adset interest) di Meta.`)) return;
+    const camp = allCampaigns.find(c => c.id === id);
+    if (!camp) return;
 
+    if (camp.product_id) {
+      // Produk sudah terhubung — langsung advance dengan konfirmasi
+      if (!confirm(`Advance "${name}" ke Phase 2 sekarang?\n\nSistem akan membuat kampanye Phase 2a (COST_CAP) dan Phase 2b (ABO 3 adset interest) di Meta.`)) return;
+      await doAdvancePhase(id, null);
+    } else {
+      // Produk belum terhubung — tampilkan modal pilih produk
+      document.getElementById('advance-camp-name').textContent = `Kampanye: "${name}"`;
+      document.getElementById('advance-product-select').innerHTML = '<option value="">-- Pilih Produk --</option>';
+      // Load products
+      const { data: prods } = await sb.from('products').select('id, name').eq('is_active', true).order('name');
+      (prods || []).forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id; opt.textContent = p.name;
+        document.getElementById('advance-product-select').appendChild(opt);
+      });
+      document.getElementById('btn-advance-confirm').onclick = async () => {
+        const selectedProd = document.getElementById('advance-product-select').value;
+        if (!selectedProd) return showToast('Pilih produk dulu', 'warning');
+        closeModal('modal-advance');
+        await doAdvancePhase(id, selectedProd);
+      };
+      openModal('modal-advance');
+    }
+  };
+
+  async function doAdvancePhase(id, productId) {
     showToast('Membuat kampanye Phase 2...', 'info');
-
     try {
       const res = await fetch('/api/autopilot-run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'advance_phase', campaign_id: id, user_id: currentProfile.id })
+        body: JSON.stringify({ action: 'advance_phase', campaign_id: id, user_id: currentProfile.id, product_id: productId })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal');
@@ -630,7 +680,7 @@
     } catch (err) {
       showToast('Gagal: ' + err.message, 'error');
     }
-  };
+  }
 
   window.deleteCampaign = async function(id, metaCampaignId, name) {
     if (!confirm(`Hapus kampanye "${name}"?\n\nIni akan menghapus dari Meta Ads Manager dan Adsy Autopilot.`)) return;
