@@ -321,41 +321,27 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
     // CPR ≤ target + 10% → tetap jalan (Phase 3 belum ada)
   }
 
-  if (newPhase === 2 && camp.current_phase === 1) {
-    // Cek apakah Phase 2 sudah pernah dibuat untuk kampanye ini
-    const { data: existing } = await sb.from('campaigns')
-      .select('id')
-      .eq('user_id', camp.user_id)
-      .eq('name', camp.name + ' — Phase 2')
-      .maybeSingle();
+  if (newPhase === 2 && camp.current_phase === 1 && !camp.initial_budget) {
+    // Ambil data produk untuk Phase 2b interest
+    const { data: product } = await sb.from('products')
+      .select('name, tagline, benefits')
+      .eq('id', camp.product_id).single();
 
-    if (!existing) {
-      // Simpan initial_budget Phase 1 sebelum ada perubahan
-      await sb.from('campaigns').update({
-        initial_budget: camp.daily_budget
-      }).eq('id', camp.id);
+    // Buat Phase 2a & 2b — initial_budget di-set setelah keduanya sukses
+    await createPhase2Campaign(camp, token, logs);
+    await createPhase2bCampaign(camp, token, product, logs);
 
-      // Ambil data produk untuk Phase 2b interest
-      const { data: product } = await sb.from('products')
-        .select('name, tagline, benefits')
-        .eq('id', camp.product_id).single();
+    await sb.from('campaigns').update({ initial_budget: camp.daily_budget }).eq('id', camp.id);
 
-      // Buat kampanye Phase 2a (COST_CAP)
-      await createPhase2Campaign(camp, token, logs);
-
-      // Buat kampanye Phase 2b (ABO 3 adset interest)
-      await createPhase2bCampaign(camp, token, product, logs);
-
-      const logEntry = {
-        user_id: camp.user_id,
-        campaign_name: camp.name,
-        action_type: 'phase_advance',
-        description: `"${camp.name}" lolos Phase 1 → kampanye Phase 2a & 2b dibuat`,
-        status: 'success'
-      };
-      await sb.from('action_logs').insert(logEntry);
-      logs.push(logEntry);
-    }
+    const logEntry = {
+      user_id: camp.user_id,
+      campaign_name: camp.name,
+      action_type: 'phase_advance',
+      description: `"${camp.name}" lolos Phase 1 → kampanye Phase 2a & 2b dibuat`,
+      status: 'success'
+    };
+    await sb.from('action_logs').insert(logEntry);
+    logs.push(logEntry);
     // Phase 1 tidak diubah apapun — tetap jalan dengan autopilot aktif
   }
 
@@ -820,14 +806,6 @@ async function createPhase2bCampaign(camp, token, product, logs) {
   if (!token || !camp.meta_campaign_id) return;
 
   try {
-    // 0. Cek duplikat — jangan buat ulang kalau sudah ada
-    const { data: existing2b } = await sb.from('campaigns')
-      .select('id')
-      .eq('user_id', camp.user_id)
-      .ilike('name', `${camp.name} — Phase 2b%`)
-      .maybeSingle();
-    if (existing2b) return;
-
     // 1. Ambil account_id + objective dari kampanye Phase 1
     const campInfoRes = await fetch(
       `${META_API}/${camp.meta_campaign_id}?fields=account_id,objective&access_token=${encodeURIComponent(token)}`
@@ -1128,15 +1106,15 @@ async function manualAdvancePhase(req, res) {
 
     const logs = [];
 
-    // Simpan initial_budget sebelum Phase 2 dibuat
-    await sb.from('campaigns').update({ initial_budget: camp.daily_budget }).eq('id', camp.id);
-
     // Ambil data produk untuk Phase 2b
     const product = camp.products || null;
 
-    // Buat Phase 2a dan Phase 2b
+    // Buat Phase 2a dan Phase 2b dulu — baru set initial_budget kalau keduanya sukses
     await createPhase2Campaign(camp, token, logs);
     await createPhase2bCampaign(camp, token, product, logs);
+
+    // Simpan initial_budget setelah kedua phase berhasil dibuat
+    await sb.from('campaigns').update({ initial_budget: camp.daily_budget }).eq('id', camp.id);
 
     await sb.from('action_logs').insert({
       user_id,
