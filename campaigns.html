@@ -375,7 +375,59 @@
     const phaseLabel = { 1: 'Testing', 2: 'Evaluasi', 3: 'Scale' };
     const phaseBadge = { 1: 'badge-warning', 2: 'badge-primary', 3: 'badge-success' };
 
-    tbody.innerHTML = data.map(c => {
+    // Group Phase 2b adsets (same meta_campaign_id) jadi 1 baris
+    const rows = [];
+    const seen2b = new Set();
+    for (const c of data) {
+      if (c.phase_type === '2b') {
+        if (seen2b.has(c.meta_campaign_id)) continue; // skip adset duplikat
+        seen2b.add(c.meta_campaign_id);
+        // Kumpulkan semua adset grup ini
+        const group = data.filter(x => x.phase_type === '2b' && x.meta_campaign_id === c.meta_campaign_id);
+        const totalSpend = group.reduce((s, x) => s + (insightsMap[x.id]?.spend ?? x.spend_today ?? 0), 0);
+        const totalBudget = group.reduce((s, x) => s + (x.daily_budget || 0), 0);
+        const avgCpr = (() => { const cprs = group.map(x => insightsMap[x.id]?.cpr ?? x.cpr).filter(v => v); return cprs.length ? cprs.reduce((a,b)=>a+b,0)/cprs.length : null; })();
+        const anyActive = group.some(x => x.status === 'ACTIVE');
+        // Nama: strip " — Phase 2b Manfaat" dll → ambil parent name + "— Phase 2b"
+        const parentName = c.name.replace(/ — Phase 2b.*$/, '') + ' — Phase 2b';
+        rows.push({ ...c, _group: group, _isGroup: true, _parentName: parentName, _totalSpend: totalSpend, _totalBudget: totalBudget, _avgCpr: avgCpr, _anyActive: anyActive });
+      } else {
+        rows.push(c);
+      }
+    }
+
+    tbody.innerHTML = rows.map(c => {
+      if (c._isGroup) {
+        const g = c._group;
+        const adsetLabels = g.map(x => x.name.replace(/.*— Phase 2b /, '')).join(', ');
+        const statusBadge = c._anyActive
+          ? `<span class="badge badge-success"><span class="badge-dot"></span>Aktif</span>`
+          : `<span class="badge badge-warning"><span class="badge-dot"></span>Paused</span>`;
+        return `
+        <tr>
+          <td>
+            <strong>${c._parentName}</strong>
+            <div style="font-size:11px; color:var(--gray-5); margin-top:2px;">ABO · ${g.length} adset: ${adsetLabels}</div>
+          </td>
+          <td><span class="badge badge-primary">P2: Evaluasi</span></td>
+          <td>${formatRupiah(c._totalBudget)}</td>
+          <td>${formatRupiah(c._totalSpend)}</td>
+          <td>${c._avgCpr ? formatRupiah(Math.round(c._avgCpr)) : '-'}</td>
+          <td>-</td>
+          <td>${statusBadge}</td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              ${c._anyActive
+                ? `<button class="btn btn-outline btn-sm" onclick="toggle2bGroup('${c.meta_campaign_id}', 'PAUSED')">⏸ Pause</button>`
+                : `<button class="btn btn-success btn-sm" onclick="toggle2bGroup('${c.meta_campaign_id}', 'ACTIVE')">▶ Aktifkan</button>`
+              }
+              <button class="btn btn-outline btn-sm" onclick="viewDetail('${g[0].id}')">Detail</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="delete2bGroup('${c.meta_campaign_id}', '${c._parentName}')">Hapus</button>
+            </div>
+          </td>
+        </tr>`;
+      }
+
       const ins = insightsMap[c.id] || {};
       const spend = ins.spend ?? c.spend_today;
       const cpr = ins.cpr ?? c.cpr;
@@ -512,6 +564,51 @@
       await loadCampaigns();
     } catch (err) {
       showToast('Gagal: ' + err.message, 'error');
+    }
+  };
+
+  // Toggle semua adset dalam grup Phase 2b
+  window.toggle2bGroup = async function(metaCampaignId, status) {
+    const group = allCampaigns.filter(c => c.phase_type === '2b' && c.meta_campaign_id === metaCampaignId);
+    try {
+      await Promise.all(group.map(c =>
+        fetch('/api/meta-campaigns', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: c.id, meta_campaign_id: c.meta_campaign_id, status, user_id: currentProfile.id })
+        })
+      ));
+      showToast(`Phase 2b ${status === 'ACTIVE' ? 'diaktifkan' : 'di-pause'}`, 'success');
+      await loadCampaigns();
+    } catch (err) {
+      showToast('Gagal: ' + err.message, 'error');
+    }
+  };
+
+  // Hapus semua adset dalam grup Phase 2b
+  window.delete2bGroup = async function(metaCampaignId, name) {
+    if (!confirm(`Hapus "${name}" (3 adset)?\n\nIni akan menghapus semua adset dari Meta dan Adsy.`)) return;
+    const group = allCampaigns.filter(c => c.phase_type === '2b' && c.meta_campaign_id === metaCampaignId);
+    try {
+      // Hapus campaign di Meta sekali (1 campaign = 3 adset)
+      const first = group[0];
+      await fetch('/api/meta-campaigns', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: first.id, meta_campaign_id: metaCampaignId, user_id: currentProfile.id })
+      });
+      // Hapus sisa rows di Supabase (adset lain, meta sudah terhapus semua)
+      await Promise.all(group.slice(1).map(c =>
+        fetch('/api/meta-campaigns', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: c.id, meta_campaign_id: null, user_id: currentProfile.id })
+        })
+      ));
+      showToast('Phase 2b berhasil dihapus', 'success');
+      await loadCampaigns();
+    } catch (err) {
+      showToast('Gagal hapus: ' + err.message, 'error');
     }
   };
 
