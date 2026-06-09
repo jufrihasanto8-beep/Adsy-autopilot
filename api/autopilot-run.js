@@ -504,6 +504,7 @@ async function createPhase2Campaign(camp, token, logs) {
       description: `Gagal buat kampanye Phase 2a: ${err.message}`,
       status: 'error'
     }); } catch(e) {}
+    throw err; // propagate ke manualAdvancePhase / checkPhaseAdvancement
   }
 }
 
@@ -926,6 +927,7 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       description: `Gagal buat kampanye Phase 2b: ${err.message}`,
       status: 'error'
     }); } catch(e) {}
+    throw err; // propagate ke caller
   }
 }
 
