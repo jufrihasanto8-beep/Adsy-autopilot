@@ -497,13 +497,13 @@ async function createPhase2Campaign(camp, token, logs) {
 
   } catch (err) {
     console.error('createPhase2Campaign error:', err.message);
-    await sb.from('action_logs').insert({
+    try { await sb.from('action_logs').insert({
       user_id: camp.user_id,
       campaign_name: camp.name,
       action_type: 'create',
       description: `Gagal buat kampanye Phase 2a: ${err.message}`,
       status: 'error'
-    }).catch(() => {});
+    }); } catch(e) {}
   }
 }
 
@@ -919,13 +919,13 @@ async function createPhase2bCampaign(camp, token, product, logs) {
 
   } catch (err) {
     console.error('createPhase2bCampaign error:', err.message);
-    await sb.from('action_logs').insert({
+    try { await sb.from('action_logs').insert({
       user_id: camp.user_id,
       campaign_name: camp.name,
       action_type: 'create',
       description: `Gagal buat kampanye Phase 2b: ${err.message}`,
       status: 'error'
-    }).catch(() => {});
+    }); } catch(e) {}
   }
 }
 
@@ -1139,7 +1139,7 @@ async function executeAction(camp, rule, token, userId, logs) {
   } catch (err) {
     logEntry.status = 'error';
     logEntry.description = err.message;
-    await sb.from('action_logs').insert(logEntry).catch(() => {});
+    try { await sb.from('action_logs').insert(logEntry); } catch(e) {}
   }
 }
 
