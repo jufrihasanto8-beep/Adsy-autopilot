@@ -443,6 +443,7 @@ async function createPhase2Campaign(camp, token, logs) {
         name: camp.name + ' — Phase 2a',
         objective,
         status: 'PAUSED',
+        special_ad_categories: [],
         access_token: token
       })
     });
@@ -887,6 +888,7 @@ async function createPhase2bCampaign(camp, token, product, logs) {
         name: camp.name + ' — Phase 2b',
         objective,
         status: 'ACTIVE',
+        special_ad_categories: [],
         access_token: token
       })
     });
