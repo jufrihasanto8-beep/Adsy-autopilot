@@ -408,6 +408,7 @@
               : `<button class="btn btn-success btn-sm" onclick="toggleStatus('${c.id}', '${c.meta_campaign_id}', 'ACTIVE')">▶ Aktifkan</button>`
             }
             <button class="btn btn-outline btn-sm" onclick="viewDetail('${c.id}')">Detail</button>
+            ${c.current_phase === 1 && !c.initial_budget ? `<button class="btn btn-outline btn-sm" style="color:var(--primary);" onclick="advancePhase('${c.id}', '${c.name}')">→ Phase 2</button>` : ''}
             <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteCampaign('${c.id}', '${c.meta_campaign_id}', '${c.name}')">Hapus</button>
           </div>
         </td>
@@ -508,6 +509,26 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal');
       showToast(`Kampanye ${status === 'ACTIVE' ? 'diaktifkan' : 'di-pause'}`, 'success');
+      await loadCampaigns();
+    } catch (err) {
+      showToast('Gagal: ' + err.message, 'error');
+    }
+  };
+
+  window.advancePhase = async function(id, name) {
+    if (!confirm(`Advance "${name}" ke Phase 2 sekarang?\n\nSistem akan membuat kampanye Phase 2a (COST_CAP) dan Phase 2b (ABO 3 adset interest) di Meta.`)) return;
+
+    showToast('Membuat kampanye Phase 2...', 'info');
+
+    try {
+      const res = await fetch('/api/autopilot-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'advance_phase', campaign_id: id, user_id: currentProfile.id })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal');
+      showToast('Phase 2 berhasil dibuat!', 'success');
       await loadCampaigns();
     } catch (err) {
       showToast('Gagal: ' + err.message, 'error');
