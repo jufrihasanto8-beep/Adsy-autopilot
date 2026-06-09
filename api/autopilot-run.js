@@ -391,11 +391,17 @@ async function createPhase2Campaign(camp, token, logs) {
       const adsetInfo = await adsetInfoRes.json();
       if (!adsetInfo.error) {
         if (adsetInfo.targeting) {
-          // Copy semua field targeting dari Phase 1, strip hanya field read-only Meta
-          const READ_ONLY_FIELDS = ['brand_safety_content_filter_levels', 'brand_safety_inventory_filter', 'place_page_set_ids'];
+          // Copy targeting dari Phase 1, strip field yang tidak kompatibel dengan Advantage+ OFF
+          const STRIP_FIELDS = [
+            'brand_safety_content_filter_levels',
+            'brand_safety_inventory_filter',
+            'place_page_set_ids',
+            'age_range',         // Advantage+-only field, konflik dengan advantage_audience: 0
+            'targeting_automation' // akan di-set manual di bawah
+          ];
           const t = { ...adsetInfo.targeting };
-          READ_ONLY_FIELDS.forEach(f => delete t[f]);
-          // Override targeting_automation → matikan Advantage+ supaya targeting manual berlaku
+          STRIP_FIELDS.forEach(f => delete t[f]);
+          // Matikan Advantage+ supaya age_min/age_max + interest manual berlaku
           t.targeting_automation = { advantage_audience: 0 };
           targeting = t;
         }
