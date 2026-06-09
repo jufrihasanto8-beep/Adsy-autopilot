@@ -400,6 +400,7 @@ async function createPhase2Campaign(camp, token, logs) {
             ...(t.geo_locations && { geo_locations: t.geo_locations }),
             ...(t.flexible_spec && { flexible_spec: t.flexible_spec }),
             ...(t.exclusions && { exclusions: t.exclusions }),
+            targeting_automation: { advantage_audience: 0 }, // wajib di-set eksplisit
           };
         }
         promotedObject = adsetInfo.promoted_object || null;
@@ -421,18 +422,23 @@ async function createPhase2Campaign(camp, token, logs) {
     const baseCpr = camp.cpr || targetCpr;
     const bidAmount = baseCpr ? Math.round(baseCpr * 1.1) : null;
 
-    // 5. Buat campaign baru (ABO)
+    // 5. Buat campaign CBO + Cost Cap di level kampanye
+    const campBody = {
+      name: camp.name + ' — Phase 2a',
+      objective,
+      status: 'PAUSED',
+      special_ad_categories: [],
+      is_adset_budget_sharing_enabled: true,  // CBO: budget di kampanye
+      daily_budget: 5000000,
+      bid_strategy: bidAmount ? 'COST_CAP' : 'LOWEST_COST_WITHOUT_CAP',
+      access_token: token
+    };
+    if (bidAmount) campBody.bid_amount = bidAmount;
+
     const newCampRes = await fetch(`${META_API}/${accountId}/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: camp.name + ' — Phase 2a',
-        objective,
-        status: 'PAUSED',
-        special_ad_categories: [],
-        is_adset_budget_sharing_enabled: false,
-        access_token: token
-      })
+      body: JSON.stringify(campBody)
     });
     const newCampData = await newCampRes.json();
     if (newCampData.error) {
@@ -441,20 +447,16 @@ async function createPhase2Campaign(camp, token, logs) {
     }
     const newCampaignId = newCampData.id;
 
-    // 6. Buat adset dengan COST_CAP + budget 5jt
-    // COST_CAP wajib punya bid_amount — fallback ke LOWEST_COST_WITHOUT_CAP kalau tidak ada
+    // 6. Buat adset — CBO, tidak perlu budget/bid di adset
     const adsetBody = {
       name: camp.name + ' — Phase 2a',
       campaign_id: newCampaignId,
-      daily_budget: 5000000,
       billing_event: billingEvent,
       optimization_goal: optimizationGoal,
-      bid_strategy: bidAmount ? 'COST_CAP' : 'LOWEST_COST_WITHOUT_CAP',
       targeting,
       status: 'PAUSED',
       access_token: token
     };
-    if (bidAmount) adsetBody.bid_amount = bidAmount;
     if (promotedObject) adsetBody.promoted_object = promotedObject;
 
     const newAdsetRes = await fetch(`${META_API}/${accountId}/adsets`, {
@@ -903,6 +905,7 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       const targeting = {
         age_min: 21,
         geo_locations: { countries: ['ID'] },
+        targeting_automation: { advantage_audience: 0 }, // wajib di-set eksplisit oleh Meta
         ...(catInterests.length > 0
           ? { flexible_spec: [{ interests: catInterests.map(i => ({ id: i.id, name: i.name })) }] }
           : {})
