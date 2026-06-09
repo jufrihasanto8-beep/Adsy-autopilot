@@ -14,6 +14,11 @@ const MAX_SCALE_PCT = 30;  // batas maksimal kenaikan per hari
 export default async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
+  // ── Manual advance phase (dari user, bukan cron) ──
+  if (req.method === 'POST' && req.body?.action === 'advance_phase') {
+    return await manualAdvancePhase(req, res);
+  }
+
   // Security: cek secret key (dari cron-job.org header atau query param)
   const CRON_SECRET = process.env.CRON_SECRET;
   if (CRON_SECRET) {
@@ -940,6 +945,54 @@ async function searchInterestsPerCategory(keywords, token) {
   }
 
   return result;
+}
+
+// ── Manual Advance Phase (dipanggil dari UI) ──
+async function manualAdvancePhase(req, res) {
+  const { campaign_id, user_id } = req.body;
+  if (!campaign_id || !user_id) return res.status(400).json({ error: 'campaign_id dan user_id wajib' });
+
+  try {
+    const { data: camp } = await sb.from('campaigns')
+      .select('*, products(target_cpr, name, tagline, benefits)')
+      .eq('id', campaign_id)
+      .eq('user_id', user_id)
+      .single();
+
+    if (!camp) return res.status(404).json({ error: 'Kampanye tidak ditemukan' });
+    if (camp.current_phase !== 1) return res.status(400).json({ error: 'Hanya kampanye Phase 1 yang bisa di-advance' });
+    if (camp.initial_budget) return res.status(400).json({ error: 'Phase 2 sudah pernah dibuat untuk kampanye ini' });
+
+    const { data: config } = await sb.from('app_config')
+      .select('meta_token').eq('user_id', user_id).single();
+    const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
+    if (!token) return res.status(400).json({ error: 'Token Meta belum dikonfigurasi' });
+
+    const logs = [];
+
+    // Simpan initial_budget sebelum Phase 2 dibuat
+    await sb.from('campaigns').update({ initial_budget: camp.daily_budget }).eq('id', camp.id);
+
+    // Ambil data produk untuk Phase 2b
+    const product = camp.products || null;
+
+    // Buat Phase 2a dan Phase 2b
+    await createPhase2Campaign(camp, token, logs);
+    await createPhase2bCampaign(camp, token, product, logs);
+
+    await sb.from('action_logs').insert({
+      user_id,
+      campaign_name: camp.name,
+      action_type: 'phase_advance',
+      description: `"${camp.name}" di-advance manual ke Phase 2 oleh user`,
+      status: 'success'
+    });
+
+    return res.status(200).json({ success: true, message: 'Phase 2 berhasil dibuat', logs });
+  } catch (err) {
+    console.error('manualAdvancePhase error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
 }
 
 // ── Helpers ──
