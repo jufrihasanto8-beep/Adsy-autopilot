@@ -362,73 +362,134 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
   // Phase 3 belum diimplementasi — akan ditambahkan nanti
 }
 
-// ── Buat kampanye Phase 2 di Meta (duplikat dari Phase 1) ──
+// ── Buat kampanye Phase 2a di Meta (build from scratch, bukan deep copy) ──
+// Deep copy tidak bisa ganti bid_strategy & budget type → buat baru ambil creative dari Phase 1
 async function createPhase2Campaign(camp, token, logs) {
   if (!camp.meta_campaign_id || !token) return;
 
   try {
-    // 1. Copy kampanye Phase 1 di Meta (deep copy termasuk adset + ads)
-    const copyRes = await fetch(`${META_API}/${camp.meta_campaign_id}/copies`, {
+    // 1. Ambil info campaign Phase 1: objective + account_id
+    const campInfoRes = await fetch(
+      `${META_API}/${camp.meta_campaign_id}?fields=account_id,objective&access_token=${encodeURIComponent(token)}`
+    );
+    const campInfo = await campInfoRes.json();
+    if (campInfo.error) throw new Error('Gagal ambil info kampanye: ' + campInfo.error.message);
+    const accountId = campInfo.account_id;
+    const objective = campInfo.objective || 'OUTCOME_SALES';
+    if (!accountId) throw new Error('Tidak bisa ambil account_id dari kampanye Phase 1');
+
+    // 2. Ambil targeting dari adset Phase 1
+    const adsetInfoRes = await fetch(
+      `${META_API}/${camp.meta_adset_id}?fields=targeting,promoted_object,optimization_goal,billing_event&access_token=${encodeURIComponent(token)}`
+    );
+    const adsetInfo = await adsetInfoRes.json();
+    const targeting = adsetInfo.targeting || { age_min: 21, geo_locations: { countries: ['ID'] } };
+    const promotedObject = adsetInfo.promoted_object || null;
+    const optimizationGoal = adsetInfo.optimization_goal || 'OFFSITE_CONVERSIONS';
+    const billingEvent = adsetInfo.billing_event || 'IMPRESSIONS';
+
+    // 3. Ambil creative dari ads Phase 1
+    const adsRes = await fetch(
+      `${META_API}/${camp.meta_campaign_id}/ads?fields=creative{id}&access_token=${encodeURIComponent(token)}`
+    );
+    const adsData = await adsRes.json();
+    const creativeId = adsData.data?.[0]?.creative?.id;
+
+    // 4. Hitung bid amount COST_CAP = CPR Phase 1 + 10%
+    //    Fallback ke target_cpr produk + 10% kalau CPR belum ada
+    const targetCpr = camp.products?.target_cpr;
+    const baseCpr = camp.cpr || targetCpr;
+    const bidAmount = baseCpr ? Math.round(baseCpr * 1.1) : null;
+
+    // 5. Buat campaign baru (ABO)
+    const newCampRes = await fetch(`${META_API}/${accountId}/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deep_copy: true, access_token: token })
+      body: JSON.stringify({
+        name: camp.name + ' — Phase 2a',
+        objective,
+        status: 'PAUSED',
+        special_ad_categories: [],
+        access_token: token
+      })
     });
-    const copyData = await copyRes.json();
-    const newCampaignId = copyData.copied_campaign_id;
-    if (!newCampaignId) throw new Error('Gagal copy kampanye: ' + JSON.stringify(copyData));
+    const newCampData = await newCampRes.json();
+    if (newCampData.error) throw new Error('Gagal buat campaign: ' + newCampData.error.message);
+    const newCampaignId = newCampData.id;
 
-    // 2. Ambil adset dari kampanye baru
-    const adsetsRes = await fetch(
-      `${META_API}/${newCampaignId}/adsets?fields=id&access_token=${encodeURIComponent(token)}`
-    );
-    const adsetsData = await adsetsRes.json();
-    const newAdsetId = adsetsData.data?.[0]?.id;
+    // 6. Buat adset dengan COST_CAP + budget 5jt
+    const adsetBody = {
+      name: camp.name + ' — Phase 2a',
+      campaign_id: newCampaignId,
+      daily_budget: 5000000,
+      billing_event: billingEvent,
+      optimization_goal: optimizationGoal,
+      bid_strategy: 'COST_CAP',
+      targeting,
+      status: 'PAUSED',
+      access_token: token
+    };
+    if (bidAmount) adsetBody.bid_amount = bidAmount;
+    if (promotedObject) adsetBody.promoted_object = promotedObject;
 
-    // 3. Hitung bid amount = CPR Phase 1 + 10%
-    const bidAmount = camp.cpr ? Math.round(camp.cpr * 1.1) : null;
+    const newAdsetRes = await fetch(`${META_API}/${accountId}/adsets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(adsetBody)
+    });
+    const newAdsetData = await newAdsetRes.json();
+    if (newAdsetData.error) throw new Error('Gagal buat adset: ' + newAdsetData.error.message);
+    const newAdsetId = newAdsetData.id;
 
-    // 4. Update adset: budget 5jt + COST_CAP bid strategy
-    if (newAdsetId) {
-      const updateBody = { daily_budget: 5000000, access_token: token };
-      if (bidAmount) {
-        updateBody.bid_strategy = 'COST_CAP';
-        updateBody.bid_amount = bidAmount;
-      }
-      await fetch(`${META_API}/${newAdsetId}`, {
+    // 7. Buat ad dengan creative yang sama dari Phase 1
+    if (creativeId) {
+      await fetch(`${META_API}/${accountId}/ads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateBody)
+        body: JSON.stringify({
+          name: camp.name + ' — Phase 2a',
+          adset_id: newAdsetId,
+          creative: { creative_id: creativeId },
+          status: 'PAUSED',
+          access_token: token
+        })
       });
     }
 
-    // 5. Aktifkan kampanye baru
+    // 8. Aktifkan campaign
     await fetch(`${META_API}/${newCampaignId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'ACTIVE', access_token: token })
     });
+    await fetch(`${META_API}/${newAdsetId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'ACTIVE', access_token: token })
+    });
 
-    // 6. Simpan kampanye Phase 2 ke Supabase
+    // 9. Simpan ke Supabase
     await sb.from('campaigns').insert({
       user_id: camp.user_id,
       ad_account_id: camp.ad_account_id,
-      name: camp.name + ' — Phase 2',
+      name: camp.name + ' — Phase 2a',
       status: 'ACTIVE',
       current_phase: 2,
+      phase_type: '2a',
       phase_started_at: new Date().toISOString(),
       autopilot_enabled: true,
       product_id: camp.product_id,
       daily_budget: 5000000,
       meta_campaign_id: newCampaignId,
-      meta_adset_id: newAdsetId || null,
+      meta_adset_id: newAdsetId,
       days_running: 0
     });
 
     const logEntry = {
       user_id: camp.user_id,
-      campaign_name: camp.name + ' — Phase 2',
+      campaign_name: camp.name + ' — Phase 2a',
       action_type: 'create',
-      description: `Kampanye Phase 2 dibuat — Budget Rp 5.000.000, Target CPR Rp ${bidAmount ? bidAmount.toLocaleString('id-ID') : '-'} (CPR Phase 1 + 10%)`,
+      description: `Kampanye Phase 2a dibuat — Budget Rp 5.000.000, COST_CAP Rp ${bidAmount ? bidAmount.toLocaleString('id-ID') : '(tidak diset, CPR belum ada)'}`,
       status: 'success'
     };
     await sb.from('action_logs').insert(logEntry);
@@ -440,7 +501,7 @@ async function createPhase2Campaign(camp, token, logs) {
       user_id: camp.user_id,
       campaign_name: camp.name,
       action_type: 'create',
-      description: `Gagal buat kampanye Phase 2: ${err.message}`,
+      description: `Gagal buat kampanye Phase 2a: ${err.message}`,
       status: 'error'
     }).catch(() => {});
   }
