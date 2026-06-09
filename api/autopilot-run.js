@@ -379,7 +379,7 @@ async function createPhase2Campaign(camp, token, logs) {
     const objective = objectiveMap[rawObjective] || rawObjective;
 
     // 2. Ambil targeting dari adset Phase 1
-    let targeting = { age_min: 21, geo_locations: { countries: ['ID'] } };
+    let targeting = { age_min: 21, geo_locations: { countries: ['ID'] }, targeting_automation: { advantage_audience: 0 } };
     let promotedObject = null;
     let optimizationGoal = 'OFFSITE_CONVERSIONS';
     let billingEvent = 'IMPRESSIONS';
@@ -390,18 +390,14 @@ async function createPhase2Campaign(camp, token, logs) {
       );
       const adsetInfo = await adsetInfoRes.json();
       if (!adsetInfo.error) {
-        // Bersihkan targeting dari field deprecated/read-only yang tidak bisa dikirim ulang ke Meta
         if (adsetInfo.targeting) {
-          const t = adsetInfo.targeting;
-          targeting = {
-            ...(t.age_min && { age_min: t.age_min }),
-            ...(t.age_max && { age_max: t.age_max }),
-            ...(t.genders && { genders: t.genders }),
-            ...(t.geo_locations && { geo_locations: t.geo_locations }),
-            ...(t.flexible_spec && { flexible_spec: t.flexible_spec }),
-            ...(t.exclusions && { exclusions: t.exclusions }),
-            targeting_automation: { advantage_audience: 0 }, // wajib di-set eksplisit
-          };
+          // Copy semua field targeting dari Phase 1, strip hanya field read-only Meta
+          const READ_ONLY_FIELDS = ['brand_safety_content_filter_levels', 'brand_safety_inventory_filter', 'place_page_set_ids'];
+          const t = { ...adsetInfo.targeting };
+          READ_ONLY_FIELDS.forEach(f => delete t[f]);
+          // Override targeting_automation → matikan Advantage+ supaya targeting manual berlaku
+          t.targeting_automation = { advantage_audience: 0 };
+          targeting = t;
         }
         promotedObject = adsetInfo.promoted_object || null;
         optimizationGoal = adsetInfo.optimization_goal || 'OFFSITE_CONVERSIONS';
@@ -428,12 +424,12 @@ async function createPhase2Campaign(camp, token, logs) {
       objective,
       status: 'PAUSED',
       special_ad_categories: [],
-      is_adset_budget_sharing_enabled: false,  // CBO: adset tidak punya budget sendiri
+      is_adset_budget_sharing_enabled: false,
       daily_budget: 5000000,
       bid_strategy: bidAmount ? 'COST_CAP' : 'LOWEST_COST_WITHOUT_CAP',
       access_token: token
+      // bid_amount TIDAK di campaign — untuk CBO COST_CAP, bid_amount ada di adset
     };
-    if (bidAmount) campBody.bid_amount = bidAmount;
 
     const newCampRes = await fetch(`${META_API}/${accountId}/campaigns`, {
       method: 'POST',
@@ -447,7 +443,7 @@ async function createPhase2Campaign(camp, token, logs) {
     }
     const newCampaignId = newCampData.id;
 
-    // 6. Buat adset — CBO, tidak perlu budget/bid di adset
+    // 6. Buat adset — CBO, bid_amount di sini (bukan di campaign)
     const adsetBody = {
       name: camp.name + ' — Phase 2a',
       campaign_id: newCampaignId,
@@ -457,6 +453,7 @@ async function createPhase2Campaign(camp, token, logs) {
       status: 'PAUSED',
       access_token: token
     };
+    if (bidAmount) adsetBody.bid_amount = bidAmount;
     if (promotedObject) adsetBody.promoted_object = promotedObject;
 
     const newAdsetRes = await fetch(`${META_API}/${accountId}/adsets`, {
