@@ -428,7 +428,7 @@ async function createPhase2Campaign(camp, token, logs) {
       objective,
       status: 'PAUSED',
       special_ad_categories: [],
-      is_adset_budget_sharing_enabled: true,  // CBO: budget di kampanye
+      is_adset_budget_sharing_enabled: false,  // CBO: adset tidak punya budget sendiri
       daily_budget: 5000000,
       bid_strategy: bidAmount ? 'COST_CAP' : 'LOWEST_COST_WITHOUT_CAP',
       access_token: token
