@@ -938,7 +938,9 @@ async function createPhase2bCampaign(camp, token, product, logs) {
         throw new Error(errMsg); // langsung throw supaya kelihatan di toast
       }
       const newAdsetId = adsetData.id;
-      if (!newAdsetId) continue;
+      if (!newAdsetId) {
+        throw new Error(`Adset ${cat.label}: Meta tidak return ID — ${JSON.stringify(adsetData)}`);
+      }
       // Buat ad dengan creative yang sama dari Phase 1
       if (creativeId) {
         await fetch(`${META_API}/act_${accountId}/ads`, {
@@ -1014,9 +1016,9 @@ Benefits: ${product.benefits || '-'}
 
 Return JSON with 3 categories, 5 keywords each. Use ENGLISH keywords (Meta interest library is mostly in English):
 {
-  "manfaat": ["health condition or problem this product solves"],
-  "perilaku": ["online shopping behavior relevant to buyers of this product"],
-  "hobi": ["hobby or lifestyle interest relevant to buyers of this product"]
+  "manfaat": ["topics, products, or categories that people interested in THIS PRODUCT'S BENEFITS would follow — NOT the problem itself. E.g. if product fixes gray hair → use 'Hair care', 'Shampoo', 'Hair treatment', NOT 'gray hair'. If product is for weight loss → use 'Fitness', 'Healthy diet', 'Nutrition', NOT 'obesity'."],
+  "perilaku": ["online shopping behavior relevant to buyers of this product, e.g. 'Online shopping', 'E-commerce', specific marketplaces"],
+  "hobi": ["hobby or lifestyle interest of the target buyer, e.g. 'Beauty', 'Wellness', 'Fashion'"]
 }
 
 Return only JSON, no explanation.`;
