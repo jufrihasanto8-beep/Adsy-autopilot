@@ -444,6 +444,7 @@ async function createPhase2Campaign(camp, token, logs) {
         objective,
         status: 'PAUSED',
         special_ad_categories: [],
+        is_adset_budget_sharing_enabled: false,
         access_token: token
       })
     });
@@ -889,6 +890,7 @@ async function createPhase2bCampaign(camp, token, product, logs) {
         objective,
         status: 'ACTIVE',
         special_ad_categories: [],
+        is_adset_budget_sharing_enabled: false,
         access_token: token
       })
     });
