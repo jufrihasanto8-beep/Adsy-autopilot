@@ -1008,20 +1008,19 @@ async function generateInterestKeywords(product) {
   if (!product) return fallback;
 
   try {
-    const prompt = `You are a Meta Ads expert for Indonesia. Based on the product below, provide interest keywords to search in Meta Ads interest library.
+    const prompt = `You are a Meta Ads expert for Indonesia. Based on the product below, generate 5 English interest keywords per category for Meta Ads interest targeting.
 
 Product name: ${product.name}
 Tagline: ${product.tagline || '-'}
 Benefits: ${product.benefits || '-'}
 
-Return JSON with 3 categories, 5 keywords each. Use ENGLISH keywords (Meta interest library is mostly in English):
-{
-  "manfaat": ["topics, products, or categories that people interested in THIS PRODUCT'S BENEFITS would follow — NOT the problem itself. E.g. if product fixes gray hair → use 'Hair care', 'Shampoo', 'Hair treatment', NOT 'gray hair'. If product is for weight loss → use 'Fitness', 'Healthy diet', 'Nutrition', NOT 'obesity'."],
-  "perilaku": ["online shopping behavior relevant to buyers of this product, e.g. 'Online shopping', 'E-commerce', specific marketplaces"],
-  "hobi": ["hobby or lifestyle interest of the target buyer, e.g. 'Beauty', 'Wellness', 'Fashion'"]
-}
+Rules:
+- "manfaat": related topics, product categories, or brands that buyers of this product would follow. Do NOT use the problem/pain point as keyword. Example for gray hair product: ["Hair care", "Shampoo", "Hair treatment", "Beauty", "Personal care"]
+- "perilaku": online shopping platforms and behaviors. Example: ["Online shopping", "E-commerce", "Shopee", "Tokopedia", "Lazada"]
+- "hobi": lifestyle or hobby interests of the target buyer. Example: ["Health and wellness", "Beauty", "Skin care", "Fashion", "Lifestyle"]
 
-Return only JSON, no explanation.`;
+Return ONLY a JSON object, no explanation:
+{"manfaat":["...","...","...","...","..."],"perilaku":["...","...","...","...","..."],"hobi":["...","...","...","...","..."]}`;
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
