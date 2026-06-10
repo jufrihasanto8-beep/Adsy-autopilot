@@ -331,17 +331,18 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
       .select('name, tagline, benefits')
       .eq('id', camp.product_id).single();
 
-    // Buat Phase 2a & 2b — initial_budget di-set setelah keduanya sukses
-    await createPhase2Campaign(camp, token, logs);
-    await createPhase2bCampaign(camp, token, product, logs);
+    // Fetch blueprint config, lalu buat Phase 2 sesuai blueprint
+    const blueprintConfig = await fetchBlueprintConfig(camp.blueprint_id);
+    await createPhase2FromBlueprint(camp, token, product, blueprintConfig, logs);
 
     await sb.from('campaigns').update({ initial_budget: camp.daily_budget }).eq('id', camp.id);
 
+    const subPhaseCount = Array.isArray(blueprintConfig?.phase2) ? blueprintConfig.phase2.length : 2;
     const logEntry = {
       user_id: camp.user_id,
       campaign_name: camp.name,
       action_type: 'phase_advance',
-      description: `"${camp.name}" lolos Phase 1 → kampanye Phase 2a & 2b dibuat`,
+      description: `"${camp.name}" lolos Phase 1 → ${subPhaseCount} sub-phase Phase 2 dibuat`,
       status: 'success'
     };
     await sb.from('action_logs').insert(logEntry);
@@ -354,7 +355,7 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
 
 // ── Buat kampanye Phase 2a di Meta (build from scratch, bukan deep copy) ──
 // Deep copy tidak bisa ganti bid_strategy & budget type → buat baru ambil creative dari Phase 1
-async function createPhase2Campaign(camp, token, logs) {
+async function createPhase2Campaign(camp, token, logs, subPhaseConfig = {}, label = 'a') {
   if (!camp.meta_campaign_id || !token) return;
 
   try {
@@ -422,20 +423,22 @@ async function createPhase2Campaign(camp, token, logs) {
     const adsData = await adsRes.json();
     const creativeId = adsData.data?.[0]?.creative?.id;
 
-    // 4. Hitung bid amount COST_CAP = CPR Phase 1 + 10%
-    //    Fallback ke target_cpr produk + 10% kalau CPR belum ada
+    // 4. Hitung bid amount COST_CAP dari blueprint config
+    //    bid_pct = % naik/turun dari CPR Phase 1 (default +10%)
     const targetCpr = camp.products?.target_cpr;
     const baseCpr = camp.cpr || targetCpr;
-    const bidAmount = baseCpr ? Math.round(baseCpr * 1.1) : null;
+    const bidPct = subPhaseConfig.bid_pct ?? 10;
+    const bidAmount = baseCpr ? Math.round(baseCpr * (1 + bidPct / 100)) : null;
+    const p2aBudget = subPhaseConfig.budget ?? 5000000;
 
     // 5. Buat campaign CBO + Cost Cap di level kampanye
     const campBody = {
-      name: camp.name + ' — Phase 2a',
+      name: `${camp.name} — Phase 2${label.toUpperCase()}`,
       objective,
       status: 'PAUSED',
       special_ad_categories: [],
       is_adset_budget_sharing_enabled: false,
-      daily_budget: 5000000,
+      daily_budget: p2aBudget,
       bid_strategy: bidAmount ? 'COST_CAP' : 'LOWEST_COST_WITHOUT_CAP',
       access_token: token
       // bid_amount TIDAK di campaign — untuk CBO COST_CAP, bid_amount ada di adset
@@ -536,7 +539,7 @@ async function createPhase2Campaign(camp, token, logs) {
       user_id: camp.user_id,
       campaign_name: camp.name + ' — Phase 2a',
       action_type: 'create',
-      description: `Kampanye Phase 2a dibuat — Budget Rp 5.000.000, COST_CAP Rp ${bidAmount ? bidAmount.toLocaleString('id-ID') : '(tidak diset, CPR belum ada)'}`,
+      description: `Kampanye Phase 2${label.toUpperCase()} (Cost Cap) dibuat — Budget Rp ${p2aBudget.toLocaleString('id-ID')}, Bid Cap Rp ${bidAmount ? bidAmount.toLocaleString('id-ID') : '(auto)'}`,
       status: 'success'
     };
     await sb.from('action_logs').insert(logEntry);
@@ -811,7 +814,7 @@ async function runBlueprintRules(camp, targetCpr, targetRoas, token, logs) {
 }
 
 // ── Buat kampanye Phase 2b (ABO, 3 adset interest) ──
-async function createPhase2bCampaign(camp, token, product, logs) {
+async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig = {}, label = 'b') {
   if (!token || !camp.meta_campaign_id) return;
 
   try {
@@ -882,7 +885,7 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: camp.name + ' — Phase 2b',
+        name: `${camp.name} — Phase 2${phaseLabel}`,
         objective,
         status: 'ACTIVE',
         special_ad_categories: [],
@@ -898,12 +901,20 @@ async function createPhase2bCampaign(camp, token, product, logs) {
     const newCampaignId = newCampData.id;
     if (!newCampaignId) throw new Error('Gagal buat campaign 2b: ID tidak ada di response');
 
-    // 7. Buat 3 adset dengan interest berbeda
-    const categories = [
-      { key: 'manfaat', label: 'Manfaat' },
-      { key: 'perilaku', label: 'Perilaku Belanja' },
-      { key: 'hobi', label: 'Hobi' }
-    ];
+    const budgetPerAdset = subPhaseConfig.budget_per_adset ?? 50000;
+    const phaseLabel = label.toUpperCase();
+
+    // 7. Buat adset sesuai blueprint config (default: Manfaat/Perilaku/Hobi)
+    const blueprintAdsets = subPhaseConfig.adsets?.length
+      ? subPhaseConfig.adsets
+      : [{ label: 'Manfaat', type: 'interest' }, { label: 'Perilaku Belanja', type: 'interest' }, { label: 'Hobi', type: 'interest' }];
+
+    // Map label adset ke key interest untuk AI keyword generation
+    const keyMap = { 'manfaat': 'manfaat', 'manfaat kesehatan': 'manfaat', 'perilaku': 'perilaku', 'perilaku belanja': 'perilaku', 'hobi': 'hobi' };
+    const categories = blueprintAdsets.map(a => ({
+      key: keyMap[a.label?.toLowerCase()] || a.label?.toLowerCase() || 'manfaat',
+      label: a.label || 'Interest'
+    }));
 
     for (const cat of categories) {
       const catInterests = interests[cat.key] || [];
@@ -923,9 +934,9 @@ async function createPhase2bCampaign(camp, token, product, logs) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: `${camp.name} — Phase 2b ${cat.label}`,
+          name: `${camp.name} — Phase 2${phaseLabel} ${cat.label}`,
           campaign_id: newCampaignId,
-          daily_budget: 50000,
+          daily_budget: budgetPerAdset,
           billing_event: 'IMPRESSIONS',
           optimization_goal: optimizationGoal,
           bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
@@ -951,7 +962,7 @@ async function createPhase2bCampaign(camp, token, product, logs) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: `${camp.name} — Phase 2b ${cat.label}`,
+            name: `${camp.name} — Phase 2${phaseLabel} ${cat.label}`,
             adset_id: newAdsetId,
             creative: { creative_id: creativeId },
             status: 'ACTIVE',
@@ -964,14 +975,14 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       await sb.from('campaigns').insert({
         user_id: camp.user_id,
         ad_account_id: camp.ad_account_id,
-        name: `${camp.name} — Phase 2b ${cat.label}`,
+        name: `${camp.name} — Phase 2${phaseLabel} ${cat.label}`,
         status: 'ACTIVE',
         current_phase: 2,
         phase_type: '2b',
         phase_started_at: new Date().toISOString(),
         autopilot_enabled: true,
         product_id: camp.product_id,
-        daily_budget: 50000,
+        daily_budget: budgetPerAdset,
         meta_campaign_id: newCampaignId,
         meta_adset_id: newAdsetId,
         days_running: 0
@@ -982,7 +993,7 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       user_id: camp.user_id,
       campaign_name: camp.name + ' — Phase 2b',
       action_type: 'create',
-      description: `Kampanye Phase 2b dibuat — 3 adset (Manfaat, Perilaku, Hobi) @ Rp 50.000/adset`,
+      description: `Kampanye Phase 2${phaseLabel} (ABO Interest) dibuat — ${categories.length} adset @ Rp ${budgetPerAdset.toLocaleString('id-ID')}/adset`,
       status: 'success'
     };
     await sb.from('action_logs').insert(logEntry);
@@ -1130,9 +1141,9 @@ async function manualAdvancePhase(req, res) {
     // Ambil data produk untuk Phase 2b
     const product = camp.products || null;
 
-    // Buat Phase 2a dan Phase 2b dulu — baru set initial_budget kalau keduanya sukses
-    await createPhase2Campaign(camp, token, logs);
-    await createPhase2bCampaign(camp, token, product, logs);
+    // Fetch blueprint config, buat Phase 2 sesuai blueprint
+    const blueprintConfig = await fetchBlueprintConfig(camp.blueprint_id);
+    await createPhase2FromBlueprint(camp, token, product, blueprintConfig, logs);
 
     // Simpan initial_budget setelah kedua phase berhasil dibuat
     await sb.from('campaigns').update({ initial_budget: camp.daily_budget }).eq('id', camp.id);
@@ -1149,6 +1160,48 @@ async function manualAdvancePhase(req, res) {
   } catch (err) {
     console.error('manualAdvancePhase error:', err.message);
     return res.status(500).json({ error: err.message });
+  }
+}
+
+// ── Fetch blueprint config dari Supabase ──
+async function fetchBlueprintConfig(blueprintId) {
+  if (!blueprintId) return null;
+  const { data } = await sb.from('autopilot_blueprints').select('config').eq('id', blueprintId).single();
+  return data?.config || null;
+}
+
+// ── Dispatcher Phase 2: baca blueprint, buat sub-phase sesuai urutan ──
+async function createPhase2FromBlueprint(camp, token, product, blueprintConfig, logs) {
+  // Normalize phase2: new array format, old single-strategy, or fallback default
+  let subPhases = [];
+  const p2 = blueprintConfig?.phase2;
+  if (Array.isArray(p2) && p2.length) {
+    subPhases = p2;
+  } else if (p2?.strategy) {
+    // old single-strategy format
+    const s = p2.strategy;
+    if (s === 'cost_cap_abo' || s === 'cost_cap_only') subPhases.push({ strategy: 'cost_cap', budget: p2.cost_cap?.budget, bid_pct: p2.cost_cap?.bid_multiplier ? Math.round((p2.cost_cap.bid_multiplier - 1) * 100) : 10 });
+    if (s === 'cost_cap_abo' || s === 'abo_interest') subPhases.push({ strategy: 'abo_interest', adsets: p2.abo?.adsets, budget_per_adset: p2.abo?.budget_per_adset });
+    if (s === 'lookalike') subPhases.push({ strategy: 'lookalike', budget: p2.simple?.budget });
+    if (s === 'broad') subPhases.push({ strategy: 'broad', budget: p2.simple?.budget });
+  } else if (blueprintConfig?.phase2a || blueprintConfig?.phase2b) {
+    // legacy format
+    if (blueprintConfig.phase2a?.enabled !== false) subPhases.push({ strategy: 'cost_cap', budget: blueprintConfig.phase2a?.budget, bid_pct: Math.round(((blueprintConfig.phase2a?.bid_multiplier ?? 1.1) - 1) * 100) });
+    if (blueprintConfig.phase2b?.enabled !== false) subPhases.push({ strategy: 'abo_interest', adsets: blueprintConfig.phase2b?.adsets, budget_per_adset: blueprintConfig.phase2b?.budget_per_adset });
+  } else {
+    // No blueprint / blueprint tanpa phase2 → default standard
+    subPhases = [{ strategy: 'cost_cap' }, { strategy: 'abo_interest' }];
+  }
+
+  for (let idx = 0; idx < subPhases.length; idx++) {
+    const sp = subPhases[idx];
+    const label = String.fromCharCode(97 + idx); // a, b, c...
+    if (sp.strategy === 'cost_cap') {
+      await createPhase2Campaign(camp, token, logs, sp, label);
+    } else if (sp.strategy === 'abo_interest' || sp.strategy === 'cbo_interest') {
+      await createPhase2bCampaign(camp, token, product, logs, sp, label);
+    }
+    // lookalike / broad → placeholder, will be implemented later
   }
 }
 
