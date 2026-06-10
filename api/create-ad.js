@@ -41,6 +41,7 @@ export default async function handler(req, res) {
     const existingMetaCampaignId = fields.meta_campaign_id?.[0];
     const existingMetaAdsetId    = fields.meta_adset_id?.[0];
     const existingSbCampaignId   = fields.sb_campaign_id?.[0];
+    const originalFileName       = fields.file_name?.[0]; // nama file asli, dikirim dari frontend
 
     const preUploadedVideoId = fields.video_id?.[0]; // Video sudah diupload dari browser langsung ke Meta
     const thumbnailImageHash = fields.thumbnail_image_hash?.[0]; // Thumbnail di-extract & upload dari browser
@@ -392,20 +393,22 @@ export default async function handler(req, res) {
     // ── Upsert ke content_library ── track file ini untuk performa
     let contentLibraryId = null;
     try {
-      const fileName = file?.originalFilename || file?.newFilename || `content-${Date.now()}`;
+      // Prioritas nama: field file_name dari frontend → originalFilename → newFilename → fallback timestamp
+      const fileName = originalFileName || file?.originalFilename || file?.newFilename || `upload-${Date.now()}`;
       const { data: existingContent } = await sb.from('content_library')
-        .select('id').eq('user_id', userId).eq('name', fileName).single();
+        .select('id').eq('user_id', userId).eq('name', fileName).maybeSingle();
       if (existingContent) {
         contentLibraryId = existingContent.id;
         await sb.from('content_library').update({ status: 'used' }).eq('id', contentLibraryId);
       } else {
-        const { data: newContent } = await sb.from('content_library').insert({
+        const { data: newContent, error: libErr } = await sb.from('content_library').insert({
           user_id: userId,
           name: fileName,
           content_type: fileType || 'image',
           status: 'used',
-          gdrive_url: null
+          gdrive_url: ''  // empty string agar tidak gagal kalau kolom NOT NULL
         }).select('id').single();
+        if (libErr) console.error('content_library insert error:', libErr.message);
         contentLibraryId = newContent?.id;
       }
     } catch (e) { console.error('content_library upsert failed (non-fatal):', e.message); }
