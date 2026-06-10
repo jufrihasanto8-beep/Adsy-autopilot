@@ -38,9 +38,10 @@ export default async function handler(req, res) {
 
     // Ambil semua kampanye aktif dengan autopilot, join ke products untuk target CPR
     const { data: campaigns } = await sb.from('campaigns')
-      .select('*, products(target_cpr, target_roas)')
+      .select('*, products(target_cpr, target_roas, target_cpr_ctwa)')
       .eq('status', 'ACTIVE')
-      .eq('autopilot_enabled', true);
+      .eq('autopilot_enabled', true)
+      .neq('campaign_type', 'ctwa'); // CTWA autopilot belum dibangun, skip dulu
 
     if (!campaigns?.length) {
       return res.status(200).json({ success: true, actions_taken: 0, message: 'Tidak ada kampanye autopilot aktif' });
@@ -57,11 +58,13 @@ export default async function handler(req, res) {
 
         // Re-fetch kampanye setelah sync untuk data terbaru
         const { data: fresh } = await sb.from('campaigns')
-          .select('*, products(target_cpr, target_roas)')
+          .select('*, products(target_cpr, target_roas, target_cpr_ctwa)')
           .eq('id', camp.id).single();
         if (!fresh) continue;
 
-        const targetCpr  = fresh.products?.target_cpr || null;
+        const targetCpr = fresh.campaign_type === 'ctwa'
+          ? (fresh.products?.target_cpr_ctwa || null)
+          : (fresh.products?.target_cpr || null);
         const targetRoas = fresh.products?.target_roas || null;
         const impressions = fresh.impressions || 0;
 
@@ -199,13 +202,11 @@ async function syncCampaignInsights(camp, token) {
     const spend       = parseFloat(insight.spend || 0); // Meta return IDR langsung untuk akun IDR
     const ctr         = parseFloat(insight.ctr || 0);
 
-    // CPR = spend / results (sama persis dengan Ads Manager)
+    // CPR = spend / results — deteksi berdasarkan campaign_type
     const actions = insight.actions || [];
-    const resultAction = actions.find(x =>
-      x.action_type === 'offsite_conversion.fb_pixel_purchase' ||
-      x.action_type === 'lead' ||
-      x.action_type === 'post_engagement'
-    );
+    const resultAction = camp.campaign_type === 'ctwa'
+      ? actions.find(x => x.action_type === 'onsite_conversion.messaging_conversation_started_7d')
+      : actions.find(x => x.action_type === 'offsite_conversion.fb_pixel_purchase' || x.action_type === 'lead');
     const results = parseInt(resultAction?.value || 0);
     // cpr = null kalau spend ada tapi konversi 0 (bukan sekadar belum ada data)
     // undefined = jangan update DB (spend 0 = belum ada data hari ini)

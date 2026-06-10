@@ -44,10 +44,7 @@ export default async function handler(req, res) {
         if (insight.error || !insight.data || insight.data.length === 0) continue;
 
         const d = insight.data[0];
-        // Hitung results: purchase → lead (tidak pakai link_click)
-        const results = d.actions?.find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value
-          || d.actions?.find(a => a.action_type === 'lead')?.value
-          || 0;
+        const results = getResults(d.actions, camp.campaign_type);
         const cpr = results > 0 ? parseFloat(d.spend) / results : null;
 
         // Update campaign
@@ -84,7 +81,7 @@ async function fetchRangeInsights(req, res) {
   if (!token) return res.status(400).json({ error: 'Token Meta belum dikonfigurasi' });
 
   const { data: campaigns } = await sb.from('campaigns')
-    .select('id, name, meta_campaign_id, meta_adset_id, current_phase, status, daily_budget')
+    .select('id, name, meta_campaign_id, meta_adset_id, current_phase, status, daily_budget, campaign_type')
     .eq('user_id', userId)
     .not('meta_campaign_id', 'is', null);
 
@@ -124,7 +121,7 @@ async function fetchRangeInsights(req, res) {
         }
         return 0;
       };
-      const resultCount = getAction('offsite_conversion.fb_pixel_purchase', 'lead');
+      const resultCount = getResults(actions, camp.campaign_type);
       const cpr = resultCount > 0 ? Math.round(spend / resultCount) : null;
 
       totalSpend += spend;
@@ -204,10 +201,10 @@ async function getTokenAndCampaigns(user_id, campaign_id) {
   const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
   let campaigns = [];
   if (campaign_id) {
-    const { data } = await sb.from('campaigns').select('id,name,meta_campaign_id').eq('id', campaign_id).not('meta_campaign_id','is',null).single();
+    const { data } = await sb.from('campaigns').select('id,name,meta_campaign_id,campaign_type').eq('id', campaign_id).not('meta_campaign_id','is',null).single();
     if (data) campaigns = [data];
   } else {
-    const { data } = await sb.from('campaigns').select('id,name,meta_campaign_id').eq('user_id', user_id).not('meta_campaign_id','is',null);
+    const { data } = await sb.from('campaigns').select('id,name,meta_campaign_id,campaign_type').eq('user_id', user_id).not('meta_campaign_id','is',null);
     campaigns = data || [];
   }
   return { token, campaigns };
@@ -219,10 +216,14 @@ function buildTimeParam(since, until) {
     : `date_preset=last_30_days`;
 }
 
-function getResults(actions) {
+function getResults(actions, campaignType) {
+  const acts = actions || [];
+  if (campaignType === 'ctwa') {
+    return parseInt(acts.find(a => a.action_type === 'onsite_conversion.messaging_conversation_started_7d')?.value || 0);
+  }
   return parseInt(
-    (actions || []).find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value ||
-    (actions || []).find(a => a.action_type === 'lead')?.value || 0
+    acts.find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value ||
+    acts.find(a => a.action_type === 'lead')?.value || 0
   );
 }
 
@@ -246,7 +247,7 @@ async function fetchDailyTrend(req, res) {
         const d = item.date_start;
         if (!dateMap[d]) dateMap[d] = { date: d, spend: 0, results: 0 };
         dateMap[d].spend   += parseFloat(item.spend || 0);
-        dateMap[d].results += getResults(item.actions);
+        dateMap[d].results += getResults(item.actions, camp.campaign_type);
       }
     } catch (e) {}
   }));
@@ -275,7 +276,7 @@ async function fetchDemoBreakdown(req, res) {
         const key = `${item.age}__${item.gender}`;
         if (!demoMap[key]) demoMap[key] = { age: item.age, gender: item.gender, spend: 0, results: 0 };
         demoMap[key].spend   += parseFloat(item.spend || 0);
-        demoMap[key].results += getResults(item.actions);
+        demoMap[key].results += getResults(item.actions, camp.campaign_type);
       }
     } catch (e) {}
   }));
@@ -305,7 +306,7 @@ async function fetchPlacementBreakdown(req, res) {
         if (!placeMap[key]) placeMap[key] = { platform: item.publisher_platform, position: item.platform_position, spend: 0, impressions: 0, results: 0 };
         placeMap[key].spend       += parseFloat(item.spend || 0);
         placeMap[key].impressions += parseInt(item.impressions || 0);
-        placeMap[key].results     += getResults(item.actions);
+        placeMap[key].results     += getResults(item.actions, camp.campaign_type);
       }
     } catch (e) {}
   }));
