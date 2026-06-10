@@ -400,7 +400,7 @@
   }
 
   async function loadCampaigns() {
-    let q = sb.from('campaigns').select('*, content_library(name)').order('created_at', { ascending: false });
+    let q = sb.from('campaigns').select('*, content_library(name), autopilot_blueprints(name)').order('created_at', { ascending: false });
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
     const { data } = await q;
     allCampaigns = data || [];
@@ -526,6 +526,7 @@
           <span class="badge ${phaseBadge[c.current_phase] || 'badge-gray'}">
             P${c.current_phase || 1}: ${phaseLabel[c.current_phase] || 'Testing'}
           </span>
+          ${c.autopilot_blueprints?.name ? `<div style="font-size:10px;color:var(--gray-5);margin-top:3px;">🧬 ${c.autopilot_blueprints.name}</div>` : ''}
         </td>
         <td>
           <div style="display:flex; align-items:center; gap:6px;">
