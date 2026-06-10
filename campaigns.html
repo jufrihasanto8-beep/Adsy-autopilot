@@ -384,7 +384,8 @@
     });
 
     await loadAdAccountLabels();
-    await syncMeta(true); // auto-sync live data dari Meta saat halaman dibuka (silent)
+    await loadCampaigns();        // load DB dulu — cepat, langsung tampil
+    syncMeta(true);               // sync Meta di background — tidak ditunggu
   }
 
   async function loadCampaigns() {
