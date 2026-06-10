@@ -33,6 +33,9 @@ export default async function handler(req, res) {
   const logs = [];
 
   try {
+    // ── Cek status billing semua ad account ──
+    await checkAdAccountStatuses();
+
     // ── Sync status kampanye dari Meta (pause/delete) sebelum rules engine jalan ──
     await syncAllCampaignsFromMeta();
 
@@ -1330,5 +1333,91 @@ async function sendWASummary(count, logs) {
     }
   } catch (err) {
     console.error('WA summary error:', err.message);
+  }
+}
+
+// ── Cek status billing semua ad account, notif WA kalau bermasalah ──
+async function checkAdAccountStatuses() {
+  try {
+    // Ambil semua ad account unik per user
+    const { data: accounts } = await sb.from('ad_accounts').select('user_id, ad_account_id');
+    if (!accounts?.length) return;
+
+    // Deduplikasi per user + ad_account
+    const pairs = [...new Map(accounts.map(a => [`${a.user_id}|${a.ad_account_id}`, a])).values()];
+
+    const STATUS_LABEL = {
+      2: 'DISABLED ❌ — akun dinonaktifkan',
+      3: 'UNSETTLED ⚠️ — tagihan belum dibayar',
+      7: 'PENDING REVIEW 🔍 — sedang direview Meta',
+      9: 'IN GRACE PERIOD 🕐 — masa tenggang, segera bayar',
+    };
+
+    for (const { user_id, ad_account_id } of pairs) {
+      try {
+        const { data: config } = await sb.from('app_config')
+          .select('meta_token, fonnte_token, wa_number').eq('user_id', user_id).single();
+        const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
+        if (!token) continue;
+
+        // Cek status akun ke Meta
+        const r = await fetch(
+          `${META_API}/${ad_account_id}?fields=account_status,name,currency&access_token=${encodeURIComponent(token)}`
+        );
+        const data = await r.json();
+        if (data.error || data.account_status === 1) continue; // 1 = ACTIVE, aman
+
+        const statusText = STATUS_LABEL[data.account_status] || `STATUS ${data.account_status}`;
+        const accName = data.name || ad_account_id;
+
+        // Cek apakah sudah pernah notif dalam 6 jam terakhir (hindari spam)
+        const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+        const { data: recentLog } = await sb.from('action_logs')
+          .select('id').eq('user_id', user_id).eq('action_type', 'billing_alert')
+          .eq('campaign_name', ad_account_id).gte('created_at', sixHoursAgo).maybeSingle();
+        if (recentLog) continue; // Sudah dinotif, skip
+
+        const message = `⚠️ *Adsy Autopilot — Billing Alert*\n\nAd Account *${accName}* bermasalah:\n*${statusText}*\n\nIklan kemungkinan sudah berhenti atau akan segera berhenti.\n\n👉 Segera cek di:\nbusiness.facebook.com → Billing & Payments`;
+
+        // Kirim WA ke user
+        if (config?.fonnte_token && config?.wa_number) {
+          await fetch('https://api.fonnte.com/send', {
+            method: 'POST',
+            headers: { 'Authorization': config.fonnte_token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target: config.wa_number, message })
+          });
+        }
+
+        // Kirim WA ke admin (kalau beda dari user)
+        const { data: admins } = await sb.from('profiles')
+          .select('id').in('role', ['admin', 'superadmin']).neq('id', user_id);
+        for (const admin of (admins || [])) {
+          const { data: adminCfg } = await sb.from('app_config')
+            .select('fonnte_token, wa_number').eq('user_id', admin.id).single();
+          if (adminCfg?.fonnte_token && adminCfg?.wa_number) {
+            await fetch('https://api.fonnte.com/send', {
+              method: 'POST',
+              headers: { 'Authorization': adminCfg.fonnte_token, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ target: adminCfg.wa_number, message: `[Info Admin]\n${message}` })
+            });
+          }
+        }
+
+        // Simpan ke action_logs sebagai billing_alert
+        await sb.from('action_logs').insert({
+          user_id,
+          campaign_id: null,
+          campaign_name: ad_account_id,
+          action_type: 'billing_alert',
+          description: `Ad Account ${accName}: ${statusText}`,
+          status: 'success'
+        });
+
+      } catch (e) {
+        console.error('checkAdAccountStatuses error:', ad_account_id, e.message);
+      }
+    }
+  } catch (e) {
+    console.error('checkAdAccountStatuses fatal:', e.message);
   }
 }
