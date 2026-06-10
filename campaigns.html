@@ -151,7 +151,7 @@
                 <th>Phase</th>
                 <th>Budget/Hari</th>
                 <th>Spend</th>
-                <th>Hasil</th>
+                <th>Hasil / Chat</th>
                 <th>CPR</th>
                 <th>CTR</th>
                 <th>Status</th>
@@ -521,7 +521,7 @@
           </div>
         </td>
         <td>${formatRupiah(spend)}</td>
-        <td>${results > 0 ? results : '-'}</td>
+        <td title="${c.campaign_type === 'ctwa' ? 'Percakapan WA' : 'Purchase/Lead'}">${results > 0 ? results : '-'} <span style="font-size:10px;color:var(--gray-5);">${c.campaign_type === 'ctwa' ? '💬' : ''}</span></td>
         <td>${cpr ? formatRupiah(cpr) : '-'}</td>
         <td>${ctr ? parseFloat(ctr).toFixed(2) + '%' : '-'}</td>
         <td>

@@ -168,13 +168,23 @@
         <div style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:12px;">🎯 TARGET AUTOPILOT</div>
         <div class="form-row">
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Target CPR <span>*</span></label>
+            <label class="form-label">Target CPR Form/Purchase <span>*</span></label>
             <div style="position:relative;">
               <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--gray-6);">Rp</span>
               <input type="number" class="form-input" id="p-target-cpr" placeholder="50000" style="padding-left:36px;" />
             </div>
-            <div class="form-hint">Batas maksimal biaya per hasil yang masih dianggap bagus</div>
+            <div class="form-hint">Batas biaya per purchase / lead</div>
           </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Target CPR CTWA <span style="font-weight:400; color:var(--gray-5);">(opsional)</span></label>
+            <div style="position:relative;">
+              <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--gray-6);">Rp</span>
+              <input type="number" class="form-input" id="p-target-cpr-ctwa" placeholder="15000" style="padding-left:36px;" />
+            </div>
+            <div class="form-hint">Batas biaya per percakapan WA dimulai</div>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:12px;">
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Target ROAS <span style="font-weight:400; color:var(--gray-5);">(opsional)</span></label>
             <div style="position:relative;">
@@ -183,6 +193,7 @@
             </div>
             <div class="form-hint">Return on Ad Spend minimum (opsional)</div>
           </div>
+          <div class="form-group" style="margin-bottom:0;"></div>
         </div>
       </div>
 
@@ -282,18 +293,25 @@
           ${p.price ? `<span class="badge badge-gray" style="font-size:10px;">💰 ${p.price}</span>` : ''}
         </div>
 
-        <div style="display:flex; gap:8px; margin-bottom:14px; padding:10px 12px; background:var(--primary-light); border-radius:8px;">
-          <div style="flex:1; text-align:center;">
-            <div style="font-size:10px; font-weight:600; color:var(--primary); text-transform:uppercase; letter-spacing:0.5px;">Target CPR</div>
-            <div style="font-size:14px; font-weight:700; color:var(--primary); margin-top:2px;">
-              ${p.target_cpr ? 'Rp ' + Number(p.target_cpr).toLocaleString('id-ID') : '<span style="color:var(--danger); font-size:12px;">Belum diset</span>'}
+        <div style="display:flex; gap:8px; margin-bottom:14px; padding:10px 12px; background:var(--primary-light); border-radius:8px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:80px; text-align:center;">
+            <div style="font-size:10px; font-weight:600; color:var(--primary); text-transform:uppercase; letter-spacing:0.5px;">CPR Form</div>
+            <div style="font-size:13px; font-weight:700; color:var(--primary); margin-top:2px;">
+              ${p.target_cpr ? 'Rp ' + Number(p.target_cpr).toLocaleString('id-ID') : '<span style="color:var(--danger); font-size:11px;">Belum diset</span>'}
+            </div>
+          </div>
+          <div style="width:1px; background:var(--gray-3);"></div>
+          <div style="flex:1; min-width:80px; text-align:center;">
+            <div style="font-size:10px; font-weight:600; color:#10B981; text-transform:uppercase; letter-spacing:0.5px;">CPR CTWA</div>
+            <div style="font-size:13px; font-weight:700; color:#10B981; margin-top:2px;">
+              ${p.target_cpr_ctwa ? 'Rp ' + Number(p.target_cpr_ctwa).toLocaleString('id-ID') : '<span style="color:var(--gray-4); font-size:11px;">-</span>'}
             </div>
           </div>
           ${p.target_roas ? `
           <div style="width:1px; background:var(--gray-3);"></div>
-          <div style="flex:1; text-align:center;">
-            <div style="font-size:10px; font-weight:600; color:var(--primary); text-transform:uppercase; letter-spacing:0.5px;">Target ROAS</div>
-            <div style="font-size:14px; font-weight:700; color:var(--primary); margin-top:2px;">${p.target_roas}×</div>
+          <div style="flex:1; min-width:60px; text-align:center;">
+            <div style="font-size:10px; font-weight:600; color:var(--primary); text-transform:uppercase; letter-spacing:0.5px;">ROAS</div>
+            <div style="font-size:13px; font-weight:700; color:var(--primary); margin-top:2px;">${p.target_roas}×</div>
           </div>` : ''}
         </div>
 
@@ -320,7 +338,7 @@
   }
 
   function resetForm() {
-    ['p-name','p-tagline','p-benefits','p-audience','p-price','p-promo','p-restrictions','p-notes','p-target-cpr','p-target-roas']
+    ['p-name','p-tagline','p-benefits','p-audience','p-price','p-promo','p-restrictions','p-notes','p-target-cpr','p-target-cpr-ctwa','p-target-roas']
       .forEach(id => document.getElementById(id).value = '');
     document.getElementById('p-tone').value = 'santai';
     document.getElementById('p-cta').value = 'Hubungi Sekarang';
@@ -336,6 +354,7 @@
     btn.disabled = true; btn.textContent = 'Menyimpan...';
 
     const targetCpr = parseFloat(document.getElementById('p-target-cpr').value);
+    const targetCprCtwa = parseFloat(document.getElementById('p-target-cpr-ctwa').value);
     const targetRoas = parseFloat(document.getElementById('p-target-roas').value);
     if (!targetCpr) {
       btn.disabled = false; btn.textContent = 'Simpan Produk';
@@ -354,7 +373,8 @@
       restrictions: document.getElementById('p-restrictions').value.trim(),
       notes: document.getElementById('p-notes').value.trim(),
       is_active: document.getElementById('p-active').checked,
-      target_cpr: targetCpr,
+      target_cpr: targetCpr || null,
+      target_cpr_ctwa: targetCprCtwa || null,
       target_roas: targetRoas || null
     };
 
@@ -389,6 +409,7 @@
     document.getElementById('p-restrictions').value = p.restrictions || '';
     document.getElementById('p-notes').value = p.notes || '';
     document.getElementById('p-target-cpr').value = p.target_cpr || '';
+    document.getElementById('p-target-cpr-ctwa').value = p.target_cpr_ctwa || '';
     document.getElementById('p-target-roas').value = p.target_roas || '';
     document.getElementById('p-active').checked = p.is_active;
     openModal('modal-product');

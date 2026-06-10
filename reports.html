@@ -1074,7 +1074,7 @@
   // ── Top Konten by CPR & Konten Perlu Diganti ──
   async function loadContentAnalysis() {
     let q = sb.from('campaigns')
-      .select('id, name, cpr, spend_today, results_today, is_winner, status, current_phase, target_cpr, products:product_id(name, target_cpr), ad_copies(file_name, content_library_id)')
+      .select('id, name, cpr, spend_today, results_today, is_winner, status, current_phase, target_cpr, campaign_type, products:product_id(name, target_cpr, target_cpr_ctwa), ad_copies(file_name, content_library_id)')
       .not('spend_today', 'is', null)
       .gt('spend_today', 0);
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
@@ -1090,7 +1090,8 @@
       const copy = camp.ad_copies?.[0];
       const fileName = copy?.file_name || camp.name;
       const shortName = fileName.length > 28 ? fileName.substring(0, 26) + '…' : fileName;
-      const targetCPR = camp.target_cpr || camp.products?.target_cpr;
+      const targetCPR = camp.target_cpr ||
+        (camp.campaign_type === 'ctwa' ? camp.products?.target_cpr_ctwa : camp.products?.target_cpr);
       return { ...camp, shortName, targetCPR };
     };
 
