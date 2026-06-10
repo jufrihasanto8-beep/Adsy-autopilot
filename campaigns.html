@@ -359,8 +359,7 @@
     });
 
     await loadAdAccountLabels();
-    await loadCampaigns();
-    setLastUpdated();
+    await syncMeta(true); // auto-sync live data dari Meta saat halaman dibuka (silent)
   }
 
   async function loadCampaigns() {
@@ -575,23 +574,20 @@
 
   let insightsMap = {}; // meta_campaign_id → insight data
 
-  async function syncMeta() {
+  async function syncMeta(silent = false) {
     const btn = document.getElementById('btn-sync');
     btn.disabled = true; btn.textContent = '🔄 Loading...';
     try {
       const datePreset = document.getElementById('date-preset').value;
-      // Fetch insights dari Meta untuk range yang dipilih
       const insightRes = await fetch(`/api/meta-insights?user_id=${currentProfile.id}&date_preset=${datePreset}`);
       const insightData = await insightRes.json();
-      // Buat map meta_campaign_id → data performa
       insightsMap = {};
       for (const c of (insightData.campaigns || [])) {
         insightsMap[c.id] = c;
       }
-      // Reload campaign list dari Supabase
       await loadCampaigns();
       setLastUpdated();
-      showToast('Data diperbarui!', 'success');
+      if (!silent) showToast('Data diperbarui!', 'success');
     } catch (err) {
       showToast('Gagal refresh: ' + err.message, 'error');
     } finally {
