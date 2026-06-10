@@ -80,6 +80,7 @@
     </header>
 
     <div class="page-content">
+      <div id="token-alert"></div>
       <div class="stats-grid">
         <div class="stat-card">
           <div>
@@ -224,6 +225,38 @@
     document.getElementById('date-preset')?.addEventListener('change', () => refreshData());
   });
 
+  async function checkTokenExpiry(profile) {
+    const { data: cfg } = await sb.from('app_config')
+      .select('token_expires_at').eq('user_id', profile.id).maybeSingle();
+
+    const el = document.getElementById('token-alert');
+    if (!cfg?.token_expires_at) return;
+
+    const expiresAt = new Date(cfg.token_expires_at);
+    const now = new Date();
+    const daysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+
+    if (daysLeft > 7) return; // Masih aman, tidak perlu banner
+
+    const expired = daysLeft <= 0;
+    const bg    = expired ? '#FEE2E2' : '#FEF9C3';
+    const border= expired ? '#FCA5A5' : '#FDE047';
+    const icon  = expired ? '🔴' : '⚠️';
+    const text  = expired
+      ? `Token Meta kamu sudah <strong>expired</strong>. Autopilot tidak berfungsi.`
+      : `Token Meta kamu akan expired dalam <strong>${daysLeft} hari</strong>. Perbarui sebelum autopilot berhenti.`;
+
+    el.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;
+        background:${bg}; border:1px solid ${border}; border-radius:10px;
+        padding:12px 16px; margin-bottom:20px; font-size:13px;">
+        <span>${icon} ${text}</span>
+        <a href="settings.html" class="btn btn-outline" style="font-size:12px; padding:5px 14px; white-space:nowrap; flex-shrink:0;">
+          Perbarui Token →
+        </a>
+      </div>`;
+  }
+
   async function init() {
     sb = await getSupabase();
     const session = await requireAuth();
@@ -236,6 +269,7 @@
     loadActionLog(profile);
     loadRecentContent(profile);
     setLastUpdated();
+    checkTokenExpiry(profile);
   }
 
   async function loadStats(profile) {
