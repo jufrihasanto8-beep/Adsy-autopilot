@@ -182,6 +182,18 @@
     </div>
     <div class="modal-body" style="padding:0;">
 
+      <!-- Autopilot Toggle -->
+      <div style="padding:16px 24px;border-bottom:1px solid var(--gray-3);display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-weight:600;font-size:14px;">🤖 Autopilot</div>
+          <div style="font-size:12px;color:var(--gray-5);margin-top:2px;" id="detail-autopilot-desc">-</div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <span style="font-size:13px;color:var(--gray-5);" id="detail-autopilot-label">OFF</span>
+          <div class="ap-toggle" id="detail-autopilot-toggle" onclick="toggleAutopilotDetail()"></div>
+        </label>
+      </div>
+
       <!-- Performa -->
       <div style="padding:20px 24px;border-bottom:1px solid var(--gray-3);">
         <div style="font-size:11px;font-weight:700;color:var(--gray-5);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Performa Hari Ini</div>
@@ -512,16 +524,10 @@
         <td>${cpr ? formatRupiah(cpr) : '-'}</td>
         <td>${ctr ? parseFloat(ctr).toFixed(2) + '%' : '-'}</td>
         <td>
-          <div style="display:flex; flex-direction:column; gap:5px; align-items:flex-start;">
-            <span class="badge ${c.status === 'ACTIVE' ? 'badge-success' : c.status === 'PAUSED' ? 'badge-warning' : 'badge-gray'}">
-              <span class="badge-dot"></span>
-              ${c.status === 'ACTIVE' ? 'Aktif' : c.status === 'PAUSED' ? 'Paused' : c.status}
-            </span>
-            <label style="display:flex; align-items:center; gap:5px; cursor:pointer;" title="${c.autopilot_enabled ? 'Autopilot aktif' : 'Autopilot nonaktif'}">
-              <div class="ap-toggle ${c.autopilot_enabled ? 'ap-toggle-on' : ''}" onclick="toggleAutopilot('${c.id}', ${c.autopilot_enabled})"></div>
-              <span style="font-size:11px; color:${c.autopilot_enabled ? 'var(--primary)' : 'var(--gray-5)'};">🤖 Auto</span>
-            </label>
-          </div>
+          <span class="badge ${c.status === 'ACTIVE' ? 'badge-success' : c.status === 'PAUSED' ? 'badge-warning' : 'badge-gray'}">
+            <span class="badge-dot"></span>
+            ${c.status === 'ACTIVE' ? 'Aktif' : c.status === 'PAUSED' ? 'Paused' : c.status}
+          </span>
         </td>
         <td>
           <div style="display:flex; gap:6px;">
@@ -742,8 +748,41 @@
     }
   };
 
+  let detailCampaignId = null; // track kampanye yang sedang dibuka di modal
+
+  function setAutopilotToggle(enabled) {
+    const toggle = document.getElementById('detail-autopilot-toggle');
+    const label = document.getElementById('detail-autopilot-label');
+    const desc = document.getElementById('detail-autopilot-desc');
+    toggle.classList.toggle('ap-toggle-on', enabled);
+    label.textContent = enabled ? 'ON' : 'OFF';
+    label.style.color = enabled ? 'var(--primary)' : 'var(--gray-5)';
+    desc.textContent = enabled ? 'Autopilot aktif — budget & status dikontrol otomatis' : 'Autopilot nonaktif — kontrol manual';
+  }
+
+  window.toggleAutopilotDetail = async function() {
+    if (!detailCampaignId) return;
+    const camp = allCampaigns.find(c => c.id === detailCampaignId);
+    if (!camp) return;
+    const newState = !camp.autopilot_enabled;
+    try {
+      const { error } = await sb.from('campaigns').update({ autopilot_enabled: newState }).eq('id', detailCampaignId);
+      if (error) throw error;
+      camp.autopilot_enabled = newState;
+      setAutopilotToggle(newState);
+      // Update badge di header modal
+      document.getElementById('detail-badges').querySelectorAll('.badge').forEach(b => {
+        if (b.textContent.includes('Autopilot')) b.remove();
+      });
+      showToast(`Autopilot ${newState ? 'diaktifkan' : 'dinonaktifkan'}`, 'success');
+    } catch (e) {
+      showToast('Gagal: ' + e.message, 'error');
+    }
+  };
+
   window.viewDetail = async function(id) {
     openModal('modal-detail');
+    detailCampaignId = id;
 
     // Reset
     document.getElementById('detail-name').textContent = 'Memuat...';
@@ -752,6 +791,7 @@
     document.getElementById('detail-info').innerHTML = '';
     document.getElementById('detail-ads').innerHTML = '<div style="color:var(--gray-5);font-size:13px;">Memuat...</div>';
     document.getElementById('detail-logs').innerHTML = '<div style="color:var(--gray-5);font-size:13px;">Memuat...</div>';
+    setAutopilotToggle(false);
 
     try {
       // Fetch campaign
@@ -765,9 +805,9 @@
       document.getElementById('detail-badges').innerHTML = `
         <span class="badge ${c.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}"><span class="badge-dot"></span>${c.status === 'ACTIVE' ? 'Aktif' : 'Paused'}</span>
         <span class="badge ${phaseBadge[c.current_phase] || 'badge-gray'}">Phase ${c.current_phase || 1}: ${phaseLabel[c.current_phase] || 'Testing'}</span>
-        ${c.autopilot_enabled ? '<span class="badge badge-primary">🤖 Autopilot ON</span>' : '<span class="badge badge-gray">Autopilot OFF</span>'}
         ${c.is_winner ? '<span class="badge badge-success">🏆 Winner</span>' : ''}
       `;
+      setAutopilotToggle(c.autopilot_enabled);
 
       // Performa
       document.getElementById('detail-spend').textContent = formatRupiah(c.spend_today);
