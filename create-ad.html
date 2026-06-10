@@ -838,11 +838,13 @@
           }
           formData.append('video_id', videoData.id);
           formData.append('file_type', 'video');
+          formData.append('file_name', item.file.name);
           if (thumbnailHash) formData.append('thumbnail_image_hash', thumbnailHash);
           btn.innerHTML = `<div class="loading-spinner"></div> Publishing...`;
         } else {
           formData.append('file', item.file);
           formData.append('file_type', item.type);
+          formData.append('file_name', item.file.name);
         }
 
         formData.append('headline', item.headline);
