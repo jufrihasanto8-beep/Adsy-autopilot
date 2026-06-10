@@ -858,8 +858,11 @@ async function createPhase2bCampaign(camp, token, product, logs) {
       promotedObject = { page_id: pageId };
     }
 
-    // 4. Cari & kategorikan interest via Meta + Claude (pola AdStudio)
-    const interests = await searchInterestsPerCategory(null, token, product);
+    // 4. Generate keyword per kategori via Claude
+    const keywords = await generateInterestKeywords(product);
+
+    // 5. Cari interest di Meta per kategori
+    const interests = await searchInterestsPerCategory(keywords, token);
 
     // Log interests yang ditemukan supaya bisa debug
     const interestSummary = Object.entries(interests).map(([k, v]) => `${k}: ${v.length} (${v.slice(0,2).map(i=>i.name).join(', ')})`).join(' | ');
@@ -994,196 +997,102 @@ async function createPhase2bCampaign(camp, token, product, logs) {
   }
 }
 
-// ── Cari & kategorikan interest Phase 2b via Meta + Claude (pola AdStudio) ──
-async function searchInterestsPerCategory(_, token, product) {
-  const junk = [
-    /akses facebook/i, /perangkat seluler/i, /perangkat android/i,
-    /perangkat ios/i, /pengguna perangkat/i, /teman penggemar/i,
-    /teman dari teman/i, /ulang tahun/i, /administrator halaman/i
-  ];
-  const seen = new Set();
-  let allInterests = [];
-
-  function addInterest(item, tag) {
-    if (!item.id || !item.name) return;
-    if (seen.has(item.id)) return;
-    if (junk.some(p => p.test(item.name))) return;
-    seen.add(item.id);
-    allInterests.push({ id: item.id, name: item.name, audience_size: item.audience_size || 0, tag });
-  }
-
-  // ── 1. Claude ekstrak keyword search dari produk ──
-  // Mirip user ngetik di AdStudio: "shampoo", "rambut rontok", dll
-  const productName = product?.name || '';
-  let searchTerms = [];
-  try {
-    const kwRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        messages: [{
-          role: 'user',
-          content: `Produk: "${productName}"
-Manfaat: ${product?.benefits || '-'}
-
-Buat 8 kata kunci pencarian untuk mencari audience di Meta Ads. Kata kunci harus:
-- Kata/frasa singkat (1-3 kata) yang mewakili KATEGORI atau TOPIK produk ini
-- Campuran bahasa Indonesia dan Inggris
-- Contoh untuk shampoo rambut beruban: ["shampoo", "rambut", "hair care", "perawatan rambut", "rambut sehat", "hair treatment", "vitamin rambut", "keramas"]
-
-HANYA array JSON: ["...","...","...","...","...","...","...","..."]`
-        }]
-      })
-    });
-    const kwData = await kwRes.json();
-    const kwText = kwData.content?.[0]?.text || '[]';
-    const kwMatch = kwText.match(/\[[\s\S]*\]/);
-    if (kwMatch) searchTerms = JSON.parse(kwMatch[0]);
-  } catch (e) {}
-
-  // Fallback: split nama produk per kata
-  if (!searchTerms.length) {
-    searchTerms = [productName, ...productName.split(/\s+/).filter(w => w.length > 2)];
-  }
-
-  // Search Meta untuk semua keyword (mirip AdStudio)
-  const initialFetches = searchTerms.map(term =>
-    fetch(`${META_API}/search?type=adinterest&q=${encodeURIComponent(term)}&limit=100&locale=id_ID&access_token=${encodeURIComponent(token)}`)
-      .then(r => r.json()).catch(() => ({ data: [] }))
-  );
-  const initialResults = await Promise.all(initialFetches);
-  initialResults.forEach(r => (r.data || []).forEach(i => addInterest(i, 'direct')));
-  console.log(`Phase 2b search terms: ${searchTerms.join(', ')} → ${allInterests.length} interests`);
-
-  // ── 2. Suggestion ronde 1 dari hasil awal ──
-  if (allInterests.length > 0) {
-    try {
-      const seedNames = allInterests.slice(0, 10).map(i => i.name);
-      const sugg1 = await fetch(
-        `${META_API}/search?type=adinterestsuggestion&interest_list=${encodeURIComponent(JSON.stringify(seedNames))}&locale=id_ID&access_token=${encodeURIComponent(token)}`
-      ).then(r => r.json()).catch(() => ({ data: [] }));
-      (sugg1.data || []).forEach(i => addInterest(i, 'suggested'));
-    } catch (e) {}
-  }
-
-  // ── 3. Claude generate lifestyle/behavior terms (campuran ID + EN) ──
-  let behaviorTerms = [];
-  try {
-    const behaviorRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 800,
-        messages: [{
-          role: 'user',
-          content: `Produk: "${productName}".
-Manfaat: ${product?.benefits || '-'}
-
-Pikirkan konkret: orang yang beli "${productName}" itu dalam kesehariannya:
-- Pakai/bawa apa? (merek produk sejenis, aksesoris)
-- Pergi ke mana? (toko, komunitas, tempat)
-- Melakukan apa? (hobi, aktivitas, olahraga)
-- Beli apa lagi? (produk pelengkap)
-- Konsumsi apa? (media, konten, makanan)
-
-Berikan 30 kata kunci — campuran bahasa Indonesia DAN Inggris karena Meta punya kedua bahasa.
-HANYA array JSON, tanpa penjelasan: ["kata1","kata2",...]`
-        }]
-      })
-    });
-    const bData = await behaviorRes.json();
-    const bText = bData.content?.[0]?.text || '[]';
-    const bMatch = bText.match(/\[[\s\S]*\]/);
-    if (bMatch) behaviorTerms = JSON.parse(bMatch[0]);
-  } catch (e) { console.error('behavior terms error:', e.message); }
-
-  // ── 4. Search Meta untuk behavior terms ──
-  if (behaviorTerms.length > 0) {
-    const behaviorFetches = behaviorTerms.map(term =>
-      fetch(`${META_API}/search?type=adinterest&q=${encodeURIComponent(term)}&limit=15&locale=id_ID&access_token=${encodeURIComponent(token)}`)
-        .then(r => r.json()).catch(() => ({ data: [] }))
-    );
-    const behaviorResults = await Promise.all(behaviorFetches);
-    behaviorResults.forEach(r => (r.data || []).forEach(i => addInterest(i, 'behavior')));
-  }
-
-  // ── 5. Suggestion ronde 2 dari behavior results ──
-  const behaviorFound = allInterests.filter(i => i.tag === 'behavior').slice(0, 8);
-  if (behaviorFound.length > 0) {
-    try {
-      const sugg2 = await fetch(
-        `${META_API}/search?type=adinterestsuggestion&interest_list=${encodeURIComponent(JSON.stringify(behaviorFound.map(i => i.name)))}&locale=id_ID&access_token=${encodeURIComponent(token)}`
-      ).then(r => r.json()).catch(() => ({ data: [] }));
-      (sugg2.data || []).forEach(i => addInterest(i, 'suggested2'));
-    } catch (e) {}
-  }
-
-  console.log(`Phase 2b: total ${allInterests.length} interests found before categorization`);
-
-  // ── 6. Claude kategorikan semua interest ke 3 adset ──
+// ── Generate keyword interest per kategori via Claude ──
+async function generateInterestKeywords(product) {
   const fallback = {
-    manfaat: allInterests.filter(i => i.tag === 'direct').slice(0, 8),
-    perilaku: allInterests.filter(i => i.tag === 'behavior').slice(0, 8),
-    hobi: allInterests.filter(i => i.tag === 'suggested' || i.tag === 'suggested2').slice(0, 8),
+    manfaat: product?.name ? [product.name, ...product.name.split(/\s+/).filter(w => w.length > 2)] : [],
+    perilaku: ['Online shopping', 'E-commerce', 'Shopee', 'Tokopedia', 'Lazada'],
+    hobi: ['Health and wellness', 'Beauty', 'Fashion', 'Lifestyle']
   };
 
-  if (allInterests.length === 0) return fallback;
+  if (!product) return fallback;
 
   try {
-    const interestList = allInterests.slice(0, 80)
-      .map(i => `- ${i.name} (${i.audience_size ? (i.audience_size/1000000).toFixed(1)+'M' : '?'})`)
-      .join('\n');
-
-    const catRes = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1500,
-        messages: [{
-          role: 'user',
-          content: `Produk: "${productName}".
+        max_tokens: 500,
+        messages: [{ role: 'user', content: `You are a Meta Ads expert for Indonesia. Based on the product below, generate 5 English interest keywords per category for Meta Ads interest targeting.
 
-Kategorikan interest berikut ke 3 grup adset Meta Ads. Pilih 6-8 interest terbaik per kategori:
-- "manfaat": interest terkait manfaat/tema produk (topik, merek sejenis, media relevan)
-- "perilaku": interest terkait perilaku belanja online & marketplace
-- "hobi": interest terkait hobi & gaya hidup pembeli
+Product name: ${product.name}
+Tagline: ${product.tagline || '-'}
+Benefits: ${product.benefits || '-'}
 
-Interest yang tersedia:
-${interestList}
+Rules:
+- "manfaat": related topics, product categories, or brands that buyers of this product would follow. Example for gray hair product: ["Hair care", "Shampoo", "Hair treatment", "Beauty", "Personal care"]
+- "perilaku": online shopping platforms and behaviors. Example: ["Online shopping", "E-commerce", "Shopee", "Tokopedia", "Lazada"]
+- "hobi": lifestyle or hobby interests of the target buyer. Example: ["Health and wellness", "Beauty", "Skin care", "Fashion", "Lifestyle"]
 
-Setiap interest HANYA boleh masuk 1 kategori. Return HANYA JSON:
-{"manfaat":["nama1","nama2",...],"perilaku":["nama1","nama2",...],"hobi":["nama1","nama2",...]}`
-        }]
+Return ONLY a JSON object, no explanation:
+{"manfaat":["...","...","...","...","..."],"perilaku":["...","...","...","...","..."],"hobi":["...","...","...","...","..."]}` }]
       })
     });
-    const catData = await catRes.json();
-    const catText = catData.content?.[0]?.text || '{}';
-    const catMatch = catText.match(/\{[\s\S]*\}/);
-    if (!catMatch) return fallback;
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '{}';
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return fallback;
 
-    const categorized = JSON.parse(catMatch[0]);
-    const nameToInterest = Object.fromEntries(allInterests.map(i => [i.name, i]));
-
-    const result = { manfaat: [], perilaku: [], hobi: [] };
-    for (const cat of ['manfaat', 'perilaku', 'hobi']) {
-      (categorized[cat] || []).forEach(name => {
-        const found = nameToInterest[name];
-        if (found) result[cat].push(found);
-      });
-      // Fallback kalau kategori kosong
-      if (result[cat].length === 0) result[cat] = fallback[cat];
-    }
-
-    console.log(`Phase 2b categorized: manfaat=${result.manfaat.length}, perilaku=${result.perilaku.length}, hobi=${result.hobi.length}`);
-    return result;
-  } catch (e) {
-    console.error('categorize interests error:', e.message);
+    const parsed = JSON.parse(match[0]);
+    // Tambah nama produk + tiap kata sebagai search term untuk manfaat (pola AdStudio)
+    const productWords = [product.name, ...product.name.split(/\s+/).filter(w => w.length > 2)];
+    return {
+      manfaat: [...productWords, ...(parsed.manfaat || [])].slice(0, 8),
+      perilaku: [...(parsed.perilaku || []), 'Online shopping', 'E-commerce'].slice(0, 6),
+      hobi: [...(parsed.hobi || []), 'Lifestyle', 'Health and wellness'].slice(0, 6),
+    };
+  } catch (err) {
+    console.error('generateInterestKeywords error:', err.message);
     return fallback;
   }
+}
+
+// ── Cari interest di Meta per kategori ──
+async function searchInterestsPerCategory(keywords, token) {
+  const result = { manfaat: [], perilaku: [], hobi: [] };
+
+  for (const [cat, terms] of Object.entries(keywords)) {
+    if (!terms?.length) continue;
+
+    const fetches = terms.map(term =>
+      fetch(`${META_API}/search?type=adinterest&q=${encodeURIComponent(term)}&limit=20&access_token=${encodeURIComponent(token)}`)
+        .then(r => r.json()).catch(() => ({ data: [] }))
+    );
+    const results = await Promise.all(fetches);
+
+    const seen = new Set();
+    results.forEach(r => {
+      (r.data || []).forEach(item => {
+        if (!item.id || !item.name || seen.has(item.id)) return;
+        seen.add(item.id);
+        result[cat].push({ id: item.id, name: item.name, audience_size: item.audience_size || 0 });
+      });
+    });
+
+    result[cat] = result[cat].sort((a, b) => b.audience_size - a.audience_size).slice(0, 8);
+
+    // Kalau masih kosong, coba suggestion dari kategori lain yang sudah ada
+    if (result[cat].length === 0) {
+      const seeds = [...(result.hobi || []), ...(result.perilaku || []), ...(result.manfaat || [])].slice(0, 5);
+      if (seeds.length > 0) {
+        try {
+          const suggRes = await fetch(
+            `${META_API}/search?type=adinterestsuggestion&interest_list=${encodeURIComponent(JSON.stringify(seeds.map(i => i.name)))}&access_token=${encodeURIComponent(token)}`
+          ).then(r => r.json()).catch(() => ({ data: [] }));
+          (suggRes.data || []).forEach(item => {
+            if (!item.id || !item.name || seen.has(item.id)) return;
+            seen.add(item.id);
+            result[cat].push({ id: item.id, name: item.name, audience_size: item.audience_size || 0 });
+          });
+          result[cat] = result[cat].sort((a, b) => b.audience_size - a.audience_size).slice(0, 8);
+          console.log(`Phase 2b ${cat}: suggestion fallback → ${result[cat].length} interests`);
+        } catch (e) {}
+      }
+    }
+  }
+
+  return result;
 }
 
 // ── Manual Advance Phase (dipanggil dari UI) ──
