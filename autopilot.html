@@ -506,8 +506,8 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group" style="margin:0;">
           <label class="form-label" style="font-size:11px;">Budget (Rp)</label>
-          <input type="number" class="form-input" value="${sp.budget??5000000}" step="500000"
-            oninput="bpP2SubPhases[${i}].budget=parseInt(this.value)" />
+          <input type="text" inputmode="numeric" class="form-input" value="${fmtRp(sp.budget??5000000)}"
+            oninput="bpInputRp(this, v => bpP2SubPhases[${i}].budget=v)" />
         </div>
         <div class="form-group" style="margin:0;">
           <label class="form-label" style="font-size:11px;">Bid Cap dari CPR Phase 1 (%)</label>
@@ -539,8 +539,8 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group" style="margin:0;">
           <label class="form-label" style="font-size:11px;">Budget CBO (Rp)</label>
-          <input type="number" class="form-input" value="${sp.budget??1000000}" step="100000"
-            oninput="bpP2SubPhases[${i}].budget=parseInt(this.value)" />
+          <input type="text" inputmode="numeric" class="form-input" value="${fmtRp(sp.budget??1000000)}"
+            oninput="bpInputRp(this, v => bpP2SubPhases[${i}].budget=v)" />
         </div>
         <div class="form-group" style="margin:0;">
           <label class="form-label" style="font-size:11px;">Evaluasi (hari)</label>
@@ -569,8 +569,8 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group" style="margin:0;">
           <label class="form-label" style="font-size:11px;">Budget/Adset (Rp)</label>
-          <input type="number" class="form-input" value="${sp.budget_per_adset??50000}" step="10000"
-            oninput="bpP2SubPhases[${i}].budget_per_adset=parseInt(this.value)" />
+          <input type="text" inputmode="numeric" class="form-input" value="${fmtRp(sp.budget_per_adset??50000)}"
+            oninput="bpInputRp(this, v => bpP2SubPhases[${i}].budget_per_adset=v)" />
         </div>
         <div class="form-group" style="margin:0;">
           <label class="form-label" style="font-size:11px;">Evaluasi (hari)</label>
@@ -584,8 +584,8 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group" style="margin:0;">
           <label class="form-label" style="font-size:11px;">Budget (Rp)</label>
-          <input type="number" class="form-input" value="${sp.budget??100000}" step="10000"
-            oninput="bpP2SubPhases[${i}].budget=parseInt(this.value)" />
+          <input type="text" inputmode="numeric" class="form-input" value="${fmtRp(sp.budget??100000)}"
+            oninput="bpInputRp(this, v => bpP2SubPhases[${i}].budget=v)" />
         </div>
         <div class="form-group" style="margin:0;">
           <label class="form-label" style="font-size:11px;">Evaluasi (hari)</label>
@@ -594,6 +594,15 @@
         </div>
       </div>`;
   }
+
+  // Format angka dengan titik ribuan (1000000 → 1.000.000)
+  function fmtRp(n) { return (n||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+  window.bpInputRp = function(el, stateRef) {
+    const raw = el.value.replace(/\./g, '').replace(/[^0-9]/g, '');
+    el.value = raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    // stateRef is a function that receives the parsed int
+    stateRef(parseInt(raw) || 0);
+  };
 
   window.bpAddP2SubPhase    = () => { bpP2SubPhases.push({ strategy: '' }); bpRenderP2SubPhases(); };
   window.bpRemoveP2SubPhase = (i) => { bpP2SubPhases.splice(i, 1); bpRenderP2SubPhases(); };
