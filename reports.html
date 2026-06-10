@@ -144,6 +144,82 @@
         </div>
       </div>
 
+      <!-- TREND HARIAN -->
+      <div class="card" style="margin-bottom:24px;">
+        <div class="card-header" style="flex-wrap:wrap; gap:12px;">
+          <div>
+            <div class="card-title">Trend Harian</div>
+            <div class="card-sub">Spend & hasil per hari di periode ini</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <select class="form-input form-select" id="trend-campaign-filter" style="width:auto; font-size:13px;">
+              <option value="">Semua Kampanye</option>
+            </select>
+            <button class="btn btn-outline" id="btn-load-trend" style="font-size:13px; padding:6px 14px;">Muat Data</button>
+          </div>
+        </div>
+        <div id="trend-loading" style="display:none; text-align:center; padding:40px; color:var(--gray-5);">
+          <div style="font-size:24px; margin-bottom:8px;">⏳</div>Mengambil data dari Meta...
+        </div>
+        <div id="trend-empty" style="text-align:center; padding:40px; color:var(--gray-5);">
+          Klik Muat Data untuk melihat trend harian
+        </div>
+        <div id="trend-content" style="display:none; padding:16px 20px;">
+          <canvas id="chart-trend" height="100"></canvas>
+        </div>
+      </div>
+
+      <!-- DEMOGRAFI + PLACEMENT -->
+      <div class="grid-2" style="margin-bottom:24px;">
+        <!-- Demografi -->
+        <div class="card">
+          <div class="card-header" style="flex-wrap:wrap; gap:8px;">
+            <div>
+              <div class="card-title">Demografi</div>
+              <div class="card-sub">Spend per umur & gender</div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <select class="form-input form-select" id="demo-campaign-filter" style="width:auto; font-size:12px;">
+                <option value="">Semua</option>
+              </select>
+              <button class="btn btn-outline" id="btn-load-demo" style="font-size:12px; padding:5px 12px;">Muat</button>
+            </div>
+          </div>
+          <div id="demo-loading" style="display:none; text-align:center; padding:30px; color:var(--gray-5);">⏳ Memuat...</div>
+          <div id="demo-empty" style="text-align:center; padding:30px; color:var(--gray-5); font-size:13px;">Klik Muat untuk lihat data</div>
+          <div id="demo-content" style="display:none; padding:16px;">
+            <canvas id="chart-demo" height="180"></canvas>
+            <div id="demo-table-wrap" style="margin-top:12px; max-height:180px; overflow-y:auto;">
+              <table style="font-size:12px;">
+                <thead><tr><th>Umur</th><th>Pria</th><th>Wanita</th><th>Total Spend</th></tr></thead>
+                <tbody id="demo-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Placement -->
+        <div class="card">
+          <div class="card-header" style="flex-wrap:wrap; gap:8px;">
+            <div>
+              <div class="card-title">Placement</div>
+              <div class="card-sub">Spend per platform & posisi</div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <select class="form-input form-select" id="place-campaign-filter" style="width:auto; font-size:12px;">
+                <option value="">Semua</option>
+              </select>
+              <button class="btn btn-outline" id="btn-load-place" style="font-size:12px; padding:5px 12px;">Muat</button>
+            </div>
+          </div>
+          <div id="place-loading" style="display:none; text-align:center; padding:30px; color:var(--gray-5);">⏳ Memuat...</div>
+          <div id="place-empty" style="text-align:center; padding:30px; color:var(--gray-5); font-size:13px;">Klik Muat untuk lihat data</div>
+          <div id="place-content" style="display:none; padding:16px;">
+            <canvas id="chart-place" height="180"></canvas>
+          </div>
+        </div>
+      </div>
+
       <!-- CHARTS ROW -->
       <div class="grid-2" style="margin-bottom: 24px;">
         <div class="card">
@@ -447,6 +523,10 @@
 
     initDatepicker();
     document.getElementById('btn-export').addEventListener('click', exportCSV);
+    document.getElementById('btn-load-trend').addEventListener('click', loadDailyTrend);
+    document.getElementById('trend-campaign-filter').addEventListener('change', loadDailyTrend);
+    document.getElementById('btn-load-demo').addEventListener('click', loadDemoBreakdown);
+    document.getElementById('btn-load-place').addEventListener('click', loadPlacementBreakdown);
     document.getElementById('btn-load-region').addEventListener('click', loadRegionBreakdown);
     document.getElementById('region-campaign-filter').addEventListener('change', loadRegionBreakdown);
 
@@ -510,12 +590,16 @@
       return;
     }
 
-    // Populate region campaign filter dropdown
+    // Populate semua campaign filter dropdowns
     allCampaignsForRegion = (data || []).filter(c => c.meta_campaign_id);
-    const sel = document.getElementById('region-campaign-filter');
-    const currentVal = sel.value;
-    sel.innerHTML = `<option value="">Semua Kampanye</option>` +
-      allCampaignsForRegion.map(c => `<option value="${c.id}" ${currentVal === c.id ? 'selected' : ''}>${c.name.length > 35 ? c.name.substring(0,33)+'…' : c.name}</option>`).join('');
+    const opts = allCampaignsForRegion.map(c => `<option value="${c.id}">${c.name.length > 35 ? c.name.substring(0,33)+'…' : c.name}</option>`).join('');
+    ['region-campaign-filter','trend-campaign-filter','demo-campaign-filter','place-campaign-filter'].forEach(id => {
+      const sel = document.getElementById(id);
+      const cur = sel.value;
+      const label = id === 'region-campaign-filter' ? 'Semua Kampanye' : 'Semua';
+      sel.innerHTML = `<option value="">${label}</option>` + opts;
+      if (cur) sel.value = cur;
+    });
 
     const phaseLabel = { 1: 'Testing', 2: 'Evaluasi', 3: 'Scale' };
     const phaseBadge = { 1: 'badge-warning', 2: 'badge-primary', 3: 'badge-success' };
@@ -775,6 +859,160 @@
         }
       }
     });
+  }
+
+  // ── Shared helpers ──
+  let trendChart, demoChart, placeChart;
+
+  function getBreakdownUrl(breakdown, campaignId) {
+    const { from, to } = getDateRange();
+    let url = `/api/meta-insights?breakdown=${breakdown}&user_id=${currentProfile.id}&since=${from}&until=${to}`;
+    if (campaignId) url += `&campaign_id=${campaignId}`;
+    return url;
+  }
+
+  function showBreakdownLoading(prefix) {
+    document.getElementById(`${prefix}-empty`).style.display = 'none';
+    document.getElementById(`${prefix}-content`).style.display = 'none';
+    document.getElementById(`${prefix}-loading`).style.display = 'block';
+  }
+
+  function showBreakdownEmpty(prefix, msg) {
+    document.getElementById(`${prefix}-loading`).style.display = 'none';
+    document.getElementById(`${prefix}-empty`).textContent = msg;
+    document.getElementById(`${prefix}-empty`).style.display = 'block';
+  }
+
+  function showBreakdownContent(prefix) {
+    document.getElementById(`${prefix}-loading`).style.display = 'none';
+    document.getElementById(`${prefix}-content`).style.display = 'block';
+  }
+
+  // ── Trend Harian ──
+  async function loadDailyTrend() {
+    const campaignId = document.getElementById('trend-campaign-filter').value;
+    showBreakdownLoading('trend');
+    try {
+      const json = await (await fetch(getBreakdownUrl('daily', campaignId))).json();
+      if (!json.daily?.length) return showBreakdownEmpty('trend', 'Tidak ada data di periode ini.');
+      showBreakdownContent('trend');
+
+      const labels  = json.daily.map(d => { const [y,m,day]=d.date.split('-'); return `${day}/${m}`; });
+      const spends  = json.daily.map(d => d.spend);
+      const results = json.daily.map(d => d.results);
+
+      const ctx = document.getElementById('chart-trend').getContext('2d');
+      if (trendChart) trendChart.destroy();
+      trendChart = new Chart(ctx, {
+        data: {
+          labels,
+          datasets: [
+            { type:'bar',  label:'Spend (Rp)', data: spends,  backgroundColor:'rgba(37,99,235,0.15)', borderColor:'#2563EB', borderWidth:2, borderRadius:4, yAxisID:'ySpend' },
+            { type:'line', label:'Hasil',      data: results, borderColor:'#10B981', backgroundColor:'rgba(16,185,129,0.1)', borderWidth:2, tension:0.4, pointRadius:3, fill:true, yAxisID:'yResults' }
+          ]
+        },
+        options: {
+          responsive:true,
+          interaction:{ mode:'index', intersect:false },
+          plugins:{ legend:{ position:'top', labels:{ boxWidth:12, font:{ size:12 } } } },
+          scales:{
+            ySpend:   { type:'linear', position:'left',  ticks:{ callback: v => 'Rp '+(v>=1000000?(v/1000000).toFixed(1)+'jt':(v/1000).toFixed(0)+'K') }, grid:{ color:'#F1F5F9' } },
+            yResults: { type:'linear', position:'right', ticks:{ stepSize:1, precision:0 }, grid:{ display:false } },
+            x: { grid:{ display:false }, ticks:{ maxRotation:45, font:{ size:11 } } }
+          }
+        }
+      });
+    } catch(e) { showBreakdownEmpty('trend', 'Gagal memuat data: ' + e.message); }
+  }
+
+  // ── Demografi ──
+  async function loadDemoBreakdown() {
+    const campaignId = document.getElementById('demo-campaign-filter').value;
+    showBreakdownLoading('demo');
+    try {
+      const json = await (await fetch(getBreakdownUrl('demo', campaignId))).json();
+      if (!json.demo?.length) return showBreakdownEmpty('demo', 'Tidak ada data demografi di periode ini.');
+      showBreakdownContent('demo');
+
+      // Group by age
+      const ageMap = {};
+      for (const item of json.demo) {
+        if (!ageMap[item.age]) ageMap[item.age] = { male: 0, female: 0 };
+        if (item.gender === 'male')   ageMap[item.age].male   += item.spend;
+        if (item.gender === 'female') ageMap[item.age].female += item.spend;
+      }
+      const ages = Object.keys(ageMap).sort();
+
+      const ctx = document.getElementById('chart-demo').getContext('2d');
+      if (demoChart) demoChart.destroy();
+      demoChart = new Chart(ctx, {
+        type:'bar',
+        data:{
+          labels: ages,
+          datasets:[
+            { label:'Pria',   data: ages.map(a => ageMap[a].male),   backgroundColor:'rgba(37,99,235,0.7)',  borderRadius:4 },
+            { label:'Wanita', data: ages.map(a => ageMap[a].female), backgroundColor:'rgba(236,72,153,0.7)', borderRadius:4 }
+          ]
+        },
+        options:{
+          responsive:true,
+          plugins:{ legend:{ position:'top', labels:{ boxWidth:12, font:{ size:12 } } } },
+          scales:{
+            y:{ ticks:{ callback: v => v>=1000000?(v/1000000).toFixed(1)+'jt':(v/1000).toFixed(0)+'K' }, grid:{ color:'#F1F5F9' } },
+            x:{ grid:{ display:false } }
+          }
+        }
+      });
+
+      // Table
+      document.getElementById('demo-table').innerHTML = ages.map(a => {
+        const total = ageMap[a].male + ageMap[a].female;
+        return `<tr>
+          <td>${a}</td>
+          <td>${formatRupiah(Math.round(ageMap[a].male))}</td>
+          <td>${formatRupiah(Math.round(ageMap[a].female))}</td>
+          <td><strong>${formatRupiah(Math.round(total))}</strong></td>
+        </tr>`;
+      }).join('');
+    } catch(e) { showBreakdownEmpty('demo', 'Gagal memuat data: ' + e.message); }
+  }
+
+  // ── Placement ──
+  const PLATFORM_LABEL = { facebook:'Facebook', instagram:'Instagram', audience_network:'Audience Network', messenger:'Messenger' };
+  const POSITION_LABEL = { feed:'Feed', story:'Stories', reel:'Reels', video_feeds:'Video Feed', right_hand_column:'Right Column', marketplace:'Marketplace', search:'Search', instagram_explore:'Explore' };
+  const PLATFORM_COLOR = { facebook:'rgba(37,99,235,0.75)', instagram:'rgba(236,72,153,0.75)', audience_network:'rgba(245,158,11,0.75)', messenger:'rgba(16,185,129,0.75)' };
+
+  async function loadPlacementBreakdown() {
+    const campaignId = document.getElementById('place-campaign-filter').value;
+    showBreakdownLoading('place');
+    try {
+      const json = await (await fetch(getBreakdownUrl('placement', campaignId))).json();
+      if (!json.placements?.length) return showBreakdownEmpty('place', 'Tidak ada data placement di periode ini.');
+      showBreakdownContent('place');
+
+      const top = json.placements.slice(0, 10);
+      const labels = top.map(p => `${PLATFORM_LABEL[p.platform]||p.platform} ${POSITION_LABEL[p.position]||p.position}`);
+      const colors = top.map(p => PLATFORM_COLOR[p.platform] || 'rgba(100,116,139,0.75)');
+
+      const ctx = document.getElementById('chart-place').getContext('2d');
+      if (placeChart) placeChart.destroy();
+      placeChart = new Chart(ctx, {
+        type:'bar',
+        data:{
+          labels,
+          datasets:[{ label:'Spend (Rp)', data: top.map(p => p.spend), backgroundColor: colors, borderRadius:4 }]
+        },
+        options:{
+          indexAxis:'y',
+          responsive:true,
+          plugins:{ legend:{ display:false } },
+          scales:{
+            x:{ ticks:{ callback: v => v>=1000000?(v/1000000).toFixed(1)+'jt':(v/1000).toFixed(0)+'K' }, grid:{ color:'#F1F5F9' } },
+            y:{ grid:{ display:false }, ticks:{ font:{ size:11 } } }
+          }
+        }
+      });
+    } catch(e) { showBreakdownEmpty('place', 'Gagal memuat data: ' + e.message); }
   }
 
   async function exportCSV() {
