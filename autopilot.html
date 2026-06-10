@@ -241,67 +241,14 @@
 
       <!-- Phase 2 -->
       <div style="background:#FFFBEB;border-radius:8px;padding:16px;border-left:3px solid var(--warning);">
-        <div style="font-size:12px;font-weight:700;color:#B45309;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;">PHASE 2 — Evaluasi</div>
-
-        <div class="form-group" style="margin-bottom:12px;">
-          <label class="form-label" style="font-size:11px;">Strategi Phase 2</label>
-          <select class="form-input form-select" id="bp-p2-strategy" onchange="bpOnP2Strategy(this.value)">
-            <option value="">-- Pilih Strategi --</option>
-            <option value="cost_cap_abo">Cost Cap + ABO Interest</option>
-            <option value="cost_cap_only">Hanya Cost Cap</option>
-            <option value="abo_interest">Hanya ABO Interest</option>
-            <option value="lookalike">Lookalike Audience</option>
-            <option value="broad">Broad (tanpa targeting)</option>
-            <option value="skip">Skip Phase 2 → langsung Phase 3</option>
-          </select>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:12px;font-weight:700;color:#B45309;text-transform:uppercase;letter-spacing:.5px;">PHASE 2 — Skala Bertahap</div>
+          <button type="button" class="btn btn-outline btn-sm" onclick="bpAddP2SubPhase()" style="font-size:11px;padding:4px 10px;border-color:#B45309;color:#B45309;">+ Tambah Sub-Phase</button>
         </div>
-
-        <!-- Cost Cap config -->
-        <div id="bp-p2a-config" style="display:none;background:rgba(180,83,9,0.06);border-radius:6px;padding:12px;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:700;color:#B45309;margin-bottom:8px;">COST CAP</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-            <div class="form-group" style="margin:0;">
-              <label class="form-label" style="font-size:11px;">Budget (Rp)</label>
-              <input type="number" class="form-input" id="bp-p2a-budget" value="5000000" step="500000" />
-            </div>
-            <div class="form-group" style="margin:0;">
-              <label class="form-label" style="font-size:11px;">Bid Cap = CPR Phase 1 × …</label>
-              <input type="number" class="form-input" id="bp-p2a-bid" value="1.1" step="0.05" min="1" />
-            </div>
-          </div>
+        <div id="bp-p2-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <div id="bp-p2-empty" style="text-align:center;padding:16px;color:var(--gray-5);font-size:12px;border:1px dashed var(--gray-3);border-radius:6px;">
+          Belum ada sub-phase. Klik "+ Tambah Sub-Phase" untuk menambahkan.
         </div>
-
-        <!-- ABO Interest config -->
-        <div id="bp-p2b-config" style="display:none;background:rgba(180,83,9,0.06);border-radius:6px;padding:12px;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:700;color:#B45309;margin-bottom:8px;">ABO INTEREST — Adset</div>
-          <div id="bp-p2b-adsets" style="display:flex;flex-direction:column;gap:8px;"></div>
-          <button type="button" class="btn btn-outline btn-sm" onclick="bpAddP2bAdset()" style="margin-top:8px;font-size:12px;">+ Tambah Adset</button>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
-            <div class="form-group" style="margin:0;">
-              <label class="form-label" style="font-size:11px;">Budget per Adset (Rp)</label>
-              <input type="number" class="form-input" id="bp-p2b-budget" value="50000" step="10000" />
-            </div>
-            <div class="form-group" style="margin:0;">
-              <label class="form-label" style="font-size:11px;">Evaluasi setelah (hari)</label>
-              <input type="number" class="form-input" id="bp-p2b-days" value="7" min="1" max="30" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Lookalike / Broad config -->
-        <div id="bp-p2-simple-config" style="display:none;background:rgba(180,83,9,0.06);border-radius:6px;padding:12px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-            <div class="form-group" style="margin:0;">
-              <label class="form-label" style="font-size:11px;">Budget Adset (Rp)</label>
-              <input type="number" class="form-input" id="bp-p2-simple-budget" value="100000" step="10000" />
-            </div>
-            <div class="form-group" style="margin:0;">
-              <label class="form-label" style="font-size:11px;">Evaluasi setelah (hari)</label>
-              <input type="number" class="form-input" id="bp-p2-simple-days" value="7" min="1" max="30" />
-            </div>
-          </div>
-        </div>
-
       </div>
 
       <!-- Phase 3 -->
@@ -515,14 +462,118 @@
 
   window.bpAddP1Adset  = () => { bpP1Adsets.push({ type: 'interest' }); bpRenderP1Adsets(); };
   window.bpRemoveP1Adset  = (i) => { bpP1Adsets.splice(i, 1); bpRenderP1Adsets(); };
-  window.bpAddP2bAdset = () => { bpP2bAdsets.push({ type: 'interest', label: '' }); bpRenderP2bAdsets(); };
-  window.bpRemoveP2bAdset = (i) => { bpP2bAdsets.splice(i, 1); bpRenderP2bAdsets(); };
+  // ── Phase 2 sub-phases (dynamic list) ──
+  let bpP2SubPhases = []; // [{ strategy, adsets?, budget?, bid_multiplier?, budget_per_adset?, evaluation_days? }]
 
-  window.bpOnP2Strategy = function(strategy) {
-    document.getElementById('bp-p2a-config').style.display   = (strategy === 'cost_cap_abo' || strategy === 'cost_cap_only') ? '' : 'none';
-    document.getElementById('bp-p2b-config').style.display   = (strategy === 'cost_cap_abo' || strategy === 'abo_interest')  ? '' : 'none';
-    document.getElementById('bp-p2-simple-config').style.display = (strategy === 'lookalike' || strategy === 'broad')        ? '' : 'none';
+  const P2_STRATEGY_LABELS = {
+    cost_cap:    'Cost Cap CBO',
+    abo_interest:'ABO Interest',
+    lookalike:   'Lookalike',
+    broad:       'Broad',
   };
+
+  function bpRenderP2SubPhases() {
+    const list = document.getElementById('bp-p2-list');
+    const empty = document.getElementById('bp-p2-empty');
+    if (!bpP2SubPhases.length) {
+      list.innerHTML = '';
+      empty.style.display = '';
+      return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = bpP2SubPhases.map((sp, i) => {
+      const label = P2_STRATEGY_LABELS[sp.strategy] || '-- Pilih --';
+      const alpha = String.fromCharCode(97 + i); // a, b, c...
+      return `
+      <div style="background:rgba(180,83,9,0.06);border-radius:8px;padding:12px;border:1px solid rgba(180,83,9,0.15);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <span style="font-size:11px;font-weight:700;color:#B45309;background:rgba(180,83,9,0.12);padding:2px 8px;border-radius:4px;">2${alpha.toUpperCase()}</span>
+          <select class="form-input form-select" style="flex:1;font-size:12px;" onchange="bpP2SubPhaseSetStrategy(${i}, this.value)">
+            <option value="">-- Pilih Strategi --</option>
+            ${Object.entries(P2_STRATEGY_LABELS).map(([v,l]) => `<option value="${v}"${sp.strategy===v?' selected':''}>${l}</option>`).join('')}
+          </select>
+          <button type="button" onclick="bpRemoveP2SubPhase(${i})" class="btn btn-ghost btn-sm" style="color:var(--danger);padding:4px 8px;flex-shrink:0;">✕</button>
+        </div>
+        ${bpRenderP2SubPhaseConfig(sp, i)}
+      </div>`;
+    }).join('');
+  }
+
+  function bpRenderP2SubPhaseConfig(sp, i) {
+    if (!sp.strategy) return '';
+    if (sp.strategy === 'cost_cap') return `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Budget (Rp)</label>
+          <input type="number" class="form-input" value="${sp.budget??5000000}" step="500000"
+            oninput="bpP2SubPhases[${i}].budget=parseInt(this.value)" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Bid Cap = CPR × …</label>
+          <input type="number" class="form-input" value="${sp.bid_multiplier??1.1}" step="0.05" min="1"
+            oninput="bpP2SubPhases[${i}].bid_multiplier=parseFloat(this.value)" />
+        </div>
+      </div>`;
+    if (sp.strategy === 'abo_interest') {
+      const adsets = sp.adsets || [];
+      return `
+      <div style="margin-bottom:8px;">
+        <div style="font-size:11px;color:#B45309;font-weight:600;margin-bottom:6px;">Adset</div>
+        <div id="bp-p2-adsets-${i}" style="display:flex;flex-direction:column;gap:6px;">${adsets.map((a,j) => `
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" class="form-input" style="width:90px;flex-shrink:0;font-size:12px;" placeholder="Label" value="${a.label||''}"
+              oninput="bpP2SubPhases[${i}].adsets[${j}].label=this.value" />
+            <select class="form-input form-select" style="flex:1;font-size:12px;" onchange="bpP2SubPhases[${i}].adsets[${j}].type=this.value">
+              ${ADSET_TYPES.map(t=>`<option value="${t.value}"${a.type===t.value?' selected':''}>${t.label}</option>`).join('')}
+            </select>
+            ${adsets.length>1?`<button type="button" onclick="bpP2RemoveAdset(${i},${j})" class="btn btn-ghost btn-sm" style="color:var(--danger);padding:3px 7px;">✕</button>`:''}
+          </div>`).join('')}
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="bpP2AddAdset(${i})" style="margin-top:6px;font-size:11px;">+ Adset</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Budget/Adset (Rp)</label>
+          <input type="number" class="form-input" value="${sp.budget_per_adset??50000}" step="10000"
+            oninput="bpP2SubPhases[${i}].budget_per_adset=parseInt(this.value)" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Evaluasi (hari)</label>
+          <input type="number" class="form-input" value="${sp.evaluation_days??7}" min="1" max="30"
+            oninput="bpP2SubPhases[${i}].evaluation_days=parseInt(this.value)" />
+        </div>
+      </div>`;
+    }
+    // lookalike / broad
+    return `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Budget (Rp)</label>
+          <input type="number" class="form-input" value="${sp.budget??100000}" step="10000"
+            oninput="bpP2SubPhases[${i}].budget=parseInt(this.value)" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Evaluasi (hari)</label>
+          <input type="number" class="form-input" value="${sp.evaluation_days??7}" min="1" max="30"
+            oninput="bpP2SubPhases[${i}].evaluation_days=parseInt(this.value)" />
+        </div>
+      </div>`;
+  }
+
+  window.bpAddP2SubPhase    = () => { bpP2SubPhases.push({ strategy: '' }); bpRenderP2SubPhases(); };
+  window.bpRemoveP2SubPhase = (i) => { bpP2SubPhases.splice(i, 1); bpRenderP2SubPhases(); };
+  window.bpP2SubPhaseSetStrategy = (i, val) => {
+    const defaults = {
+      cost_cap:     { strategy: val, budget: 5000000, bid_multiplier: 1.1 },
+      abo_interest: { strategy: val, adsets: [{type:'interest',label:'Manfaat'},{type:'interest',label:'Perilaku'},{type:'interest',label:'Hobi'}], budget_per_adset: 50000, evaluation_days: 7 },
+      lookalike:    { strategy: val, budget: 100000, evaluation_days: 7 },
+      broad:        { strategy: val, budget: 100000, evaluation_days: 7 },
+    };
+    bpP2SubPhases[i] = defaults[val] || { strategy: val };
+    bpRenderP2SubPhases();
+  };
+  window.bpP2AddAdset    = (i) => { (bpP2SubPhases[i].adsets = bpP2SubPhases[i].adsets||[]).push({type:'interest',label:''}); bpRenderP2SubPhases(); };
+  window.bpP2RemoveAdset = (i, j) => { bpP2SubPhases[i].adsets.splice(j,1); bpRenderP2SubPhases(); };
 
   function openBlueprintModal(bp = null) {
     bpEditId = bp?.id || null;
@@ -532,52 +583,44 @@
     const p1  = cfg.phase1  || {};
     const p3  = cfg.phase3  || {};
 
-    // Support both new format (cfg.phase2) and old format (cfg.phase2a / cfg.phase2b)
-    let strategy = '';
-    let p2cost = {}, p2abo = {}, p2simple = {};
-    if (cfg.phase2?.strategy) {
-      strategy  = cfg.phase2.strategy;
-      p2cost    = cfg.phase2.cost_cap  || {};
-      p2abo     = cfg.phase2.abo       || {};
-      p2simple  = cfg.phase2.simple    || {};
-    } else if (cfg.phase2a || cfg.phase2b) {
-      // migrate old format
-      const p2a = cfg.phase2a || {};
-      const p2b = cfg.phase2b || {};
-      if (p2a.enabled !== false && p2b.enabled !== false) strategy = 'cost_cap_abo';
-      else if (p2a.enabled !== false) strategy = 'cost_cap_only';
-      else if (p2b.enabled !== false) strategy = 'abo_interest';
-      else strategy = 'skip';
-      p2cost   = { budget: p2a.budget, bid_multiplier: p2a.bid_multiplier };
-      p2abo    = { adsets: p2b.adsets, budget_per_adset: p2b.budget_per_adset, evaluation_days: p2b.evaluation_days };
-    }
-
     document.getElementById('bp-name').value = bp?.name || '';
     document.getElementById('bp-desc').value = bp?.description || '';
     document.getElementById('bp-p1-days').value    = p1.evaluation?.duration_days ?? 3;
     document.getElementById('bp-p1-pause').value   = p1.evaluation?.pause_cpr_multiplier ?? 2.5;
     document.getElementById('bp-p1-advance').value = Math.round(((p1.evaluation?.advance_cpr_multiplier ?? 1.1) - 1) * 100);
-    document.getElementById('bp-p2-strategy').value = strategy;
-    document.getElementById('bp-p2a-budget').value  = p2cost.budget ?? 5000000;
-    document.getElementById('bp-p2a-bid').value     = p2cost.bid_multiplier ?? 1.1;
-    document.getElementById('bp-p2b-budget').value  = p2abo.budget_per_adset ?? 50000;
-    document.getElementById('bp-p2b-days').value    = p2abo.evaluation_days ?? 7;
-    document.getElementById('bp-p2-simple-budget').value = p2simple.budget ?? 100000;
-    document.getElementById('bp-p2-simple-days').value   = p2simple.evaluation_days ?? 7;
     document.getElementById('bp-p3-scale').value    = p3.scale_pct ?? 3;
     document.getElementById('bp-p3-maxscale').value = p3.max_scale_pct ?? 30;
     document.getElementById('bp-p3-pause').value    = p3.pause_cpr_multiplier ?? 2.0;
 
-    bpP1Adsets  = p1.adsets?.length   ? JSON.parse(JSON.stringify(p1.adsets))   : [{ type: 'interest' }];
-    bpP2bAdsets = p2abo.adsets?.length ? JSON.parse(JSON.stringify(p2abo.adsets)) : [
-      { type: 'interest', label: 'Manfaat' },
-      { type: 'interest', label: 'Perilaku' },
-      { type: 'interest', label: 'Hobi' }
-    ];
+    bpP1Adsets = p1.adsets?.length ? JSON.parse(JSON.stringify(p1.adsets)) : [{ type: 'interest' }];
+
+    // Load Phase 2 sub-phases — support new array format + old format migration
+    if (Array.isArray(cfg.phase2)) {
+      bpP2SubPhases = JSON.parse(JSON.stringify(cfg.phase2));
+    } else if (cfg.phase2?.strategy) {
+      // old single-strategy format → convert to array
+      const s = cfg.phase2.strategy;
+      bpP2SubPhases = [];
+      if (s === 'cost_cap_abo' || s === 'cost_cap_only') {
+        bpP2SubPhases.push({ strategy: 'cost_cap', budget: cfg.phase2.cost_cap?.budget ?? 5000000, bid_multiplier: cfg.phase2.cost_cap?.bid_multiplier ?? 1.1 });
+      }
+      if (s === 'cost_cap_abo' || s === 'abo_interest') {
+        bpP2SubPhases.push({ strategy: 'abo_interest', adsets: cfg.phase2.abo?.adsets || [{type:'interest',label:'Manfaat'},{type:'interest',label:'Perilaku'},{type:'interest',label:'Hobi'}], budget_per_adset: cfg.phase2.abo?.budget_per_adset ?? 50000, evaluation_days: cfg.phase2.abo?.evaluation_days ?? 7 });
+      }
+      if (s === 'lookalike' || s === 'broad') {
+        bpP2SubPhases.push({ strategy: s, budget: cfg.phase2.simple?.budget ?? 100000, evaluation_days: cfg.phase2.simple?.evaluation_days ?? 7 });
+      }
+    } else if (cfg.phase2a || cfg.phase2b) {
+      // legacy format
+      bpP2SubPhases = [];
+      if (cfg.phase2a?.enabled !== false) bpP2SubPhases.push({ strategy: 'cost_cap', budget: cfg.phase2a?.budget ?? 5000000, bid_multiplier: cfg.phase2a?.bid_multiplier ?? 1.1 });
+      if (cfg.phase2b?.enabled !== false) bpP2SubPhases.push({ strategy: 'abo_interest', adsets: cfg.phase2b?.adsets || [{type:'interest',label:'Manfaat'},{type:'interest',label:'Perilaku'},{type:'interest',label:'Hobi'}], budget_per_adset: cfg.phase2b?.budget_per_adset ?? 50000, evaluation_days: cfg.phase2b?.evaluation_days ?? 7 });
+    } else {
+      bpP2SubPhases = [];
+    }
 
     bpRenderP1Adsets();
-    bpRenderP2bAdsets();
-    bpOnP2Strategy(strategy);
+    bpRenderP2SubPhases();
     openModal('modal-blueprint');
   }
 
@@ -586,28 +629,9 @@
     if (!name) return showToast('Nama blueprint wajib diisi', 'warning');
     if (!bpP1Adsets.length) return showToast('Minimal 1 adset di Phase 1', 'warning');
 
-    const strategy = document.getElementById('bp-p2-strategy').value;
-    if (!strategy) return showToast('Pilih strategi Phase 2 terlebih dahulu', 'warning');
-
-    const p2config = { strategy };
-    if (strategy === 'cost_cap_abo' || strategy === 'cost_cap_only') {
-      p2config.cost_cap = {
-        budget:         parseInt(document.getElementById('bp-p2a-budget').value) || 5000000,
-        bid_multiplier: parseFloat(document.getElementById('bp-p2a-bid').value) || 1.1,
-      };
-    }
-    if (strategy === 'cost_cap_abo' || strategy === 'abo_interest') {
-      p2config.abo = {
-        adsets:           bpP2bAdsets,
-        budget_per_adset: parseInt(document.getElementById('bp-p2b-budget').value) || 50000,
-        evaluation_days:  parseInt(document.getElementById('bp-p2b-days').value)   || 7,
-      };
-    }
-    if (strategy === 'lookalike' || strategy === 'broad') {
-      p2config.simple = {
-        budget:          parseInt(document.getElementById('bp-p2-simple-budget').value) || 100000,
-        evaluation_days: parseInt(document.getElementById('bp-p2-simple-days').value)   || 7,
-      };
+    // Validate Phase 2 sub-phases
+    for (const sp of bpP2SubPhases) {
+      if (!sp.strategy) return showToast('Ada sub-phase Phase 2 yang belum dipilih strateginya', 'warning');
     }
 
     const config = {
@@ -619,7 +643,7 @@
           advance_cpr_multiplier: 1 + (parseFloat(document.getElementById('bp-p1-advance').value) || 10) / 100,
         }
       },
-      phase2: p2config,
+      phase2: bpP2SubPhases,
       phase3: {
         scale_pct:            parseInt(document.getElementById('bp-p3-scale').value)    || 3,
         max_scale_pct:        parseInt(document.getElementById('bp-p3-maxscale').value) || 30,
@@ -682,15 +706,17 @@
       const p1adsets = cfg.phase1?.adsets?.length || 1;
       const scale = cfg.phase3?.scale_pct || 3;
 
-      // Support both new and old config format for summary
+      // Support new array format + old formats
+      const LABELS = { cost_cap:'Cost Cap', abo_interest:'ABO', lookalike:'Lookalike', broad:'Broad', cost_cap_abo:'Cost Cap+ABO', cost_cap_only:'Cost Cap', skip:'Skip' };
       let p2label = '';
-      if (cfg.phase2?.strategy) {
-        const labels = { cost_cap_abo: 'Cost Cap + ABO', cost_cap_only: 'Cost Cap', abo_interest: 'ABO Interest', lookalike: 'Lookalike', broad: 'Broad', skip: 'Skip' };
-        p2label = labels[cfg.phase2.strategy] || cfg.phase2.strategy;
+      if (Array.isArray(cfg.phase2) && cfg.phase2.length) {
+        p2label = cfg.phase2.map((sp,i) => `2${String.fromCharCode(65+i)}: ${LABELS[sp.strategy]||sp.strategy}`).join(' · ');
+      } else if (cfg.phase2?.strategy) {
+        p2label = LABELS[cfg.phase2.strategy] || cfg.phase2.strategy;
       } else if (cfg.phase2a || cfg.phase2b) {
         const hasCostCap = cfg.phase2a?.enabled !== false;
         const hasAbo     = cfg.phase2b?.enabled !== false;
-        p2label = hasCostCap && hasAbo ? 'Cost Cap + ABO' : hasCostCap ? 'Cost Cap' : hasAbo ? 'ABO Interest' : 'Skip';
+        p2label = hasCostCap && hasAbo ? 'Cost Cap + ABO' : hasCostCap ? 'Cost Cap' : hasAbo ? 'ABO' : 'Skip';
       }
 
       const summary = [

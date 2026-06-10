@@ -491,23 +491,25 @@
       `P1: ${p1.adsets?.length || 1} adset · evaluasi ${p1.evaluation?.duration_days || 3} hari`,
     ];
 
-    // Support new format (cfg.phase2) and old format (cfg.phase2a/phase2b)
-    if (cfg.phase2?.strategy) {
+    // Support new array format + old formats
+    if (Array.isArray(cfg.phase2) && cfg.phase2.length) {
+      cfg.phase2.forEach((sp, i) => {
+        const alpha = String.fromCharCode(65 + i);
+        if (sp.strategy === 'cost_cap')     parts.push(`P2${alpha}: Cost Cap Rp ${(sp.budget||5000000).toLocaleString('id-ID')}`);
+        else if (sp.strategy === 'abo_interest') parts.push(`P2${alpha}: ABO ${sp.adsets?.length||3} adset @ Rp ${(sp.budget_per_adset||50000).toLocaleString('id-ID')}`);
+        else if (sp.strategy === 'lookalike')    parts.push(`P2${alpha}: Lookalike Rp ${(sp.budget||100000).toLocaleString('id-ID')}`);
+        else if (sp.strategy === 'broad')        parts.push(`P2${alpha}: Broad Rp ${(sp.budget||100000).toLocaleString('id-ID')}`);
+      });
+    } else if (cfg.phase2?.strategy) {
       const s = cfg.phase2.strategy;
-      const cc = cfg.phase2.cost_cap || {};
-      const abo = cfg.phase2.abo || {};
-      const sim = cfg.phase2.simple || {};
-      if (s === 'cost_cap_abo')   parts.push(`P2: Cost Cap Rp ${(cc.budget || 5000000).toLocaleString('id-ID')} + ABO ${abo.adsets?.length || 3} adset`);
-      else if (s === 'cost_cap_only') parts.push(`P2: Cost Cap Rp ${(cc.budget || 5000000).toLocaleString('id-ID')}`);
-      else if (s === 'abo_interest')  parts.push(`P2: ABO ${abo.adsets?.length || 3} adset @ Rp ${(abo.budget_per_adset || 50000).toLocaleString('id-ID')}`);
-      else if (s === 'lookalike')     parts.push(`P2: Lookalike Rp ${(sim.budget || 100000).toLocaleString('id-ID')}`);
-      else if (s === 'broad')         parts.push(`P2: Broad Rp ${(sim.budget || 100000).toLocaleString('id-ID')}`);
-      else if (s === 'skip')          parts.push('P2: Skip');
+      const cc = cfg.phase2.cost_cap || {}; const abo = cfg.phase2.abo || {}; const sim = cfg.phase2.simple || {};
+      if (s === 'cost_cap_abo')       parts.push(`P2: Cost Cap + ABO ${abo.adsets?.length||3} adset`);
+      else if (s === 'cost_cap_only') parts.push(`P2: Cost Cap Rp ${(cc.budget||5000000).toLocaleString('id-ID')}`);
+      else if (s === 'abo_interest')  parts.push(`P2: ABO ${abo.adsets?.length||3} adset`);
+      else if (s !== 'skip')          parts.push(`P2: ${s}`);
     } else if (cfg.phase2a || cfg.phase2b) {
-      const p2a = cfg.phase2a || {};
-      const p2b = cfg.phase2b || {};
-      if (p2a.enabled !== false) parts.push(`P2a: Cost Cap Rp ${(p2a.budget || 5000000).toLocaleString('id-ID')}`);
-      if (p2b.enabled !== false) parts.push(`P2b: ABO ${p2b.adsets?.length || 3} adset`);
+      if (cfg.phase2a?.enabled !== false) parts.push(`P2A: Cost Cap Rp ${(cfg.phase2a?.budget||5000000).toLocaleString('id-ID')}`);
+      if (cfg.phase2b?.enabled !== false) parts.push(`P2B: ABO ${cfg.phase2b?.adsets?.length||3} adset`);
     }
 
     parts.push(`P3: scale ${p3.scale_pct || 3}%/hari`);
