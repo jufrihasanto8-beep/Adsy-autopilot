@@ -236,6 +236,61 @@
         </div>
       </div>
 
+      <!-- TOP KONTEN + PERLU DIGANTI -->
+      <div class="grid-2" style="margin-bottom:24px;">
+
+        <!-- Top Konten by CPR -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🏆 Top Konten by CPR</div>
+              <div class="card-sub">Konten dengan biaya per hasil termurah</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Konten</th>
+                  <th>Kampanye</th>
+                  <th>CPR</th>
+                  <th>Hasil</th>
+                </tr>
+              </thead>
+              <tbody id="top-content-table">
+                <tr><td colspan="4" style="text-align:center; padding:30px; color:var(--gray-5);">Memuat...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Konten Perlu Diganti -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">⚠️ Konten Perlu Diganti</div>
+              <div class="card-sub">CPR mahal atau budget habis tanpa hasil</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Konten</th>
+                  <th>Kampanye</th>
+                  <th>Spend</th>
+                  <th>Keterangan</th>
+                </tr>
+              </thead>
+              <tbody id="bad-content-table">
+                <tr><td colspan="4" style="text-align:center; padding:30px; color:var(--gray-5);">Memuat...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
       <!-- REGION BREAKDOWN -->
       <div class="card" style="margin-bottom: 24px;">
         <div class="card-header" style="flex-wrap:wrap; gap:12px;">
@@ -547,7 +602,8 @@
       loadStats(since, until),
       loadCampaignReport(),
       loadActionLog(since, until),
-      loadCharts()
+      loadCharts(),
+      loadContentAnalysis()
     ]);
   }
 
@@ -1013,6 +1069,77 @@
         }
       });
     } catch(e) { showBreakdownEmpty('place', 'Gagal memuat data: ' + e.message); }
+  }
+
+  // ── Top Konten by CPR & Konten Perlu Diganti ──
+  async function loadContentAnalysis() {
+    let q = sb.from('campaigns')
+      .select('id, name, cpr, spend_today, results_today, is_winner, status, current_phase, target_cpr, products:product_id(name, target_cpr), ad_copies(file_name, content_library_id)')
+      .not('spend_today', 'is', null)
+      .gt('spend_today', 0);
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+    if (!data?.length) {
+      document.getElementById('top-content-table').innerHTML = `<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--gray-5);">Belum ada data</td></tr>`;
+      document.getElementById('bad-content-table').innerHTML = `<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--gray-5);">Belum ada data</td></tr>`;
+      return;
+    }
+
+    // Enrichment: ambil nama file dari ad_copies pertama
+    const enrich = (camp) => {
+      const copy = camp.ad_copies?.[0];
+      const fileName = copy?.file_name || camp.name;
+      const shortName = fileName.length > 28 ? fileName.substring(0, 26) + '…' : fileName;
+      const targetCPR = camp.target_cpr || camp.products?.target_cpr;
+      return { ...camp, shortName, targetCPR };
+    };
+
+    const camps = data.map(enrich);
+
+    // ── Top Konten: ada CPR, sort asc ──
+    const topList = camps
+      .filter(c => c.cpr > 0)
+      .sort((a, b) => a.cpr - b.cpr)
+      .slice(0, 8);
+
+    document.getElementById('top-content-table').innerHTML = topList.length
+      ? topList.map(c => `
+          <tr>
+            <td style="max-width:140px;">
+              <div style="font-size:12px; font-weight:500; color:var(--gray-8);">${c.shortName}</div>
+              ${c.is_winner ? '<span class="badge badge-success" style="font-size:10px;">🏆 Winner</span>' : ''}
+            </td>
+            <td style="font-size:12px; color:var(--gray-6); max-width:120px;">${c.name.length>22?c.name.substring(0,20)+'…':c.name}</td>
+            <td><strong style="color:#2563EB;">${formatRupiah(Math.round(c.cpr))}</strong></td>
+            <td style="font-size:13px;">${c.results_today || 0}</td>
+          </tr>`).join('')
+      : `<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--gray-5);">Belum ada data CPR</td></tr>`;
+
+    // ── Perlu Diganti: CPR > 1.5x target, atau spend > 30rb & hasil 0 ──
+    const badList = camps.filter(c => {
+      const expensive = c.targetCPR && c.cpr > c.targetCPR * 1.5;
+      const wasted    = c.spend_today >= 30000 && !c.results_today;
+      return expensive || wasted;
+    }).sort((a, b) => b.spend_today - a.spend_today).slice(0, 8);
+
+    document.getElementById('bad-content-table').innerHTML = badList.length
+      ? badList.map(c => {
+          const expensive = c.targetCPR && c.cpr > c.targetCPR * 1.5;
+          const wasted    = c.spend_today >= 30000 && !c.results_today;
+          let ket = '';
+          if (expensive) ket = `<span class="badge badge-warning">CPR ${formatRupiah(Math.round(c.cpr))} &gt; target</span>`;
+          else if (wasted) ket = `<span class="badge badge-danger">0 hasil</span>`;
+          return `
+          <tr>
+            <td style="max-width:140px;">
+              <div style="font-size:12px; font-weight:500; color:var(--gray-8);">${c.shortName}</div>
+            </td>
+            <td style="font-size:12px; color:var(--gray-6); max-width:120px;">${c.name.length>22?c.name.substring(0,20)+'…':c.name}</td>
+            <td style="font-size:13px;">${formatRupiah(Math.round(c.spend_today))}</td>
+            <td>${ket}</td>
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--gray-5);">Semua konten performa baik 👍</td></tr>`;
   }
 
   async function exportCSV() {
