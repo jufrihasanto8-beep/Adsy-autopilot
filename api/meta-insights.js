@@ -142,7 +142,7 @@ async function fetchRangeInsights(req, res) {
 
 // ── GET: Fetch spend breakdown per region (provinsi) ──
 async function fetchRegionBreakdown(req, res) {
-  const { user_id, campaign_id, date_preset = 'last_30_days' } = req.query;
+  const { user_id, campaign_id, since, until } = req.query;
   if (!user_id) return res.status(400).json({ error: 'user_id required' });
 
   const { data: config } = await sb.from('app_config').select('meta_token').eq('user_id', user_id).single();
@@ -167,12 +167,17 @@ async function fetchRegionBreakdown(req, res) {
 
   if (!campaigns.length) return res.status(200).json({ regions: [] });
 
+  // Build time param — pakai time_range jika since/until ada
+  const timeParam = (since && until)
+    ? `time_range=${encodeURIComponent(JSON.stringify({ since, until }))}`
+    : `date_preset=last_30_days`;
+
   // Fetch region breakdown per campaign in parallel
   const regionMap = {};
   await Promise.all(campaigns.map(async (camp) => {
     try {
       const fields = 'spend,impressions,clicks';
-      const url = `${META_API}/${camp.meta_campaign_id}/insights?fields=${fields}&breakdowns=region&date_preset=${date_preset}&access_token=${encodeURIComponent(token)}`;
+      const url = `${META_API}/${camp.meta_campaign_id}/insights?fields=${fields}&breakdowns=region&${timeParam}&access_token=${encodeURIComponent(token)}`;
       const r = await fetch(url);
       const json = await r.json();
       if (!json.data) return;
@@ -187,5 +192,5 @@ async function fetchRegionBreakdown(req, res) {
   }));
 
   const regions = Object.values(regionMap).sort((a, b) => b.spend - a.spend);
-  return res.status(200).json({ regions, campaign_id: campaign_id || null, date_preset });
+  return res.status(200).json({ regions, campaign_id: campaign_id || null, since, until });
 }
