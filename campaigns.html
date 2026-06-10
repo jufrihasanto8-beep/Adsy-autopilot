@@ -707,8 +707,20 @@
     if (!camp) return;
 
     if (camp.product_id) {
-      // Produk sudah terhubung — langsung advance dengan konfirmasi
-      if (!confirm(`Advance "${name}" ke Phase 2 sekarang?\n\nSistem akan membuat kampanye Phase 2a (COST_CAP) dan Phase 2b (ABO 3 adset interest) di Meta.`)) return;
+      // Build deskripsi Phase 2 dari blueprint
+      let p2desc = 'Phase 2a (Cost Cap) + Phase 2b (ABO Interest)'; // default
+      if (camp.blueprint_id) {
+        const { data: bp } = await sb.from('autopilot_blueprints').select('config,name').eq('id', camp.blueprint_id).single();
+        if (bp) {
+          const p2 = bp.config?.phase2;
+          const LABELS = { cost_cap:'Cost Cap CBO', cbo_interest:'CBO Interest', abo_interest:'ABO Interest', lookalike:'Lookalike', broad:'Broad' };
+          if (Array.isArray(p2) && p2.length) {
+            p2desc = p2.map((sp,i) => `Phase 2${String.fromCharCode(65+i)}: ${LABELS[sp.strategy]||sp.strategy}`).join(', ');
+          }
+          p2desc += `\nBlueprint: ${bp.name}`;
+        }
+      }
+      if (!confirm(`Advance "${name}" ke Phase 2 sekarang?\n\nSistem akan membuat:\n${p2desc}`)) return;
       await doAdvancePhase(id, null);
     } else {
       // Produk belum terhubung — tampilkan modal pilih produk
