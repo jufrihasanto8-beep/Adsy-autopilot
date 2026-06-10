@@ -839,9 +839,16 @@
     if (!c) return;
     editBudgetTarget = c;
     document.getElementById('edit-budget-name').textContent = c.name;
-    document.getElementById('edit-budget-input').value = c.daily_budget || '';
+    const inp = document.getElementById('edit-budget-input');
+    inp.value = c.daily_budget ? Number(c.daily_budget).toLocaleString('id-ID') : '';
     document.getElementById('modal-edit-budget').classList.remove('hidden');
-  }
+    setTimeout(() => inp.focus(), 100);
+  };
+
+  document.getElementById('edit-budget-input').addEventListener('input', function() {
+    const raw = this.value.replace(/\D/g, '');
+    this.value = raw ? Number(raw).toLocaleString('id-ID') : '';
+  });
 
   document.getElementById('edit-budget-cancel').addEventListener('click', () => {
     document.getElementById('modal-edit-budget').classList.add('hidden');
@@ -850,7 +857,8 @@
 
   document.getElementById('edit-budget-save').addEventListener('click', async () => {
     if (!editBudgetTarget) return;
-    const budget = parseInt(document.getElementById('edit-budget-input').value);
+    const raw = document.getElementById('edit-budget-input').value.replace(/\D/g, '');
+    const budget = parseInt(raw);
     if (!budget || budget < 1000) return showToast('Budget minimal Rp 1.000', 'warning');
 
     const btn = document.getElementById('edit-budget-save');
@@ -884,20 +892,25 @@
 
 <!-- Modal Edit Budget -->
 <div class="modal-overlay hidden" id="modal-edit-budget">
-  <div class="modal" style="max-width:400px;">
+  <div class="modal" style="max-width:380px;">
     <div class="modal-header">
-      <h3 class="modal-title">Edit Budget</h3>
+      <h3 class="modal-title">Edit Budget Harian</h3>
       <button class="modal-close" id="edit-budget-cancel">&times;</button>
     </div>
-    <div class="modal-body">
-      <p id="edit-budget-name" style="font-weight:600; margin-bottom:16px; color:var(--text);"></p>
-      <label class="form-label">Budget Harian (Rp)</label>
-      <input type="number" class="form-input" id="edit-budget-input" placeholder="50000" min="1000" step="1000" />
-      <p style="font-size:12px; color:var(--gray-5); margin-top:6px;">Perubahan akan langsung diterapkan ke Meta Ads.</p>
+    <div class="modal-body" style="padding:20px 24px;">
+      <p id="edit-budget-name" style="font-size:13px; color:var(--gray-5); margin-bottom:20px; line-height:1.4;"></p>
+      <label class="form-label" style="font-size:12px; font-weight:600; color:var(--gray-5); text-transform:uppercase; letter-spacing:.5px;">Budget Harian</label>
+      <div style="position:relative; margin-top:6px;">
+        <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%); font-weight:600; color:var(--gray-4); font-size:14px;">Rp</span>
+        <input type="text" inputmode="numeric" class="form-input" id="edit-budget-input"
+          style="padding-left:42px; font-size:18px; font-weight:700; height:52px;"
+          placeholder="0" />
+      </div>
+      <p style="font-size:11px; color:var(--gray-5); margin-top:8px;">Perubahan langsung diterapkan ke Meta Ads.</p>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" id="edit-budget-cancel2" onclick="document.getElementById('modal-edit-budget').classList.add('hidden')">Batal</button>
-      <button class="btn btn-primary" id="edit-budget-save">Simpan</button>
+    <div class="modal-footer" style="justify-content:flex-end; gap:8px;">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-edit-budget').classList.add('hidden')">Batal</button>
+      <button class="btn btn-primary" id="edit-budget-save" style="min-width:100px;">Simpan</button>
     </div>
   </div>
 </div>
