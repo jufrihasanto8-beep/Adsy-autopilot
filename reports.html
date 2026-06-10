@@ -152,6 +152,48 @@
         </div>
       </div>
 
+      <!-- REGION BREAKDOWN -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header" style="flex-wrap:wrap; gap:12px;">
+          <div>
+            <div class="card-title">Sebaran Pengeluaran per Daerah</div>
+            <div class="card-sub">Provinsi dengan spend tertinggi di periode ini</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <select class="form-input form-select" id="region-campaign-filter" style="width:auto; font-size:13px;">
+              <option value="">Semua Kampanye</option>
+            </select>
+            <button class="btn btn-outline" id="btn-load-region" style="font-size:13px; padding:6px 14px;">Muat Data</button>
+          </div>
+        </div>
+        <div id="region-loading" style="display:none; text-align:center; padding:40px; color:var(--gray-5);">
+          <div style="font-size:24px; margin-bottom:8px;">⏳</div>Mengambil data dari Meta...
+        </div>
+        <div id="region-empty" style="text-align:center; padding:40px; color:var(--gray-5);">
+          Pilih kampanye atau klik Muat Data untuk melihat sebaran daerah
+        </div>
+        <div id="region-content" style="display:none;">
+          <div style="padding:20px 20px 0;">
+            <canvas id="chart-region" height="200"></canvas>
+          </div>
+          <div class="table-wrap" style="margin-top:8px;">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:36px;">#</th>
+                  <th>Daerah / Provinsi</th>
+                  <th>Spend</th>
+                  <th>Impresi</th>
+                  <th>Klik</th>
+                  <th>% dari Total</th>
+                </tr>
+              </thead>
+              <tbody id="region-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- AUTOPILOT SUMMARY -->
       <div class="card">
         <div class="card-header">
@@ -193,7 +235,7 @@
 
   let sb;
   let currentProfile = null;
-  let spendChart, ctrChart;
+  let spendChart, ctrChart, regionChart;
 
   async function init() {
     sb = await getSupabase();
@@ -204,6 +246,8 @@
 
     document.getElementById('date-range').addEventListener('change', loadAll);
     document.getElementById('btn-export').addEventListener('click', exportCSV);
+    document.getElementById('btn-load-region').addEventListener('click', loadRegionBreakdown);
+    document.getElementById('region-campaign-filter').addEventListener('change', loadRegionBreakdown);
 
     await loadAll();
   }
@@ -246,6 +290,8 @@
     document.getElementById('r-actions').textContent = count || 0;
   }
 
+  let allCampaignsForRegion = [];
+
   async function loadCampaignReport(since) {
     let q = sb.from('campaigns').select('*').order('spend_today', { ascending: false });
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
@@ -256,6 +302,13 @@
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:40px; color:var(--gray-5);">Belum ada data</td></tr>`;
       return;
     }
+
+    // Populate region campaign filter dropdown
+    allCampaignsForRegion = (data || []).filter(c => c.meta_campaign_id);
+    const sel = document.getElementById('region-campaign-filter');
+    const currentVal = sel.value;
+    sel.innerHTML = `<option value="">Semua Kampanye</option>` +
+      allCampaignsForRegion.map(c => `<option value="${c.id}" ${currentVal === c.id ? 'selected' : ''}>${c.name.length > 35 ? c.name.substring(0,33)+'…' : c.name}</option>`).join('');
 
     const phaseLabel = { 1: 'Testing', 2: 'Evaluasi', 3: 'Scale' };
     const phaseBadge = { 1: 'badge-warning', 2: 'badge-primary', 3: 'badge-success' };
@@ -271,6 +324,94 @@
         <td>${(c.impressions || 0).toLocaleString('id-ID')}</td>
         <td><span class="badge ${c.autopilot_enabled ? 'badge-success' : 'badge-gray'}">${c.autopilot_enabled ? '🤖 Aktif' : 'Manual'}</span></td>
       </tr>`).join('');
+  }
+
+  async function loadRegionBreakdown() {
+    const days = parseInt(document.getElementById('date-range').value);
+    const campaignId = document.getElementById('region-campaign-filter').value;
+
+    // Map days to Meta date_preset
+    const presetMap = { 7: 'last_7_days', 14: 'last_14_days', 30: 'last_30_days', 90: 'last_90_days' };
+    const datePreset = presetMap[days] || 'last_30_days';
+
+    document.getElementById('region-empty').style.display = 'none';
+    document.getElementById('region-content').style.display = 'none';
+    document.getElementById('region-loading').style.display = 'block';
+
+    try {
+      let url = `/api/meta-insights?breakdown=region&user_id=${currentProfile.id}&date_preset=${datePreset}`;
+      if (campaignId) url += `&campaign_id=${campaignId}`;
+
+      const r = await fetch(url);
+      const json = await r.json();
+
+      document.getElementById('region-loading').style.display = 'none';
+
+      if (!json.regions || json.regions.length === 0) {
+        document.getElementById('region-empty').textContent = 'Tidak ada data daerah di periode ini.';
+        document.getElementById('region-empty').style.display = 'block';
+        return;
+      }
+
+      const top10 = json.regions.slice(0, 10);
+      const totalSpend = json.regions.reduce((s, r) => s + r.spend, 0);
+
+      // Render table (semua region)
+      document.getElementById('region-table').innerHTML = json.regions.map((r, i) => {
+        const pct = totalSpend > 0 ? ((r.spend / totalSpend) * 100).toFixed(1) : 0;
+        const barW = totalSpend > 0 ? Math.round((r.spend / json.regions[0].spend) * 100) : 0;
+        return `<tr>
+          <td style="color:var(--gray-5); font-size:13px;">${i + 1}</td>
+          <td><strong>${r.region}</strong></td>
+          <td>${formatRupiah(Math.round(r.spend))}</td>
+          <td>${r.impressions.toLocaleString('id-ID')}</td>
+          <td>${r.clicks.toLocaleString('id-ID')}</td>
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="flex:1; background:var(--gray-2); border-radius:4px; height:6px; min-width:60px;">
+                <div style="width:${barW}%; background:#2563EB; height:6px; border-radius:4px;"></div>
+              </div>
+              <span style="font-size:12px; color:var(--gray-5); min-width:36px;">${pct}%</span>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+      // Render chart (top 10)
+      const labels = top10.map(r => r.region);
+      const spendData = top10.map(r => r.spend);
+      const ctx = document.getElementById('chart-region').getContext('2d');
+      if (regionChart) regionChart.destroy();
+      regionChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Spend (Rp)',
+            data: spendData,
+            backgroundColor: 'rgba(37, 99, 235, 0.15)',
+            borderColor: '#2563EB',
+            borderWidth: 2,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { callback: v => 'Rp ' + (v >= 1000000 ? (v/1000000).toFixed(1)+'jt' : (v/1000).toFixed(0)+'K') }, grid: { color: '#F1F5F9' } },
+            y: { grid: { display: false } }
+          }
+        }
+      });
+
+      document.getElementById('region-content').style.display = 'block';
+    } catch (e) {
+      document.getElementById('region-loading').style.display = 'none';
+      document.getElementById('region-empty').textContent = 'Gagal memuat data daerah: ' + e.message;
+      document.getElementById('region-empty').style.display = 'block';
+    }
   }
 
   const ACTION_PAGE_SIZE = 10;
