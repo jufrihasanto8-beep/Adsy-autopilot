@@ -678,25 +678,17 @@
 
   // Hapus semua adset dalam grup Phase 2b
   window.delete2bGroup = async function(metaCampaignId, name) {
-    if (!confirm(`Hapus "${name}" (3 adset)?\n\nIni akan menghapus semua adset dari Meta dan Adsy.`)) return;
     const group = allCampaigns.filter(c => c.phase_type === '2b' && c.meta_campaign_id === metaCampaignId);
+    if (!confirm(`Hapus "${name}" (${group.length} adset)?\n\nIni akan menghapus dari Meta Ads Manager dan tidak bisa dibatalkan.`)) return;
     try {
-      // Hapus campaign di Meta sekali (1 campaign = 3 adset)
       const first = group[0];
-      await fetch('/api/meta-campaigns', {
+      const res = await fetch('/api/meta-campaigns', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: first.id, meta_campaign_id: metaCampaignId, user_id: currentProfile.id })
       });
-      // Hapus sisa rows di Supabase (adset lain, meta sudah terhapus semua)
-      await Promise.all(group.slice(1).map(c =>
-        fetch('/api/meta-campaigns', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: c.id, meta_campaign_id: null, user_id: currentProfile.id })
-        })
-      ));
-      showToast('Phase 2b berhasil dihapus', 'success');
+      if (!res.ok) throw new Error((await res.json()).error || 'Gagal');
+      showToast(`Phase 2b berhasil dihapus (${group.length} adset)`, 'success');
       await loadCampaigns();
     } catch (err) {
       showToast('Gagal hapus: ' + err.message, 'error');
