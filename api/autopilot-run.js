@@ -326,6 +326,9 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
   }
 
   if (newPhase === 2 && camp.current_phase === 1 && !camp.initial_budget) {
+    // LOCK dulu sebelum create — cegah cron berikutnya bikin Phase 2 dobel kalau creation gagal
+    await sb.from('campaigns').update({ initial_budget: camp.daily_budget }).eq('id', camp.id);
+
     // Ambil data produk untuk Phase 2b interest
     const { data: product } = await sb.from('products')
       .select('name, tagline, benefits')
@@ -333,9 +336,16 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
 
     // Fetch blueprint config, lalu buat Phase 2 sesuai blueprint
     const blueprintConfig = await fetchBlueprintConfig(camp.blueprint_id);
-    await createPhase2FromBlueprint(camp, token, product, blueprintConfig, logs);
-
-    await sb.from('campaigns').update({ initial_budget: camp.daily_budget }).eq('id', camp.id);
+    try {
+      await createPhase2FromBlueprint(camp, token, product, blueprintConfig, logs);
+    } catch (createErr) {
+      await sb.from('action_logs').insert({
+        user_id: camp.user_id, campaign_name: camp.name, action_type: 'create',
+        description: `Gagal buat Phase 2 (cron): ${createErr.message}`,
+        status: 'error'
+      });
+      return; // lock tetap tersimpan, tidak retry otomatis — user bisa manual advance
+    }
 
     const subPhaseCount = Array.isArray(blueprintConfig?.phase2) ? blueprintConfig.phase2.length : 2;
     const logEntry = {
@@ -347,7 +357,6 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
     };
     await sb.from('action_logs').insert(logEntry);
     logs.push(logEntry);
-    // Phase 1 tidak diubah apapun — tetap jalan dengan autopilot aktif
   }
 
   // Phase 3 belum diimplementasi — akan ditambahkan nanti
@@ -1336,10 +1345,11 @@ async function manualAdvancePhase(req, res) {
 
     // Fetch blueprint config, buat Phase 2 sesuai blueprint
     const blueprintConfig = await fetchBlueprintConfig(camp.blueprint_id);
-    await createPhase2FromBlueprint(camp, token, product, blueprintConfig, logs);
 
-    // Simpan initial_budget setelah kedua phase berhasil dibuat
+    // LOCK dulu sebelum create — cegah dobel kalau user klik 2× atau cron jalan bersamaan
     await sb.from('campaigns').update({ initial_budget: camp.daily_budget }).eq('id', camp.id);
+
+    await createPhase2FromBlueprint(camp, token, product, blueprintConfig, logs);
 
     await sb.from('action_logs').insert({
       user_id,
