@@ -865,34 +865,59 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
       promotedObject = { page_id: pageId };
     }
 
-    // 4. Generate keyword per kategori via Claude
-    const keywords = await generateInterestKeywords(product);
+    // 4. Tentukan adset groups berdasarkan strategy
+    const isCBO = subPhaseConfig.strategy === 'cbo_interest';
+    const phaseLabel = label.toUpperCase();
 
-    // 5. Cari interest di Meta per kategori
-    const interests = await searchInterestsPerCategory(keywords, token);
+    let adsetGroups = []; // [{ label, interests: [{id,name},...] }]
 
-    // Log interests yang ditemukan supaya bisa debug
-    const interestSummary = Object.entries(interests).map(([k, v]) => `${k}: ${v.length} (${v.slice(0,2).map(i=>i.name).join(', ')})`).join(' | ');
+    if (isCBO) {
+      // CBO: auto-generate 3 varied groups (Manfaat, Lifestyle, Perilaku) — skema AdStudio
+      adsetGroups = await generateCBOInterestGroups(product, token);
+    } else {
+      // ABO: pakai blueprint adset labels, generate keywords per label
+      const blueprintAdsets = subPhaseConfig.adsets?.length
+        ? subPhaseConfig.adsets
+        : [{ label: 'Manfaat', type: 'interest' }, { label: 'Perilaku Belanja', type: 'interest' }, { label: 'Hobi', type: 'interest' }];
+      const adsetLabelsList = blueprintAdsets.map(a => a.label || 'Interest');
+      const keywords = await generateInterestKeywords(product, adsetLabelsList);
+      const interests = await searchInterestsPerCategory(keywords, token);
+      adsetGroups = blueprintAdsets.map(a => ({
+        label: a.label || 'Interest',
+        interests: interests[a.label || 'Interest'] || []
+      }));
+    }
+
+    // Log interests yang ditemukan
+    const interestSummary = adsetGroups.map(g => `${g.label}: ${g.interests.length} (${g.interests.slice(0,2).map(i=>i.name).join(', ')})`).join(' | ');
     console.log('Phase 2b interests found:', interestSummary);
     try { await sb.from('action_logs').insert({
       user_id: camp.user_id, campaign_name: camp.name, action_type: 'create',
-      description: `Phase 2b interests: ${interestSummary || 'semua kosong — pakai broad targeting'}`,
+      description: `Phase 2${phaseLabel} interests: ${interestSummary || 'semua kosong — pakai broad targeting'}`,
       status: 'info'
     }); } catch(e) {}
 
-    // 6. Buat campaign ABO
-    const phaseLabel = label.toUpperCase();
+    // 6. Buat campaign — CBO (budget di campaign) atau ABO (budget di adset)
+
+    const campPayload = {
+      name: `${camp.name} — Phase 2${phaseLabel}`,
+      objective,
+      status: 'ACTIVE',
+      special_ad_categories: [],
+      access_token: token
+    };
+    if (isCBO) {
+      // CBO: budget total di campaign level, Meta distribusi sendiri ke adsets
+      campPayload.daily_budget = subPhaseConfig.budget ?? 200000;
+    } else {
+      // ABO: tidak ada budget di campaign, tiap adset punya budget sendiri
+      campPayload.is_adset_budget_sharing_enabled = false;
+    }
+
     const newCampRes = await fetch(`${META_API}/act_${accountId}/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: `${camp.name} — Phase 2${phaseLabel}`,
-        objective,
-        status: 'ACTIVE',
-        special_ad_categories: [],
-        is_adset_budget_sharing_enabled: false,
-        access_token: token
-      })
+      body: JSON.stringify(campPayload)
     });
     const newCampData = await newCampRes.json();
     if (newCampData.error) {
@@ -903,58 +928,58 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
     if (!newCampaignId) throw new Error('Gagal buat campaign 2b: ID tidak ada di response');
 
     const budgetPerAdset = subPhaseConfig.budget_per_adset ?? 50000;
+    // Untuk display di Supabase: CBO → bagi budget ke jumlah adset, ABO → per adset budget
+    const totalCBOBudget = subPhaseConfig.budget ?? 200000;
+    const dbBudgetPerRow = isCBO
+      ? Math.round(totalCBOBudget / Math.max(adsetGroups.length, 1))
+      : budgetPerAdset;
 
-    // 7. Buat adset sesuai blueprint config (default: Manfaat/Perilaku/Hobi)
-    const blueprintAdsets = subPhaseConfig.adsets?.length
-      ? subPhaseConfig.adsets
-      : [{ label: 'Manfaat', type: 'interest' }, { label: 'Perilaku Belanja', type: 'interest' }, { label: 'Hobi', type: 'interest' }];
-
-    // Map label adset ke key interest untuk AI keyword generation
-    const keyMap = { 'manfaat': 'manfaat', 'manfaat kesehatan': 'manfaat', 'perilaku': 'perilaku', 'perilaku belanja': 'perilaku', 'hobi': 'hobi' };
-    const categories = blueprintAdsets.map(a => ({
-      key: keyMap[a.label?.toLowerCase()] || a.label?.toLowerCase() || 'manfaat',
-      label: a.label || 'Interest'
-    }));
-
-    for (const cat of categories) {
-      const catInterests = interests[cat.key] || [];
+    for (const adsetGroup of adsetGroups) {
+      const catLabel = adsetGroup.label;
+      const catInterests = adsetGroup.interests || [];
 
       // Kalau interest kosong → pakai broad targeting (tanpa interest), jangan skip
       const targeting = {
         age_min: 21,
         geo_locations: { countries: ['ID'] },
-        targeting_automation: { advantage_audience: 0 }, // wajib di-set eksplisit oleh Meta
+        targeting_automation: { advantage_audience: 0 },
         ...(catInterests.length > 0
           ? { flexible_spec: [{ interests: catInterests.map(i => ({ id: i.id, name: i.name })) }] }
           : {})
       };
 
       // Buat adset
+      const adsetBody = {
+        name: `${camp.name} — Phase 2${phaseLabel} ${catLabel}`,
+        campaign_id: newCampaignId,
+        billing_event: 'IMPRESSIONS',
+        optimization_goal: optimizationGoal,
+        bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+        status: 'ACTIVE',
+        targeting,
+        ...(promotedObject ? { promoted_object: promotedObject } : {}),
+        access_token: token
+      };
+      if (!isCBO) {
+        // ABO: budget di tiap adset
+        adsetBody.daily_budget = budgetPerAdset;
+      }
+      // CBO: tidak set daily_budget di adset, Meta yg distribute
+
       const adsetRes = await fetch(`${META_API}/act_${accountId}/adsets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: `${camp.name} — Phase 2${phaseLabel} ${cat.label}`,
-          campaign_id: newCampaignId,
-          daily_budget: budgetPerAdset,
-          billing_event: 'IMPRESSIONS',
-          optimization_goal: optimizationGoal,
-          bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
-          status: 'ACTIVE',
-          targeting,
-          ...(promotedObject ? { promoted_object: promotedObject } : {}),
-          access_token: token
-        })
+        body: JSON.stringify(adsetBody)
       });
       const adsetData = await adsetRes.json();
       if (adsetData.error) {
         const e = adsetData.error;
-        const errMsg = `Adset ${cat.label}: ` + (e.error_user_msg || e.message) + ` (code: ${e.code})`;
-        throw new Error(errMsg); // langsung throw supaya kelihatan di toast
+        const errMsg = `Adset ${catLabel}: ` + (e.error_user_msg || e.message) + ` (code: ${e.code})`;
+        throw new Error(errMsg);
       }
       const newAdsetId = adsetData.id;
       if (!newAdsetId) {
-        throw new Error(`Adset ${cat.label}: Meta tidak return ID — ${JSON.stringify(adsetData)}`);
+        throw new Error(`Adset ${catLabel}: Meta tidak return ID — ${JSON.stringify(adsetData)}`);
       }
       // Buat ad dengan creative yang sama dari Phase 1
       if (creativeId) {
@@ -962,7 +987,7 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: `${camp.name} — Phase 2${phaseLabel} ${cat.label}`,
+            name: `${camp.name} — Phase 2${phaseLabel} ${catLabel}`,
             adset_id: newAdsetId,
             creative: { creative_id: creativeId },
             status: 'ACTIVE',
@@ -975,14 +1000,14 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
       await sb.from('campaigns').insert({
         user_id: camp.user_id,
         ad_account_id: camp.ad_account_id,
-        name: `${camp.name} — Phase 2${phaseLabel} ${cat.label}`,
+        name: `${camp.name} — Phase 2${phaseLabel} ${catLabel}`,
         status: 'ACTIVE',
         current_phase: 2,
         phase_type: '2b',
         phase_started_at: new Date().toISOString(),
         autopilot_enabled: true,
         product_id: camp.product_id,
-        daily_budget: budgetPerAdset,
+        daily_budget: dbBudgetPerRow,
         meta_campaign_id: newCampaignId,
         meta_adset_id: newAdsetId,
         days_running: 0
@@ -1013,35 +1038,54 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
 }
 
 // ── Generate keyword interest per kategori via Claude ──
-async function generateInterestKeywords(product) {
-  const fallback = {
-    manfaat: product?.name ? [product.name, ...product.name.split(/\s+/).filter(w => w.length > 2)] : [],
-    perilaku: ['Online shopping', 'E-commerce', 'Shopee', 'Tokopedia', 'Lazada'],
-    hobi: ['Health and wellness', 'Beauty', 'Fashion', 'Lifestyle']
-  };
+async function generateInterestKeywords(product, labels = ['manfaat', 'perilaku', 'hobi']) {
+  // Build fallback per label
+  const fallback = {};
+  for (const label of labels) {
+    const ll = label.toLowerCase();
+    if (ll === 'manfaat' || ll.includes('manfaat') || ll.includes('produk')) {
+      fallback[label] = product?.name ? [product.name, ...product.name.split(/\s+/).filter(w => w.length > 2)] : [];
+    } else if (ll === 'perilaku' || ll.includes('perilaku') || ll.includes('belanja')) {
+      fallback[label] = ['Online shopping', 'E-commerce', 'Shopee', 'Tokopedia', 'Lazada'];
+    } else if (ll === 'hobi' || ll.includes('hobi') || ll.includes('lifestyle')) {
+      fallback[label] = ['Health and wellness', 'Beauty', 'Fashion', 'Lifestyle'];
+    } else {
+      // Label custom (Interest 1, Audience Muda, dll) → fallback generic
+      fallback[label] = product?.name ? [product.name, 'Online shopping', 'E-commerce', 'Health', 'Lifestyle'] : ['Online shopping', 'E-commerce', 'Health'];
+    }
+  }
 
   if (!product) return fallback;
 
   try {
+    // Build deskripsi per label untuk prompt AI
+    const labelsDesc = labels.map(l => {
+      const ll = l.toLowerCase();
+      if (ll === 'manfaat' || ll.includes('manfaat')) return `- "${l}": topik/kategori/merek terkait produk (misal untuk produk rambut: Hair care, Shampoo, dll)`;
+      if (ll === 'perilaku' || ll.includes('perilaku') || ll.includes('belanja')) return `- "${l}": platform belanja online dan perilaku belanja`;
+      if (ll === 'hobi' || ll.includes('hobi')) return `- "${l}": minat/hobi gaya hidup dari pembeli target`;
+      return `- "${l}": interest keyword yang relevan untuk orang yang tertarik dengan "${l}" dan berpotensi beli produk ini`;
+    }).join('\n');
+
+    const expectedJson = '{' + labels.map(l => `"${l}":["...","...","...","...","..."]`).join(',') + '}';
+
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
+        max_tokens: 600,
         messages: [{ role: 'user', content: `You are a Meta Ads expert for Indonesia. Based on the product below, generate 5 English interest keywords per category for Meta Ads interest targeting.
 
 Product name: ${product.name}
 Tagline: ${product.tagline || '-'}
 Benefits: ${product.benefits || '-'}
 
-Rules:
-- "manfaat": related topics, product categories, or brands that buyers of this product would follow. Example for gray hair product: ["Hair care", "Shampoo", "Hair treatment", "Beauty", "Personal care"]
-- "perilaku": online shopping platforms and behaviors. Example: ["Online shopping", "E-commerce", "Shopee", "Tokopedia", "Lazada"]
-- "hobi": lifestyle or hobby interests of the target buyer. Example: ["Health and wellness", "Beauty", "Skin care", "Fashion", "Lifestyle"]
+Categories (generate 5 keywords each):
+${labelsDesc}
 
-Return ONLY a JSON object, no explanation:
-{"manfaat":["...","...","...","...","..."],"perilaku":["...","...","...","...","..."],"hobi":["...","...","...","...","..."]}` }]
+Return ONLY a JSON object with EXACT category names as keys, no explanation:
+${expectedJson}` }]
       })
     });
     const data = await res.json();
@@ -1050,13 +1094,25 @@ Return ONLY a JSON object, no explanation:
     if (!match) return fallback;
 
     const parsed = JSON.parse(match[0]);
-    // Tambah nama produk + tiap kata sebagai search term untuk manfaat (pola AdStudio)
-    const productWords = [product.name, ...product.name.split(/\s+/).filter(w => w.length > 2)];
-    return {
-      manfaat: [...productWords, ...(parsed.manfaat || [])].slice(0, 8),
-      perilaku: [...(parsed.perilaku || []), 'Online shopping', 'E-commerce'].slice(0, 6),
-      hobi: [...(parsed.hobi || []), 'Lifestyle', 'Health and wellness'].slice(0, 6),
-    };
+    const result = {};
+    const productWords = product.name ? [product.name, ...product.name.split(/\s+/).filter(w => w.length > 2)] : [];
+
+    for (const label of labels) {
+      const ll = label.toLowerCase();
+      // Coba exact match dulu, lalu lowercase match
+      const kwList = parsed[label] || parsed[ll] || [];
+      if (ll === 'manfaat' || ll.includes('manfaat') || ll.includes('produk')) {
+        result[label] = [...productWords, ...kwList].slice(0, 8);
+      } else if (ll === 'perilaku' || ll.includes('perilaku') || ll.includes('belanja')) {
+        result[label] = [...kwList, 'Online shopping', 'E-commerce'].slice(0, 6);
+      } else if (ll === 'hobi' || ll.includes('hobi')) {
+        result[label] = [...kwList, 'Lifestyle', 'Health and wellness'].slice(0, 6);
+      } else {
+        // Custom label
+        result[label] = kwList.length > 0 ? kwList.slice(0, 6) : fallback[label];
+      }
+    }
+    return result;
   } catch (err) {
     console.error('generateInterestKeywords error:', err.message);
     return fallback;
@@ -1064,8 +1120,145 @@ Return ONLY a JSON object, no explanation:
 }
 
 // ── Cari interest di Meta per kategori ──
+// ── CBO Interest: auto-generate 3 varied interest groups (skema AdStudio) ──
+async function generateCBOInterestGroups(product, token) {
+  const productName = product?.name || 'produk';
+  const junk = [/akses facebook/i, /perangkat seluler/i, /perangkat android/i, /perangkat ios/i, /ulang tahun/i, /administrator halaman/i];
+
+  // Step 1: Claude generate 30 diverse behavior/lifestyle terms untuk produk ini
+  let extraTerms = [];
+  try {
+    const termRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 600,
+        messages: [{ role: 'user', content: `Produk: "${productName}". Tagline: ${product?.tagline||'-'}. Manfaat: ${product?.benefits||'-'}.
+
+Berikan 30 kata kunci campuran Indonesia+Inggris untuk cari interest di Meta Ads.
+Pikirkan KONKRET: apa yang dipakai, tempat yang dikunjungi, hobi, gaya hidup, kebiasaan belanja pembeli "${productName}".
+HANYA array JSON: ["kata1","kata2",...]` }]
+      })
+    });
+    const termData = await termRes.json();
+    const termText = termData.content?.[0]?.text || '[]';
+    const m = termText.match(/\[[\s\S]*\]/);
+    if (m) extraTerms = JSON.parse(m[0]);
+  } catch (e) { console.error('CBO term gen error:', e.message); }
+
+  // Step 2: Search Meta — nama produk + semua terms (paralel)
+  const productWords = [productName, ...productName.split(/\s+/).filter(w => w.length > 2)];
+  const allSearchTerms = [...productWords, ...extraTerms].slice(0, 30);
+  const seen = new Set();
+  const metaInterests = [];
+
+  const fetches = allSearchTerms.map(term =>
+    fetch(`${META_API}/search?type=adinterest&q=${encodeURIComponent(term)}&limit=20&access_token=${encodeURIComponent(token)}`)
+      .then(r => r.json()).catch(() => ({ data: [] }))
+  );
+  const results = await Promise.all(fetches);
+  results.forEach(r => {
+    (r.data || []).forEach(item => {
+      if (!item.id || !item.name || seen.has(item.id)) return;
+      if (junk.some(p => p.test(item.name))) return;
+      seen.add(item.id);
+      metaInterests.push({ id: item.id, name: item.name, audience_size: item.audience_size || 0 });
+    });
+  });
+
+  // Step 3: adinterestsuggestion dari top results
+  const topNames = [...metaInterests].sort((a, b) => b.audience_size - a.audience_size).slice(0, 10).map(i => i.name);
+  if (topNames.length > 0) {
+    try {
+      const suggData = await fetch(
+        `${META_API}/search?type=adinterestsuggestion&interest_list=${encodeURIComponent(JSON.stringify(topNames))}&access_token=${encodeURIComponent(token)}`
+      ).then(r => r.json()).catch(() => ({ data: [] }));
+      (suggData.data || []).forEach(item => {
+        if (!item.id || !item.name || seen.has(item.id)) return;
+        if (junk.some(p => p.test(item.name))) return;
+        seen.add(item.id);
+        metaInterests.push({ id: item.id, name: item.name, audience_size: item.audience_size || 0 });
+      });
+    } catch (e) {}
+  }
+
+  console.log(`CBO Interest: ${metaInterests.length} interests found from Meta`);
+
+  // Fallback kalau Meta kosong
+  if (metaInterests.length === 0) {
+    return [
+      { label: 'Manfaat', interests: [] },
+      { label: 'Lifestyle', interests: [] },
+      { label: 'Perilaku', interests: [] }
+    ];
+  }
+
+  // Step 4: Claude kategorikan ke 3 grup (Manfaat, Lifestyle, Perilaku)
+  const metaList = metaInterests.slice(0, 60)
+    .map(i => `- ${i.name} (${i.audience_size ? (i.audience_size/1000000).toFixed(1)+'M' : '?'})`)
+    .join('\n');
+
+  const defaultGroups = () => {
+    const sorted = [...metaInterests].sort((a, b) => b.audience_size - a.audience_size);
+    return [
+      { label: 'Manfaat', interests: sorted.slice(0, 8) },
+      { label: 'Lifestyle', interests: sorted.slice(8, 16) },
+      { label: 'Perilaku', interests: sorted.slice(16, 24) }
+    ];
+  };
+
+  try {
+    const catRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1200,
+        messages: [{ role: 'user', content: `Produk: "${productName}". Berikut ${metaInterests.length} interest dari Meta Ads:
+
+${metaList}
+
+Kategorikan ke 3 grup untuk targeting BERBEDA. Pilih 6-8 interest TERBAIK per grup dari list di atas:
+1. "Manfaat" — interest langsung terkait produk, kategori produk, manfaat, brand sejenis
+2. "Lifestyle" — gaya hidup, hobi, minat pembeli yang kemungkinan beli produk ini
+3. "Perilaku" — perilaku belanja online, platform e-commerce, aktivitas pembelian
+
+PENTING: nama interest HARUS PERSIS sama seperti di list. Return HANYA JSON:
+{"Manfaat":["nama1","nama2",...],"Lifestyle":["..."],"Perilaku":["..."]}` }]
+      })
+    });
+    const catData = await catRes.json();
+    const catText = catData.content?.[0]?.text || '{}';
+    const catMatch = catText.match(/\{[\s\S]*\}/);
+    if (!catMatch) return defaultGroups();
+
+    const categorized = JSON.parse(catMatch[0]);
+    const nameToInterest = {};
+    metaInterests.forEach(i => { nameToInterest[i.name] = i; });
+
+    const groups = ['Manfaat', 'Lifestyle', 'Perilaku'].map(groupName => ({
+      label: groupName,
+      interests: (categorized[groupName] || [])
+        .map(name => nameToInterest[name])
+        .filter(Boolean)
+        .slice(0, 8)
+    }));
+
+    // Pastikan semua grup ada interests (fallback ke default kalau Claude return kosong)
+    const total = groups.reduce((s, g) => s + g.interests.length, 0);
+    return total > 0 ? groups : defaultGroups();
+
+  } catch (e) {
+    console.error('CBO categorize error:', e.message);
+    return defaultGroups();
+  }
+}
+
 async function searchInterestsPerCategory(keywords, token) {
-  const result = { manfaat: [], perilaku: [], hobi: [] };
+  // Init result dinamis sesuai labels yang dikirim (support label apapun)
+  const result = {};
+  for (const key of Object.keys(keywords)) result[key] = [];
 
   for (const [cat, terms] of Object.entries(keywords)) {
     if (!terms?.length) continue;
