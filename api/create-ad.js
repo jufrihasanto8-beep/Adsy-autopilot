@@ -36,6 +36,7 @@ export default async function handler(req, res) {
     const startTime    = fields.start_time?.[0];
     const endTime      = fields.end_time?.[0];
     const adStatus     = fields.auto_activate?.[0] === '1' ? 'ACTIVE' : 'PAUSED';
+    const blueprintId  = fields.blueprint_id?.[0] || null;
 
     // Reuse existing campaign/adset dari item sebelumnya (multi-file)
     const existingMetaCampaignId = fields.meta_campaign_id?.[0];
@@ -381,6 +382,7 @@ export default async function handler(req, res) {
         };
         if (productId) campPayload.product_id = productId;
         if (product?.target_cpr) campPayload.target_cpr = product.target_cpr;
+        if (blueprintId) campPayload.blueprint_id = blueprintId;
 
         const { data: camp, error: campErr } = await sb.from('campaigns').insert(campPayload).select('id').single();
         if (campErr) console.error('campaigns insert error (non-fatal):', campErr.message);
