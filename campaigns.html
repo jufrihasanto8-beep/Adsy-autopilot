@@ -834,7 +834,7 @@
   // ── Edit Budget ──
   let editBudgetTarget = null;
 
-  function openEditBudget(id) {
+  window.openEditBudget = function(id) {
     const c = allCampaigns.find(x => x.id === id);
     if (!c) return;
     editBudgetTarget = c;
