@@ -467,6 +467,7 @@
 
   const P2_STRATEGY_LABELS = {
     cost_cap:    'Cost Cap CBO',
+    cbo_interest:'CBO Interest',
     abo_interest:'ABO Interest',
     lookalike:   'Lookalike',
     broad:       'Broad',
@@ -514,6 +515,36 @@
             oninput="bpP2SubPhases[${i}].bid_multiplier=parseFloat(this.value)" />
         </div>
       </div>`;
+    if (sp.strategy === 'cbo_interest') {
+      const adsets = sp.adsets || [];
+      return `
+      <div style="margin-bottom:8px;">
+        <div style="font-size:11px;color:#B45309;font-weight:600;margin-bottom:6px;">Adset</div>
+        <div id="bp-p2-adsets-${i}" style="display:flex;flex-direction:column;gap:6px;">${adsets.map((a,j) => `
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" class="form-input" style="width:90px;flex-shrink:0;font-size:12px;" placeholder="Label" value="${a.label||''}"
+              oninput="bpP2SubPhases[${i}].adsets[${j}].label=this.value" />
+            <select class="form-input form-select" style="flex:1;font-size:12px;" onchange="bpP2SubPhases[${i}].adsets[${j}].type=this.value">
+              ${ADSET_TYPES.map(t=>`<option value="${t.value}"${a.type===t.value?' selected':''}>${t.label}</option>`).join('')}
+            </select>
+            ${adsets.length>1?`<button type="button" onclick="bpP2RemoveAdset(${i},${j})" class="btn btn-ghost btn-sm" style="color:var(--danger);padding:3px 7px;">✕</button>`:''}
+          </div>`).join('')}
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="bpP2AddAdset(${i})" style="margin-top:6px;font-size:11px;">+ Adset</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Budget CBO (Rp)</label>
+          <input type="number" class="form-input" value="${sp.budget??1000000}" step="100000"
+            oninput="bpP2SubPhases[${i}].budget=parseInt(this.value)" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" style="font-size:11px;">Evaluasi (hari)</label>
+          <input type="number" class="form-input" value="${sp.evaluation_days??7}" min="1" max="30"
+            oninput="bpP2SubPhases[${i}].evaluation_days=parseInt(this.value)" />
+        </div>
+      </div>`;
+    }
     if (sp.strategy === 'abo_interest') {
       const adsets = sp.adsets || [];
       return `
@@ -565,6 +596,7 @@
   window.bpP2SubPhaseSetStrategy = (i, val) => {
     const defaults = {
       cost_cap:     { strategy: val, budget: 5000000, bid_multiplier: 1.1 },
+      cbo_interest: { strategy: val, adsets: [{type:'interest',label:'Interest 1'},{type:'interest',label:'Interest 2'},{type:'interest',label:'Interest 3'}], budget: 1000000, evaluation_days: 7 },
       abo_interest: { strategy: val, adsets: [{type:'interest',label:'Manfaat'},{type:'interest',label:'Perilaku'},{type:'interest',label:'Hobi'}], budget_per_adset: 50000, evaluation_days: 7 },
       lookalike:    { strategy: val, budget: 100000, evaluation_days: 7 },
       broad:        { strategy: val, budget: 100000, evaluation_days: 7 },
@@ -707,7 +739,7 @@
       const scale = cfg.phase3?.scale_pct || 3;
 
       // Support new array format + old formats
-      const LABELS = { cost_cap:'Cost Cap', abo_interest:'ABO', lookalike:'Lookalike', broad:'Broad', cost_cap_abo:'Cost Cap+ABO', cost_cap_only:'Cost Cap', skip:'Skip' };
+      const LABELS = { cost_cap:'Cost Cap', cbo_interest:'CBO Interest', abo_interest:'ABO', lookalike:'Lookalike', broad:'Broad', cost_cap_abo:'Cost Cap+ABO', cost_cap_only:'Cost Cap', skip:'Skip' };
       let p2label = '';
       if (Array.isArray(cfg.phase2) && cfg.phase2.length) {
         p2label = cfg.phase2.map((sp,i) => `2${String.fromCharCode(65+i)}: ${LABELS[sp.strategy]||sp.strategy}`).join(' · ');

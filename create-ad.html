@@ -496,9 +496,10 @@
       cfg.phase2.forEach((sp, i) => {
         const alpha = String.fromCharCode(65 + i);
         if (sp.strategy === 'cost_cap')     parts.push(`P2${alpha}: Cost Cap Rp ${(sp.budget||5000000).toLocaleString('id-ID')}`);
-        else if (sp.strategy === 'abo_interest') parts.push(`P2${alpha}: ABO ${sp.adsets?.length||3} adset @ Rp ${(sp.budget_per_adset||50000).toLocaleString('id-ID')}`);
-        else if (sp.strategy === 'lookalike')    parts.push(`P2${alpha}: Lookalike Rp ${(sp.budget||100000).toLocaleString('id-ID')}`);
-        else if (sp.strategy === 'broad')        parts.push(`P2${alpha}: Broad Rp ${(sp.budget||100000).toLocaleString('id-ID')}`);
+        else if (sp.strategy === 'cbo_interest')  parts.push(`P2${alpha}: CBO Interest ${sp.adsets?.length||3} adset Rp ${(sp.budget||1000000).toLocaleString('id-ID')}`);
+        else if (sp.strategy === 'abo_interest')  parts.push(`P2${alpha}: ABO ${sp.adsets?.length||3} adset @ Rp ${(sp.budget_per_adset||50000).toLocaleString('id-ID')}`);
+        else if (sp.strategy === 'lookalike')     parts.push(`P2${alpha}: Lookalike Rp ${(sp.budget||100000).toLocaleString('id-ID')}`);
+        else if (sp.strategy === 'broad')         parts.push(`P2${alpha}: Broad Rp ${(sp.budget||100000).toLocaleString('id-ID')}`);
       });
     } else if (cfg.phase2?.strategy) {
       const s = cfg.phase2.strategy;
