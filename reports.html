@@ -291,7 +291,12 @@
 
   let dp = { start: null, end: null, picking: 'start', year: 0, month: 0, preset: '30' };
 
-  function dpToStr(d) { return d.toISOString().split('T')[0]; }
+  function dpToStr(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
   function dpFmt(s) {
     if (!s) return '';
     const [y,m,d] = s.split('-');
