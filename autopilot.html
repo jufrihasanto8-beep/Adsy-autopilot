@@ -510,9 +510,13 @@
             oninput="bpP2SubPhases[${i}].budget=parseInt(this.value)" />
         </div>
         <div class="form-group" style="margin:0;">
-          <label class="form-label" style="font-size:11px;">Bid Cap = CPR × …</label>
-          <input type="number" class="form-input" value="${sp.bid_multiplier??1.1}" step="0.05" min="1"
-            oninput="bpP2SubPhases[${i}].bid_multiplier=parseFloat(this.value)" />
+          <label class="form-label" style="font-size:11px;">Bid Cap dari CPR Phase 1 (%)</label>
+          <div style="position:relative;">
+            <input type="number" class="form-input" value="${sp.bid_pct??10}" step="5" min="-50" max="200" style="padding-right:28px;"
+              oninput="bpP2SubPhases[${i}].bid_pct=parseInt(this.value)" />
+            <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--gray-5);pointer-events:none;">%</span>
+          </div>
+          <div style="font-size:10px;color:var(--gray-5);margin-top:3px;">+10% = Bid Cap di CPR+10% · −10% = lebih agresif</div>
         </div>
       </div>`;
     if (sp.strategy === 'cbo_interest') {
@@ -595,7 +599,7 @@
   window.bpRemoveP2SubPhase = (i) => { bpP2SubPhases.splice(i, 1); bpRenderP2SubPhases(); };
   window.bpP2SubPhaseSetStrategy = (i, val) => {
     const defaults = {
-      cost_cap:     { strategy: val, budget: 5000000, bid_multiplier: 1.1 },
+      cost_cap:     { strategy: val, budget: 5000000, bid_pct: 10 },
       cbo_interest: { strategy: val, adsets: [{type:'interest',label:'Interest 1'},{type:'interest',label:'Interest 2'},{type:'interest',label:'Interest 3'}], budget: 1000000, evaluation_days: 7 },
       abo_interest: { strategy: val, adsets: [{type:'interest',label:'Manfaat'},{type:'interest',label:'Perilaku'},{type:'interest',label:'Hobi'}], budget_per_adset: 50000, evaluation_days: 7 },
       lookalike:    { strategy: val, budget: 100000, evaluation_days: 7 },
@@ -634,7 +638,7 @@
       const s = cfg.phase2.strategy;
       bpP2SubPhases = [];
       if (s === 'cost_cap_abo' || s === 'cost_cap_only') {
-        bpP2SubPhases.push({ strategy: 'cost_cap', budget: cfg.phase2.cost_cap?.budget ?? 5000000, bid_multiplier: cfg.phase2.cost_cap?.bid_multiplier ?? 1.1 });
+        bpP2SubPhases.push({ strategy: 'cost_cap', budget: cfg.phase2.cost_cap?.budget ?? 5000000, bid_pct: Math.round(((cfg.phase2.cost_cap?.bid_multiplier ?? 1.1) - 1) * 100) });
       }
       if (s === 'cost_cap_abo' || s === 'abo_interest') {
         bpP2SubPhases.push({ strategy: 'abo_interest', adsets: cfg.phase2.abo?.adsets || [{type:'interest',label:'Manfaat'},{type:'interest',label:'Perilaku'},{type:'interest',label:'Hobi'}], budget_per_adset: cfg.phase2.abo?.budget_per_adset ?? 50000, evaluation_days: cfg.phase2.abo?.evaluation_days ?? 7 });
@@ -645,7 +649,7 @@
     } else if (cfg.phase2a || cfg.phase2b) {
       // legacy format
       bpP2SubPhases = [];
-      if (cfg.phase2a?.enabled !== false) bpP2SubPhases.push({ strategy: 'cost_cap', budget: cfg.phase2a?.budget ?? 5000000, bid_multiplier: cfg.phase2a?.bid_multiplier ?? 1.1 });
+      if (cfg.phase2a?.enabled !== false) bpP2SubPhases.push({ strategy: 'cost_cap', budget: cfg.phase2a?.budget ?? 5000000, bid_pct: Math.round(((cfg.phase2a?.bid_multiplier ?? 1.1) - 1) * 100) });
       if (cfg.phase2b?.enabled !== false) bpP2SubPhases.push({ strategy: 'abo_interest', adsets: cfg.phase2b?.adsets || [{type:'interest',label:'Manfaat'},{type:'interest',label:'Perilaku'},{type:'interest',label:'Hobi'}], budget_per_adset: cfg.phase2b?.budget_per_adset ?? 50000, evaluation_days: cfg.phase2b?.evaluation_days ?? 7 });
     } else {
       bpP2SubPhases = [];
