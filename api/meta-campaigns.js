@@ -7,6 +7,7 @@ const META_API = 'https://graph.facebook.com/v18.0';
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') return await syncCampaigns(req, res);
+    if (req.method === 'POST' && req.body?.action === 'duplicate') return await duplicateCampaign(req, res);
     if (req.method === 'POST') return await createCampaign(req, res);
     if (req.method === 'PATCH') {
       if (req.body.action === 'update_budget') return await updateBudget(req, res);
@@ -189,11 +190,19 @@ async function deleteCampaign(req, res) {
     }
   }
 
-  // Hapus ad_copies terkait
-  await sb.from('ad_copies').delete().eq('campaign_id', id);
-
-  // Hapus dari Supabase
-  await sb.from('campaigns').delete().eq('id', id);
+  // Hapus semua rows Supabase dengan meta_campaign_id yg sama
+  // (cover Phase 2b groups: multiple adsets share 1 meta_campaign_id)
+  if (meta_campaign_id && meta_campaign_id !== 'null') {
+    const { data: siblings } = await sb.from('campaigns')
+      .select('id').eq('meta_campaign_id', meta_campaign_id);
+    for (const row of (siblings || [])) {
+      await sb.from('ad_copies').delete().eq('campaign_id', row.id);
+    }
+    await sb.from('campaigns').delete().eq('meta_campaign_id', meta_campaign_id);
+  } else {
+    await sb.from('ad_copies').delete().eq('campaign_id', id);
+    await sb.from('campaigns').delete().eq('id', id);
+  }
 
   // Log
   try {
@@ -281,4 +290,85 @@ async function createCampaign(req, res) {
   });
 
   return res.status(200).json({ success: true, campaign });
+}
+
+// ── POST action=duplicate: Duplikat kampanye winner dengan creative baru ──
+async function duplicateCampaign(req, res) {
+  const { id, new_name, content_library_id, user_id } = req.body;
+  if (!id || !new_name || !content_library_id || !user_id) throw new Error('Data tidak lengkap');
+
+  const { data: orig } = await sb.from('campaigns').select('*').eq('id', id).single();
+  if (!orig) throw new Error('Kampanye tidak ditemukan');
+
+  const { data: config } = await sb.from('app_config').select('meta_token').eq('user_id', user_id).single();
+  const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
+  if (!token) throw new Error('Token Meta belum dikonfigurasi');
+
+  // Ambil meta_creative_id dari konten yang dipilih
+  const { data: adCopy } = await sb.from('ad_copies')
+    .select('meta_creative_id, file_name').eq('content_library_id', content_library_id)
+    .not('meta_creative_id', 'is', null).limit(1).maybeSingle();
+  if (!adCopy?.meta_creative_id) throw new Error('Konten ini belum pernah dipakai dalam iklan. Upload dulu via Buat Iklan.');
+
+  // Ambil detail kampanye asli dari Meta
+  const campInfo = await fetch(`${META_API}/${orig.meta_campaign_id}?fields=account_id,objective,special_ad_categories&access_token=${encodeURIComponent(token)}`).then(r => r.json());
+  if (campInfo.error) throw new Error('Gagal ambil data Meta: ' + campInfo.error.message);
+  const accountId = campInfo.account_id;
+
+  // Ambil targeting dari adset asli
+  let targeting = { age_min: 21, geo_locations: { countries: ['ID'] }, targeting_automation: { advantage_audience: 0 } };
+  let optimizationGoal = 'OFFSITE_CONVERSIONS', billingEvent = 'IMPRESSIONS', promotedObject = null;
+  if (orig.meta_adset_id) {
+    const adsetInfo = await fetch(`${META_API}/${orig.meta_adset_id}?fields=targeting,optimization_goal,billing_event,promoted_object&access_token=${encodeURIComponent(token)}`).then(r => r.json());
+    if (!adsetInfo.error && adsetInfo.targeting) {
+      const t = { ...adsetInfo.targeting };
+      ['age_min','age_max','brand_safety_content_filter_levels','targeting_automation'].forEach(k => delete t[k]);
+      t.age_min = 21;
+      t.targeting_automation = { advantage_audience: 0 };
+      targeting = t;
+      optimizationGoal = adsetInfo.optimization_goal || optimizationGoal;
+      billingEvent = adsetInfo.billing_event || billingEvent;
+      if (adsetInfo.promoted_object) promotedObject = adsetInfo.promoted_object;
+    }
+  }
+
+  // Buat campaign baru di Meta (PAUSED, CBO)
+  const newCamp = await fetch(`${META_API}/act_${accountId}/campaigns`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: new_name, objective: campInfo.objective, status: 'PAUSED', special_ad_categories: [], daily_budget: String(Math.round(orig.daily_budget || 50000)), is_adset_budget_sharing_enabled: true, access_token: token })
+  }).then(r => r.json());
+  if (newCamp.error) throw new Error('Gagal buat kampanye: ' + (newCamp.error.error_user_msg || newCamp.error.message));
+
+  // Buat adset baru
+  const newAdset = await fetch(`${META_API}/act_${accountId}/adsets`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: new_name, campaign_id: newCamp.id, optimization_goal: optimizationGoal, billing_event: billingEvent, bid_strategy: 'LOWEST_COST_WITHOUT_CAP', status: 'PAUSED', targeting, ...(promotedObject ? { promoted_object: promotedObject } : {}), access_token: token })
+  }).then(r => r.json());
+  if (newAdset.error) throw new Error('Gagal buat adset: ' + (newAdset.error.error_user_msg || newAdset.error.message));
+
+  // Buat ad dengan creative baru
+  const newAd = await fetch(`${META_API}/act_${accountId}/ads`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: new_name, adset_id: newAdset.id, creative: { creative_id: adCopy.meta_creative_id }, status: 'PAUSED', access_token: token })
+  }).then(r => r.json());
+  if (newAd.error) throw new Error('Gagal buat ad: ' + (newAd.error.error_user_msg || newAd.error.message));
+
+  // Simpan ke Supabase
+  const { data: saved } = await sb.from('campaigns').insert({
+    user_id, name: new_name, status: 'PAUSED',
+    meta_campaign_id: newCamp.id, meta_adset_id: newAdset.id,
+    daily_budget: orig.daily_budget, current_phase: 1,
+    ad_account_id: orig.ad_account_id, product_id: orig.product_id,
+    autopilot_enabled: false, objective: orig.objective,
+    campaign_type: orig.campaign_type || 'standard'
+  }).select().single();
+
+  await sb.from('ad_copies').insert({
+    campaign_id: saved.id, user_id, content_library_id,
+    meta_creative_id: adCopy.meta_creative_id, meta_ad_id: newAd.id, file_name: adCopy.file_name
+  });
+
+  await sb.from('action_logs').insert({ user_id, campaign_name: new_name, action_type: 'duplicate', description: `Duplikat dari "${orig.name}"`, status: 'success' });
+
+  return res.status(200).json({ success: true, campaign: saved });
 }
