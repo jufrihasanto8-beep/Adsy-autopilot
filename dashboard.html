@@ -259,7 +259,7 @@
 
   async function loadCampaigns(profile) {
     let q = sb.from('campaigns').select('*')
-      .not('phase_type', 'eq', '2b')   // exclude adset Phase 2b
+      .or('phase_type.is.null,phase_type.neq.2b')  // exclude adset Phase 2b, include null
       .order('created_at', { ascending: false }).limit(5);
     if (profile.role !== 'admin') q = q.eq('user_id', profile.id);
     const { data } = await q;
