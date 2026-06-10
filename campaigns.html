@@ -143,10 +143,21 @@
           </select>
         </div>
 
+        <!-- Bulk Action Bar -->
+        <div id="bulk-bar" style="display:none; align-items:center; gap:10px; padding:10px 16px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; margin-bottom:12px;">
+          <span id="bulk-count" style="font-size:13px; font-weight:600; color:#1D4ED8;">0 dipilih</span>
+          <div style="flex:1;"></div>
+          <button class="btn btn-outline btn-sm" onclick="bulkAction('ACTIVE')">▶ Aktifkan</button>
+          <button class="btn btn-outline btn-sm" onclick="bulkAction('PAUSED')">⏸ Pause</button>
+          <button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;" onclick="bulkAction('DELETE')">🗑 Hapus</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearBulk()">✕ Batal</button>
+        </div>
+
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th style="width:36px;"><input type="checkbox" id="select-all" style="cursor:pointer;" /></th>
                 <th>Kampanye</th>
                 <th>Phase</th>
                 <th>Budget/Hari</th>
@@ -159,7 +170,7 @@
               </tr>
             </thead>
             <tbody id="camp-table">
-              <tr><td colspan="9" style="text-align:center; padding:50px; color:var(--gray-5);">
+              <tr><td colspan="10" style="text-align:center; padding:50px; color:var(--gray-5);">
                 Memuat kampanye...
               </td></tr>
             </tbody>
@@ -424,7 +435,7 @@
   function renderCampaigns(data) {
     const tbody = document.getElementById('camp-table');
     if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:50px; color:var(--gray-5);">
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:50px; color:var(--gray-5);">
         Tidak ada kampanye ditemukan</td></tr>`;
       return;
     }
@@ -472,6 +483,7 @@
           : `<span class="badge badge-warning"><span class="badge-dot"></span>Paused</span>`;
         return `
         <tr>
+          <td><input type="checkbox" class="row-check" data-id="${g[0].id}" data-meta="${c.meta_campaign_id}" data-status="${c._anyActive ? 'ACTIVE' : 'PAUSED'}" style="cursor:pointer;" onchange="onRowCheck(this)" /></td>
           <td>
             <strong>${c._parentName}</strong>
             <div style="font-size:11px; color:var(--gray-5); margin-top:2px;">ABO · ${g.length} adset: ${adsetLabels}</div>
@@ -505,6 +517,7 @@
       const results = insLoaded ? ins.results_count : (ins.results_count ?? c.results_today);
       return `
       <tr>
+        <td><input type="checkbox" class="row-check" data-id="${c.id}" data-meta="${c.meta_campaign_id || ''}" data-status="${c.status}" style="cursor:pointer;" onchange="onRowCheck(this)" /></td>
         <td>
           <strong>${c.name}</strong>${c.is_winner ? ' <span class="badge badge-success" style="font-size:10px;vertical-align:middle;">🏆 Winner</span>' : ''}
           <div style="font-size:11px; color:var(--gray-5); margin-top:2px;">${c.objective || '-'} · ${c.content_library?.name || 'No content'}</div>
@@ -538,6 +551,7 @@
             }
             <button class="btn btn-outline btn-sm" onclick="viewDetail('${c.id}')">Detail</button>
             ${c.current_phase === 1 && !c.initial_budget ? `<button class="btn btn-outline btn-sm" style="color:var(--primary);" onclick="advancePhase('${c.id}', '${c.name}')">→ Phase 2</button>` : ''}
+            ${c.is_winner ? `<button class="btn btn-outline btn-sm" style="color:#7C3AED;border-color:#7C3AED;" onclick="openDuplicate('${c.id}', \`${c.name.replace(/`/g, "'")}\`)">⧉ Duplikat</button>` : ''}
             <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteCampaign('${c.id}', '${c.meta_campaign_id}', '${c.name}')">Hapus</button>
           </div>
         </td>
@@ -932,6 +946,75 @@
 
   document.getElementById('filter-account').addEventListener('change', filterCampaigns);
 
+  // ── Bulk Actions ──
+  let selectedIds = new Set();
+
+  document.getElementById('select-all').addEventListener('change', function() {
+    const checks = document.querySelectorAll('.row-check');
+    checks.forEach(c => {
+      c.checked = this.checked;
+      if (this.checked) selectedIds.add(c.dataset.id);
+      else selectedIds.delete(c.dataset.id);
+    });
+    updateBulkBar();
+  });
+
+  window.onRowCheck = function(el) {
+    if (el.checked) selectedIds.add(el.dataset.id);
+    else selectedIds.delete(el.dataset.id);
+    // Sync select-all state
+    const all = document.querySelectorAll('.row-check');
+    document.getElementById('select-all').checked = all.length > 0 && [...all].every(c => c.checked);
+    updateBulkBar();
+  };
+
+  function updateBulkBar() {
+    const bar = document.getElementById('bulk-bar');
+    document.getElementById('bulk-count').textContent = `${selectedIds.size} dipilih`;
+    bar.style.display = selectedIds.size > 0 ? 'flex' : 'none';
+  }
+
+  window.clearBulk = function() {
+    selectedIds.clear();
+    document.querySelectorAll('.row-check').forEach(c => c.checked = false);
+    document.getElementById('select-all').checked = false;
+    updateBulkBar();
+  };
+
+  window.bulkAction = async function(type) {
+    if (selectedIds.size === 0) return;
+    if (type === 'DELETE' && !confirm(`Hapus ${selectedIds.size} kampanye?\n\nIni akan menghapus dari Meta Ads Manager dan tidak bisa dibatalkan.`)) return;
+
+    const ids = [...selectedIds];
+    const targets = allCampaigns.filter(c => ids.includes(c.id));
+    let successCount = 0;
+
+    await Promise.all(targets.map(async c => {
+      try {
+        if (type === 'DELETE') {
+          const res = await fetch('/api/meta-campaigns', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: c.id, meta_campaign_id: c.meta_campaign_id, user_id: currentProfile.id })
+          });
+          if (res.ok) successCount++;
+        } else {
+          const res = await fetch('/api/meta-campaigns', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: c.id, meta_campaign_id: c.meta_campaign_id, status: type, user_id: currentProfile.id })
+          });
+          if (res.ok) successCount++;
+        }
+      } catch (e) {}
+    }));
+
+    clearBulk();
+    const label = type === 'ACTIVE' ? 'diaktifkan' : type === 'PAUSED' ? 'di-pause' : 'dihapus';
+    showToast(`${successCount} kampanye ${label}`, 'success');
+    await loadCampaigns();
+  };
+
   // ── Edit Budget ──
   let editBudgetTarget = null;
 
@@ -960,6 +1043,65 @@
     document.getElementById('modal-edit-budget').classList.remove('hidden');
     setTimeout(() => inp.focus(), 100);
   };
+
+  // ── Duplicate Campaign ──
+  let duplicateSourceId = null;
+
+  window.openDuplicate = async function(id, name) {
+    duplicateSourceId = id;
+    document.getElementById('dup-source-name').textContent = `Sumber: "${name}"`;
+    document.getElementById('dup-name').value = `Duplikat — ${name}`;
+    document.getElementById('dup-budget').value = '';
+
+    let q = sb.from('content_library').select('id, name').eq('status', 'ready');
+    if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
+    const { data } = await q;
+    const sel = document.getElementById('dup-content');
+    sel.innerHTML = '<option value="">-- Pilih Konten dari Library --</option>' +
+      (data || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+    openModal('modal-duplicate');
+  };
+
+  document.getElementById('btn-dup-confirm').addEventListener('click', async () => {
+    if (!duplicateSourceId) return;
+    const newName = document.getElementById('dup-name').value.trim();
+    const contentId = document.getElementById('dup-content').value;
+    const budgetVal = document.getElementById('dup-budget').value;
+
+    if (!newName) return showToast('Nama kampanye wajib diisi', 'warning');
+    if (!contentId) return showToast('Pilih konten dari library', 'warning');
+
+    const btn = document.getElementById('btn-dup-confirm');
+    btn.disabled = true; btn.textContent = 'Menduplikat...';
+
+    try {
+      const body = {
+        action: 'duplicate',
+        source_campaign_id: duplicateSourceId,
+        new_name: newName,
+        content_library_id: contentId,
+        user_id: currentProfile.id
+      };
+      if (budgetVal) body.daily_budget = parseInt(budgetVal);
+
+      const res = await fetch('/api/meta-campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal duplikat');
+
+      closeModal('modal-duplicate');
+      showToast('Kampanye berhasil diduplikat! Status: PAUSED', 'success');
+      await loadCampaigns();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '⧉ Duplikat';
+    }
+  });
 
   document.getElementById('edit-budget-input').addEventListener('input', function() {
     const raw = this.value.replace(/\D/g, '');
@@ -1026,6 +1168,42 @@
 <style>
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+
+<!-- Modal Duplicate Kampanye -->
+<div class="modal-overlay hidden" id="modal-duplicate">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div>
+        <h3>⧉ Duplikat Kampanye Winner</h3>
+        <p style="font-size:12px;color:var(--gray-5);margin-top:4px;" id="dup-source-name"></p>
+      </div>
+      <div class="modal-close" onclick="closeModal('modal-duplicate')">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nama Kampanye Baru <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-input" id="dup-name" placeholder="Nama kampanye baru..." />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Konten dari Library <span style="color:var(--danger)">*</span></label>
+        <select class="form-input form-select" id="dup-content">
+          <option value="">-- Pilih Konten --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Budget Harian (Rp) <span style="color:var(--gray-5);font-weight:400;">— kosongkan untuk sama dengan original</span></label>
+        <input type="number" class="form-input" id="dup-budget" placeholder="Contoh: 100000" />
+      </div>
+      <div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:8px;padding:12px 14px;font-size:12px;color:#5B21B6;line-height:1.5;">
+        ℹ️ Kampanye duplikat akan dibuat dalam status <strong>PAUSED</strong>. Semua targeting, adset, dan budget disalin dari kampanye asli. Aktifkan secara manual setelah siap.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-duplicate')">Batal</button>
+      <button class="btn btn-primary" id="btn-dup-confirm" style="background:#7C3AED;border-color:#7C3AED;">⧉ Duplikat Kampanye</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal Edit Budget -->
 <div class="modal-overlay hidden" id="modal-edit-budget">
