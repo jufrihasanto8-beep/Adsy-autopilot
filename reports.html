@@ -11,6 +11,37 @@
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/components.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    #datepicker-panel { display:none; position:absolute; right:0; top:calc(100% + 8px); background:#fff; border-radius:14px; box-shadow:0 8px 40px rgba(0,0,0,0.15); border:1px solid #E2E8F0; z-index:999; flex-direction:row; width:480px; overflow:hidden; }
+    .dp-presets { width:200px; border-right:1px solid #F1F5F9; padding:8px 0; overflow-y:auto; max-height:320px; }
+    .dp-preset-item { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; font-size:13px; color:#374151; }
+    .dp-preset-item:hover { background:#F8FAFC; }
+    .dp-preset-item.active { color:#2563EB; }
+    .dp-radio { width:16px; height:16px; border-radius:50%; border:2px solid #CBD5E1; flex-shrink:0; }
+    .dp-preset-item.active .dp-radio { border-color:#2563EB; background:#2563EB; box-shadow:inset 0 0 0 3px #fff; }
+    .dp-calendar { padding:16px 18px; flex:1; }
+    .dp-cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .dp-cal-header strong { font-size:14px; color:#111827; }
+    .dp-nav-btn { background:none; border:none; cursor:pointer; font-size:18px; color:#94A3B8; padding:2px 8px; border-radius:6px; line-height:1.4; }
+    .dp-nav-btn:hover { background:#F1F5F9; color:#374151; }
+    .dp-grid { display:grid; grid-template-columns:repeat(7, 1fr); row-gap:2px; }
+    .dp-day-header { height:28px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#94A3B8; }
+    .dp-day { height:34px; display:flex; align-items:center; justify-content:center; font-size:13px; cursor:pointer; color:#374151; position:relative; }
+    .dp-day::before { content:''; position:absolute; inset:0; background:transparent; }
+    .dp-day-inner { position:relative; z-index:1; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:50%; }
+    .dp-day:hover .dp-day-inner { background:#F1F5F9; }
+    .dp-day.other-month { color:#CBD5E1; cursor:default; }
+    .dp-day.other-month:hover .dp-day-inner { background:none; }
+    .dp-day.today .dp-day-inner { font-weight:700; color:#2563EB; }
+    .dp-day.sel-start .dp-day-inner, .dp-day.sel-end .dp-day-inner { background:#2563EB !important; color:#fff !important; }
+    .dp-day.in-range::before { background:rgba(37,99,235,0.1); }
+    .dp-day.in-range .dp-day-inner { color:#1D4ED8; }
+    .dp-day.sel-start::before { background:rgba(37,99,235,0.1); left:50%; }
+    .dp-day.sel-end::before { background:rgba(37,99,235,0.1); right:50%; }
+    .dp-day.sel-start.only::before, .dp-day.sel-end.only::before { background:transparent; }
+    #datepicker-trigger { display:flex; align-items:center; gap:8px; font-size:13px; white-space:nowrap; }
+    #datepicker-trigger svg { flex-shrink:0; opacity:0.5; }
+  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -59,16 +90,18 @@
         <h2>Laporan</h2>
         <p>Analisis performa kampanye & efektivitas autopilot</p>
       </div>
-      <div class="topbar-right" style="flex-wrap:wrap; gap:8px;">
-        <div style="display:flex; align-items:center; gap:4px;">
-          <button class="btn btn-outline date-preset-btn" data-days="7" style="font-size:12px; padding:5px 10px;">7H</button>
-          <button class="btn btn-outline date-preset-btn" data-days="30" style="font-size:12px; padding:5px 10px;">30H</button>
-          <button class="btn btn-outline date-preset-btn" data-days="90" style="font-size:12px; padding:5px 10px;">3BL</button>
-        </div>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <input type="date" id="date-from" class="form-input" style="width:140px; font-size:13px;" />
-          <span style="color:var(--gray-5); font-size:13px;">–</span>
-          <input type="date" id="date-to" class="form-input" style="width:140px; font-size:13px;" />
+      <div class="topbar-right">
+        <input type="hidden" id="date-from" />
+        <input type="hidden" id="date-to" />
+        <div style="position:relative;" id="datepicker-wrapper">
+          <button class="btn btn-outline" id="datepicker-trigger">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            <span id="datepicker-label">Memuat...</span>
+          </button>
+          <div id="datepicker-panel">
+            <div class="dp-presets" id="dp-presets"></div>
+            <div class="dp-calendar" id="dp-calendar"></div>
+          </div>
         </div>
         <button class="btn btn-outline" id="btn-export">⬇ Export CSV</button>
       </div>
@@ -241,6 +274,165 @@
   let currentProfile = null;
   let spendChart, ctrChart, regionChart;
 
+  // ── Custom Date Range Picker ──
+  const DP_PRESETS = [
+    { id: 'today',          label: 'Hari Ini' },
+    { id: 'yesterday',      label: 'Kemarin' },
+    { id: 'today_yest',     label: 'Hari ini dan kemarin' },
+    { id: '7',              label: '7 hari terakhir' },
+    { id: '14',             label: '14 hari terakhir' },
+    { id: '30',             label: '30 hari terakhir' },
+    { id: 'this_month',     label: 'Bulan ini' },
+    { id: 'last_month',     label: 'Bulan lalu' },
+    { id: '90',             label: '3 Bulan terakhir' },
+  ];
+  const MONTH_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const DAY_ID   = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+
+  let dp = { start: null, end: null, picking: 'start', year: 0, month: 0, preset: '30' };
+
+  function dpToStr(d) { return d.toISOString().split('T')[0]; }
+  function dpFmt(s) {
+    if (!s) return '';
+    const [y,m,d] = s.split('-');
+    return `${d}/${m}/${y}`;
+  }
+
+  function dpPresetRange(id) {
+    const t = new Date(); t.setHours(0,0,0,0);
+    const yest = new Date(t); yest.setDate(t.getDate()-1);
+    if (id === 'today')      return [dpToStr(t), dpToStr(t)];
+    if (id === 'yesterday')  return [dpToStr(yest), dpToStr(yest)];
+    if (id === 'today_yest') return [dpToStr(yest), dpToStr(t)];
+    if (id === 'this_month') return [dpToStr(new Date(t.getFullYear(), t.getMonth(), 1)), dpToStr(t)];
+    if (id === 'last_month') {
+      const s = new Date(t.getFullYear(), t.getMonth()-1, 1);
+      const e = new Date(t.getFullYear(), t.getMonth(), 0);
+      return [dpToStr(s), dpToStr(e)];
+    }
+    const days = parseInt(id);
+    const s = new Date(t); s.setDate(t.getDate() - days + 1);
+    return [dpToStr(s), dpToStr(t)];
+  }
+
+  function dpApplyPreset(id) {
+    const [s, e] = dpPresetRange(id);
+    dp.start = s; dp.end = e; dp.preset = id; dp.picking = 'start';
+    const endDate = new Date(e);
+    dp.year = endDate.getFullYear(); dp.month = endDate.getMonth();
+    dpUpdateInputs();
+    dpRenderPresets();
+    dpRenderCalendar();
+  }
+
+  function dpUpdateInputs() {
+    document.getElementById('date-from').value = dp.start || '';
+    document.getElementById('date-to').value   = dp.end   || '';
+    const lbl = document.getElementById('datepicker-label');
+    lbl.textContent = (dp.start && dp.end)
+      ? dpFmt(dp.start) + ' – ' + dpFmt(dp.end)
+      : dp.start ? dpFmt(dp.start) + ' – ...' : 'Pilih tanggal';
+  }
+
+  function dpRenderPresets() {
+    document.getElementById('dp-presets').innerHTML = DP_PRESETS.map(p => `
+      <div class="dp-preset-item ${dp.preset === p.id ? 'active' : ''}" onclick="window._dpPreset('${p.id}')">
+        <div class="dp-radio"></div><span>${p.label}</span>
+      </div>`).join('');
+  }
+
+  function dpRenderCalendar() {
+    const y = dp.year, m = dp.month;
+    const firstDow  = new Date(y, m, 1).getDay();
+    const daysInMon = new Date(y, m+1, 0).getDate();
+    const daysInPrev= new Date(y, m, 0).getDate();
+    const todayStr  = dpToStr(new Date());
+
+    let cells = DAY_ID.map(d => `<div class="dp-day-header">${d}</div>`).join('');
+
+    // prev month filler
+    for (let i = firstDow-1; i >= 0; i--)
+      cells += `<div class="dp-day other-month"><div class="dp-day-inner">${daysInPrev-i}</div></div>`;
+
+    // current month
+    for (let d = 1; d <= daysInMon; d++) {
+      const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const isStart = ds === dp.start;
+      const isEnd   = ds === dp.end;
+      const inRange = dp.start && dp.end && ds > dp.start && ds < dp.end;
+      const only    = isStart && isEnd;
+      let cls = 'dp-day';
+      if (ds === todayStr) cls += ' today';
+      if (isStart) cls += ' sel-start' + (only ? ' only' : '');
+      if (isEnd)   cls += ' sel-end'   + (only ? ' only' : '');
+      if (inRange) cls += ' in-range';
+      cells += `<div class="${cls}" onclick="window._dpDay('${ds}')"><div class="dp-day-inner">${d}</div></div>`;
+    }
+
+    // next month filler
+    const total = Math.ceil((firstDow + daysInMon) / 7) * 7;
+    for (let i = 1; i <= total - firstDow - daysInMon; i++)
+      cells += `<div class="dp-day other-month"><div class="dp-day-inner">${i}</div></div>`;
+
+    document.getElementById('dp-calendar').innerHTML = `
+      <div class="dp-cal-header">
+        <button class="dp-nav-btn" onclick="window._dpNav(-1)">‹</button>
+        <strong>${MONTH_ID[m]} ${y}</strong>
+        <button class="dp-nav-btn" onclick="window._dpNav(1)">›</button>
+      </div>
+      <div class="dp-grid">${cells}</div>`;
+  }
+
+  window._dpPreset = function(id) {
+    dpApplyPreset(id);
+    dpClose();
+    loadAll();
+  };
+
+  window._dpDay = function(ds) {
+    dp.preset = null;
+    if (dp.picking === 'start') {
+      dp.start = ds; dp.end = null; dp.picking = 'end';
+      dpUpdateInputs(); dpRenderPresets(); dpRenderCalendar();
+    } else {
+      if (ds < dp.start) { dp.end = dp.start; dp.start = ds; }
+      else               { dp.end = ds; }
+      dp.picking = 'start';
+      dpUpdateInputs(); dpClose(); loadAll();
+    }
+  };
+
+  window._dpNav = function(dir) {
+    dp.month += dir;
+    if (dp.month < 0)  { dp.month = 11; dp.year--; }
+    if (dp.month > 11) { dp.month = 0;  dp.year++; }
+    dpRenderCalendar();
+  };
+
+  function dpOpen() {
+    const panel = document.getElementById('datepicker-panel');
+    panel.style.display = 'flex';
+    dpRenderPresets();
+    dpRenderCalendar();
+  }
+
+  function dpClose() {
+    document.getElementById('datepicker-panel').style.display = 'none';
+  }
+
+  function initDatepicker() {
+    // Default: 30 hari terakhir
+    dpApplyPreset('30');
+
+    document.getElementById('datepicker-trigger').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const panel = document.getElementById('datepicker-panel');
+      panel.style.display === 'none' ? dpOpen() : dpClose();
+    });
+    document.getElementById('datepicker-panel').addEventListener('click', e => e.stopPropagation());
+    document.addEventListener('click', dpClose);
+  }
+
   async function init() {
     sb = await getSupabase();
     const session = await requireAuth();
@@ -248,24 +440,7 @@
     currentProfile = await renderUserInfo();
     initSidebar();
 
-    // Default: 30 hari terakhir
-    const today = new Date().toISOString().split('T')[0];
-    const thirtyAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
-    document.getElementById('date-from').value = thirtyAgo;
-    document.getElementById('date-to').value = today;
-
-    document.getElementById('date-from').addEventListener('change', loadAll);
-    document.getElementById('date-to').addEventListener('change', loadAll);
-    document.querySelectorAll('.date-preset-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const days = parseInt(btn.dataset.days);
-        const t = new Date().toISOString().split('T')[0];
-        const f = new Date(Date.now() - days*24*60*60*1000).toISOString().split('T')[0];
-        document.getElementById('date-from').value = f;
-        document.getElementById('date-to').value = t;
-        loadAll();
-      });
-    });
+    initDatepicker();
     document.getElementById('btn-export').addEventListener('click', exportCSV);
     document.getElementById('btn-load-region').addEventListener('click', loadRegionBreakdown);
     document.getElementById('region-campaign-filter').addEventListener('change', loadRegionBreakdown);
