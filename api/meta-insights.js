@@ -112,15 +112,7 @@ async function fetchRangeInsights(req, res) {
       const impressions = parseInt(d.impressions || 0);
       const ctr = parseFloat(d.ctr || 0);
 
-      // Hitung results: priority purchase → lead (tidak pakai link_click sebagai fallback)
       const actions = d.actions || [];
-      const getAction = (...types) => {
-        for (const t of types) {
-          const found = actions.find(a => a.action_type === t);
-          if (found) return parseInt(found.value || 0);
-        }
-        return 0;
-      };
       const resultCount = getResults(actions, camp.campaign_type);
       const cpr = resultCount > 0 ? Math.round(spend / resultCount) : null;
 

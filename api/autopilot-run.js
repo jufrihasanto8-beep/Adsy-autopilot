@@ -89,7 +89,7 @@ export default async function handler(req, res) {
 
         // Re-fetch lagi setelah phase advance untuk custom rules
         const { data: latest } = await sb.from('campaigns')
-          .select('*, products(target_cpr, target_roas)')
+          .select('*, products(target_cpr, target_roas, target_cpr_ctwa)')
           .eq('id', fresh.id).single();
         if (!latest || !latest.autopilot_enabled || latest.status === 'PAUSED') continue;
 
@@ -1111,7 +1111,7 @@ async function manualAdvancePhase(req, res) {
     }
 
     const { data: camp } = await sb.from('campaigns')
-      .select('*, products(target_cpr, name, tagline, benefits)')
+      .select('*, products(target_cpr, target_cpr_ctwa, name, tagline, benefits)')
       .eq('id', campaign_id)
       .eq('user_id', user_id)
       .single();
@@ -1406,7 +1406,6 @@ async function checkAdAccountStatuses() {
         // Simpan ke action_logs sebagai billing_alert
         await sb.from('action_logs').insert({
           user_id,
-          campaign_id: null,
           campaign_name: ad_account_id,
           action_type: 'billing_alert',
           description: `Ad Account ${accName}: ${statusText}`,
