@@ -520,25 +520,18 @@
         </div>
       </div>`;
     if (sp.strategy === 'cbo_interest') {
-      const adsets = sp.adsets || [];
       return `
-      <div style="margin-bottom:8px;">
-        <div style="font-size:11px;color:#B45309;font-weight:600;margin-bottom:6px;">Adset</div>
-        <div id="bp-p2-adsets-${i}" style="display:flex;flex-direction:column;gap:6px;">${adsets.map((a,j) => `
-          <div style="display:flex;gap:6px;align-items:center;">
-            <input type="text" class="form-input" style="width:90px;flex-shrink:0;font-size:12px;" placeholder="Label" value="${a.label||''}"
-              oninput="bpP2SetAdset(${i},${j},'label',this.value)" />
-            <select class="form-input form-select" style="flex:1;font-size:12px;" onchange="bpP2SetAdset(${i},${j},'type',this.value)">
-              ${ADSET_TYPES.map(t=>`<option value="${t.value}"${a.type===t.value?' selected':''}>${t.label}</option>`).join('')}
-            </select>
-            ${adsets.length>1?`<button type="button" onclick="bpP2RemoveAdset(${i},${j})" class="btn btn-ghost btn-sm" style="color:var(--danger);padding:3px 7px;">✕</button>`:''}
-          </div>`).join('')}
+      <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:600;color:#92400E;margin-bottom:4px;">🤖 Auto-generate 3 adset</div>
+        <div style="font-size:11px;color:#92400E;line-height:1.5;">
+          Sistem otomatis buat 3 adset dengan interest berbeda per kategori:<br>
+          <strong>Manfaat</strong> (terkait produk) · <strong>Lifestyle</strong> (gaya hidup) · <strong>Perilaku</strong> (belanja online)<br>
+          AI cari &amp; kategorikan interest dari Meta Ads berdasarkan info produk.
         </div>
-        <button type="button" class="btn btn-outline btn-sm" onclick="bpP2AddAdset(${i})" style="margin-top:6px;font-size:11px;">+ Adset</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group" style="margin:0;">
-          <label class="form-label" style="font-size:11px;">Budget CBO (Rp)</label>
+          <label class="form-label" style="font-size:11px;">Budget CBO Total (Rp)</label>
           <input type="text" inputmode="numeric" class="form-input" value="${fmtRp(sp.budget??1000000)}"
             oninput="bpInputRpP2(this,${i},'budget')" />
         </div>
@@ -614,7 +607,7 @@
   window.bpP2SubPhaseSetStrategy = (i, val) => {
     const defaults = {
       cost_cap:     { strategy: val, budget: 5000000, bid_pct: 10 },
-      cbo_interest: { strategy: val, adsets: [{type:'interest',label:'Interest 1'},{type:'interest',label:'Interest 2'},{type:'interest',label:'Interest 3'}], budget: 1000000, evaluation_days: 7 },
+      cbo_interest: { strategy: val, budget: 1000000, evaluation_days: 7 },
       abo_interest: { strategy: val, adsets: [{type:'interest',label:'Manfaat'},{type:'interest',label:'Perilaku'},{type:'interest',label:'Hobi'}], budget_per_adset: 50000, evaluation_days: 7 },
       lookalike:    { strategy: val, budget: 100000, evaluation_days: 7 },
       broad:        { strategy: val, budget: 100000, evaluation_days: 7 },
