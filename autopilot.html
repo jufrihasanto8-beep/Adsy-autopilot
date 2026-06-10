@@ -123,6 +123,18 @@
         </div>
       </div>
 
+      <!-- BLUEPRINT SECTION (admin only) -->
+      <div class="card" style="margin-bottom:24px;display:none;" id="blueprint-section">
+        <div class="card-header">
+          <div>
+            <div class="card-title">🧬 Blueprint Autopilot</div>
+            <div class="card-sub">Template strategi — dipilih saat buat kampanye</div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-add-blueprint">+ Buat Blueprint</button>
+        </div>
+        <div id="blueprint-list" style="display:flex;flex-direction:column;gap:10px;padding-top:4px;"></div>
+      </div>
+
       <div class="grid-6-4">
         <!-- RULES LIST -->
         <div>
@@ -176,6 +188,125 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- MODAL BLUEPRINT -->
+<div class="modal-overlay hidden" id="modal-blueprint">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <h3 id="bp-modal-title">Buat Blueprint</h3>
+      <div class="modal-close" onclick="closeModal('modal-blueprint')">✕</div>
+    </div>
+    <div class="modal-body" style="max-height:72vh;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Info dasar -->
+      <div class="form-row" style="margin-bottom:0;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Nama Blueprint <span style="color:var(--danger)">*</span></label>
+          <input type="text" class="form-input" id="bp-name" placeholder="Misal: Agresif 3 Adset" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Deskripsi</label>
+          <input type="text" class="form-input" id="bp-desc" placeholder="Deskripsi singkat..." />
+        </div>
+      </div>
+
+      <!-- Phase 1 -->
+      <div style="background:var(--primary-light);border-radius:8px;padding:16px;border-left:3px solid var(--primary);">
+        <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px;">PHASE 1 — Testing</div>
+
+        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;">Struktur Adset</div>
+        <div id="bp-p1-adsets" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="bpAddP1Adset()" style="margin-top:8px;font-size:12px;">+ Tambah Adset</button>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Evaluasi setelah (hari)</label>
+            <input type="number" class="form-input" id="bp-p1-days" value="3" min="1" max="14" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Pause jika CPR > …× target</label>
+            <input type="number" class="form-input" id="bp-p1-pause" value="2.5" step="0.1" min="1" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Advance jika CPR ≤ …× target</label>
+            <input type="number" class="form-input" id="bp-p1-advance" value="1.1" step="0.1" min="1" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 2a -->
+      <div style="background:#FFFBEB;border-radius:8px;padding:16px;border-left:3px solid var(--warning);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-size:12px;font-weight:700;color:#B45309;text-transform:uppercase;letter-spacing:.5px;">PHASE 2A — Cost Cap</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+            <input type="checkbox" id="bp-p2a-enabled" checked onchange="bpToggleP2a(this.checked)" />
+            <span>Aktifkan</span>
+          </label>
+        </div>
+        <div id="bp-p2a-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Budget (Rp)</label>
+            <input type="number" class="form-input" id="bp-p2a-budget" value="5000000" step="500000" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Bid Cap = CPR Phase 1 × …</label>
+            <input type="number" class="form-input" id="bp-p2a-bid" value="1.1" step="0.05" min="1" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 2b -->
+      <div style="background:#FFFBEB;border-radius:8px;padding:16px;border-left:3px solid var(--warning);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-size:12px;font-weight:700;color:#B45309;text-transform:uppercase;letter-spacing:.5px;">PHASE 2B — ABO Interest</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+            <input type="checkbox" id="bp-p2b-enabled" checked onchange="bpToggleP2b(this.checked)" />
+            <span>Aktifkan</span>
+          </label>
+        </div>
+        <div id="bp-p2b-fields">
+          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;">Adset Phase 2b</div>
+          <div id="bp-p2b-adsets" style="display:flex;flex-direction:column;gap:8px;"></div>
+          <button type="button" class="btn btn-outline btn-sm" onclick="bpAddP2bAdset()" style="margin-top:8px;font-size:12px;">+ Tambah Adset</button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:11px;">Budget per Adset (Rp)</label>
+              <input type="number" class="form-input" id="bp-p2b-budget" value="50000" step="10000" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:11px;">Evaluasi setelah (hari)</label>
+              <input type="number" class="form-input" id="bp-p2b-days" value="7" min="1" max="30" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 3 -->
+      <div style="background:#F0FDF4;border-radius:8px;padding:16px;border-left:3px solid var(--success);">
+        <div style="font-size:12px;font-weight:700;color:#15803D;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;">PHASE 3 — Scale</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Naik budget (%/hari)</label>
+            <input type="number" class="form-input" id="bp-p3-scale" value="3" min="1" max="50" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Maks naik (%/hari)</label>
+            <input type="number" class="form-input" id="bp-p3-maxscale" value="30" min="5" max="100" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Pause jika CPR > …× target</label>
+            <input type="number" class="form-input" id="bp-p3-pause" value="2.0" step="0.1" min="1" />
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-blueprint')">Batal</button>
+      <button class="btn btn-primary" id="btn-save-blueprint">Simpan Blueprint</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL TAMBAH RULE -->
@@ -321,6 +452,212 @@
   let sb;
   let currentProfile = null;
 
+  // ── Blueprint state ──
+  let bpEditId = null;
+  let bpP1Adsets = [];
+  let bpP2bAdsets = [];
+
+  const ADSET_TYPES = [
+    { value: 'interest', label: 'Interest (AI otomatis)' },
+    { value: 'broad',    label: 'Broad (tanpa targeting)' },
+    { value: 'retargeting', label: 'Retargeting (website visitor)' },
+    { value: 'lookalike',   label: 'Lookalike Audience' },
+  ];
+
+  function bpRenderP1Adsets() {
+    const el = document.getElementById('bp-p1-adsets');
+    if (!bpP1Adsets.length) { el.innerHTML = ''; return; }
+    el.innerHTML = bpP1Adsets.map((a, i) => `
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:12px;color:var(--gray-5);width:60px;flex-shrink:0;">Adset ${i + 1}</span>
+        <select class="form-input form-select" style="flex:1;font-size:13px;" onchange="bpP1Adsets[${i}].type=this.value">
+          ${ADSET_TYPES.map(t => `<option value="${t.value}"${a.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('')}
+        </select>
+        ${bpP1Adsets.length > 1 ? `<button type="button" onclick="bpRemoveP1Adset(${i})" class="btn btn-ghost btn-sm" style="color:var(--danger);padding:4px 8px;">✕</button>` : ''}
+      </div>`).join('');
+  }
+
+  function bpRenderP2bAdsets() {
+    const el = document.getElementById('bp-p2b-adsets');
+    if (!bpP2bAdsets.length) { el.innerHTML = ''; return; }
+    el.innerHTML = bpP2bAdsets.map((a, i) => `
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" class="form-input" style="width:100px;flex-shrink:0;font-size:13px;" placeholder="Label" value="${a.label || ''}"
+          oninput="bpP2bAdsets[${i}].label=this.value" />
+        <select class="form-input form-select" style="flex:1;font-size:13px;" onchange="bpP2bAdsets[${i}].type=this.value">
+          ${ADSET_TYPES.map(t => `<option value="${t.value}"${a.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('')}
+        </select>
+        ${bpP2bAdsets.length > 1 ? `<button type="button" onclick="bpRemoveP2bAdset(${i})" class="btn btn-ghost btn-sm" style="color:var(--danger);padding:4px 8px;">✕</button>` : ''}
+      </div>`).join('');
+  }
+
+  window.bpAddP1Adset  = () => { bpP1Adsets.push({ type: 'interest' }); bpRenderP1Adsets(); };
+  window.bpRemoveP1Adset  = (i) => { bpP1Adsets.splice(i, 1); bpRenderP1Adsets(); };
+  window.bpAddP2bAdset = () => { bpP2bAdsets.push({ type: 'interest', label: '' }); bpRenderP2bAdsets(); };
+  window.bpRemoveP2bAdset = (i) => { bpP2bAdsets.splice(i, 1); bpRenderP2bAdsets(); };
+
+  window.bpToggleP2a = (on) => { document.getElementById('bp-p2a-fields').style.display = on ? 'grid' : 'none'; };
+  window.bpToggleP2b = (on) => { document.getElementById('bp-p2b-fields').style.display = on ? '' : 'none'; };
+
+  function openBlueprintModal(bp = null) {
+    bpEditId = bp?.id || null;
+    document.getElementById('bp-modal-title').textContent = bp ? 'Edit Blueprint' : 'Buat Blueprint';
+
+    const cfg = bp?.config || {};
+    const p1  = cfg.phase1 || {};
+    const p2a = cfg.phase2a || {};
+    const p2b = cfg.phase2b || {};
+    const p3  = cfg.phase3  || {};
+
+    document.getElementById('bp-name').value = bp?.name || '';
+    document.getElementById('bp-desc').value = bp?.description || '';
+    document.getElementById('bp-p1-days').value    = p1.evaluation?.duration_days ?? 3;
+    document.getElementById('bp-p1-pause').value   = p1.evaluation?.pause_cpr_multiplier ?? 2.5;
+    document.getElementById('bp-p1-advance').value = p1.evaluation?.advance_cpr_multiplier ?? 1.1;
+    document.getElementById('bp-p2a-enabled').checked = p2a.enabled !== false;
+    document.getElementById('bp-p2a-budget').value = p2a.budget ?? 5000000;
+    document.getElementById('bp-p2a-bid').value    = p2a.bid_multiplier ?? 1.1;
+    document.getElementById('bp-p2b-enabled').checked = p2b.enabled !== false;
+    document.getElementById('bp-p2b-budget').value = p2b.budget_per_adset ?? 50000;
+    document.getElementById('bp-p2b-days').value   = p2b.evaluation_days ?? 7;
+    document.getElementById('bp-p3-scale').value   = p3.scale_pct ?? 3;
+    document.getElementById('bp-p3-maxscale').value= p3.max_scale_pct ?? 30;
+    document.getElementById('bp-p3-pause').value   = p3.pause_cpr_multiplier ?? 2.0;
+
+    bpP1Adsets  = p1.adsets?.length  ? JSON.parse(JSON.stringify(p1.adsets))  : [{ type: 'interest' }];
+    bpP2bAdsets = p2b.adsets?.length ? JSON.parse(JSON.stringify(p2b.adsets)) : [
+      { type: 'interest', label: 'Manfaat' },
+      { type: 'interest', label: 'Perilaku' },
+      { type: 'interest', label: 'Hobi' }
+    ];
+
+    bpRenderP1Adsets();
+    bpRenderP2bAdsets();
+    bpToggleP2a(p2a.enabled !== false);
+    bpToggleP2b(p2b.enabled !== false);
+    openModal('modal-blueprint');
+  }
+
+  async function saveBlueprintHandler() {
+    const name = document.getElementById('bp-name').value.trim();
+    if (!name) return showToast('Nama blueprint wajib diisi', 'warning');
+    if (!bpP1Adsets.length) return showToast('Minimal 1 adset di Phase 1', 'warning');
+
+    const p2aEnabled = document.getElementById('bp-p2a-enabled').checked;
+    const p2bEnabled = document.getElementById('bp-p2b-enabled').checked;
+
+    const config = {
+      phase1: {
+        adsets: bpP1Adsets,
+        evaluation: {
+          duration_days:          parseInt(document.getElementById('bp-p1-days').value)    || 3,
+          pause_cpr_multiplier:   parseFloat(document.getElementById('bp-p1-pause').value) || 2.5,
+          advance_cpr_multiplier: parseFloat(document.getElementById('bp-p1-advance').value) || 1.1,
+        }
+      },
+      phase2a: {
+        enabled:        p2aEnabled,
+        budget:         parseInt(document.getElementById('bp-p2a-budget').value) || 5000000,
+        bid_multiplier: parseFloat(document.getElementById('bp-p2a-bid').value) || 1.1,
+      },
+      phase2b: {
+        enabled:         p2bEnabled,
+        adsets:          bpP2bAdsets,
+        budget_per_adset: parseInt(document.getElementById('bp-p2b-budget').value) || 50000,
+        evaluation_days:  parseInt(document.getElementById('bp-p2b-days').value)   || 7,
+      },
+      phase3: {
+        scale_pct:            parseInt(document.getElementById('bp-p3-scale').value)    || 3,
+        max_scale_pct:        parseInt(document.getElementById('bp-p3-maxscale').value) || 30,
+        pause_cpr_multiplier: parseFloat(document.getElementById('bp-p3-pause').value)  || 2.0,
+      }
+    };
+
+    const payload = {
+      name,
+      description: document.getElementById('bp-desc').value.trim() || null,
+      config,
+      updated_at: new Date().toISOString()
+    };
+
+    const btn = document.getElementById('btn-save-blueprint');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    try {
+      let error;
+      if (bpEditId) {
+        ({ error } = await sb.from('autopilot_blueprints').update(payload).eq('id', bpEditId).eq('is_system', false));
+      } else {
+        payload.created_by = currentProfile.id;
+        ({ error } = await sb.from('autopilot_blueprints').insert(payload));
+      }
+      if (error) throw error;
+      showToast(bpEditId ? 'Blueprint diperbarui!' : 'Blueprint berhasil dibuat!', 'success');
+      closeModal('modal-blueprint');
+      await loadBlueprints();
+    } catch (e) {
+      showToast('Gagal: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Simpan Blueprint';
+    }
+  }
+
+  window.editBlueprint = async function(id) {
+    const { data: bp } = await sb.from('autopilot_blueprints').select('*').eq('id', id).single();
+    if (bp) openBlueprintModal(bp);
+  };
+
+  window.deleteBlueprint = async function(id, name) {
+    if (!confirm(`Hapus blueprint "${name}"?\n\nKampanye yang sudah pakai blueprint ini tidak terpengaruh.`)) return;
+    const { error } = await sb.from('autopilot_blueprints').delete().eq('id', id).eq('is_system', false);
+    if (error) return showToast('Gagal hapus: ' + error.message, 'error');
+    showToast('Blueprint dihapus', 'success');
+    await loadBlueprints();
+  };
+
+  async function loadBlueprints() {
+    const { data } = await sb.from('autopilot_blueprints').select('*').order('created_at');
+    const el = document.getElementById('blueprint-list');
+    if (!data?.length) {
+      el.innerHTML = `<div style="text-align:center;padding:24px;color:var(--gray-5);font-size:13px;">Belum ada blueprint</div>`;
+      return;
+    }
+
+    el.innerHTML = data.map(bp => {
+      const cfg = bp.config || {};
+      const p1adsets = cfg.phase1?.adsets?.length || 1;
+      const p2bAdsets = cfg.phase2b?.adsets?.length || 0;
+      const p2bEnabled = cfg.phase2b?.enabled !== false;
+      const p2aEnabled = cfg.phase2a?.enabled !== false;
+      const scale = cfg.phase3?.scale_pct || 3;
+
+      const summary = [
+        `P1: ${p1adsets} adset`,
+        p2aEnabled ? 'P2a: Cost Cap' : '',
+        p2bEnabled ? `P2b: ${p2bAdsets} adset` : '',
+        `P3: Scale ${scale}%`
+      ].filter(Boolean).join(' · ');
+
+      return `
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--gray-1);border-radius:8px;border:1px solid var(--gray-3);">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span style="font-size:14px;font-weight:700;">${bp.name}</span>
+            ${bp.is_system ? '<span class="badge badge-primary" style="font-size:10px;">Bawaan</span>' : ''}
+          </div>
+          ${bp.description ? `<div style="font-size:12px;color:var(--gray-5);margin-bottom:4px;">${bp.description}</div>` : ''}
+          <div style="font-size:12px;color:var(--text-sub);">${summary}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          ${!bp.is_system ? `
+            <button class="btn btn-outline btn-sm" onclick="editBlueprint('${bp.id}')">Edit</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteBlueprint('${bp.id}', '${bp.name.replace(/'/g, "\\'")}')">Hapus</button>
+          ` : `<span style="font-size:12px;color:var(--gray-5);">Read-only</span>`}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
   async function init() {
     sb = await getSupabase();
     const session = await requireAuth();
@@ -333,6 +670,10 @@
       document.getElementById('btn-run-now').style.display = '';
       document.getElementById('btn-add-rule').style.display = '';
       document.getElementById('btn-edit-scheme').style.display = '';
+      document.getElementById('blueprint-section').style.display = '';
+      document.getElementById('btn-add-blueprint').addEventListener('click', () => openBlueprintModal());
+      document.getElementById('btn-save-blueprint').addEventListener('click', saveBlueprintHandler);
+      await loadBlueprints();
     }
 
     document.getElementById('btn-add-rule').addEventListener('click', () => openModal('modal-rule'));

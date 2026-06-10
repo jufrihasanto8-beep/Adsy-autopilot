@@ -305,6 +305,20 @@
             </div>
           </div>
 
+          <!-- Blueprint Selector -->
+          <div style="margin-bottom:16px;padding:14px 16px;background:var(--primary-light);border-radius:8px;border:1px solid #BFDBFE;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div>
+                <div style="font-size:13px;font-weight:700;">🧬 Blueprint Autopilot</div>
+                <div style="font-size:12px;color:var(--text-sub);margin-top:2px;">Strategi yang dijalankan autopilot untuk kampanye ini</div>
+              </div>
+              <select class="form-input form-select" id="pub-blueprint" style="width:220px;font-size:13px;">
+                <option value="">Memuat blueprint...</option>
+              </select>
+            </div>
+            <div id="blueprint-preview" style="font-size:12px;color:var(--text-sub);"></div>
+          </div>
+
           <!-- Row 1: Nama + Objective -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
             <div class="form-group" style="margin:0;">
@@ -442,7 +456,7 @@
     currentProfile = await renderUserInfo();
     initSidebar();
 
-    await loadProducts();
+    await Promise.all([loadProducts(), loadBlueprints()]);
     setupUpload();
     setupEvents();
 
@@ -453,6 +467,37 @@
       document.getElementById('select-product').value = productId;
       document.getElementById('select-product').dispatchEvent(new Event('change'));
     }
+  }
+
+  async function loadBlueprints() {
+    const { data } = await sb.from('autopilot_blueprints').select('*').order('created_at');
+    const sel = document.getElementById('pub-blueprint');
+    if (!data?.length) {
+      sel.innerHTML = '<option value="">Tidak ada blueprint</option>';
+      return;
+    }
+    sel.innerHTML = data.map(bp =>
+      `<option value="${bp.id}" ${bp.is_system ? 'selected' : ''}>${bp.name}${bp.is_system ? ' (Default)' : ''}</option>`
+    ).join('');
+    sel.addEventListener('change', () => renderBlueprintPreview(data.find(b => b.id === sel.value)));
+    renderBlueprintPreview(data.find(b => b.is_system) || data[0]);
+  }
+
+  function renderBlueprintPreview(bp) {
+    const el = document.getElementById('blueprint-preview');
+    if (!bp) { el.innerHTML = ''; return; }
+    const cfg = bp.config || {};
+    const p1 = cfg.phase1 || {};
+    const p2a = cfg.phase2a || {};
+    const p2b = cfg.phase2b || {};
+    const p3 = cfg.phase3 || {};
+    const parts = [
+      `P1: ${p1.adsets?.length || 1} adset · evaluasi ${p1.evaluation?.duration_days || 3} hari`,
+      p2a.enabled !== false ? `P2a: Cost Cap Rp ${(p2a.budget || 5000000).toLocaleString('id-ID')}` : '',
+      p2b.enabled !== false ? `P2b: ABO ${p2b.adsets?.length || 3} adset @ Rp ${(p2b.budget_per_adset || 50000).toLocaleString('id-ID')}` : '',
+      `P3: scale ${p3.scale_pct || 3}%/hari`
+    ].filter(Boolean);
+    el.innerHTML = parts.join(' &nbsp;·&nbsp; ');
   }
 
   async function loadProducts() {
@@ -861,6 +906,8 @@
         formData.append('bid_strategy', bidStrategy);
         if (bidValue) formData.append('bid_value', bidValue);
         formData.append('campaign_name', campaignNameInput || `${selectedProduct.name} - ${new Date().toLocaleDateString('id-ID')}`);
+        const bpId = document.getElementById('pub-blueprint').value;
+        if (bpId) formData.append('blueprint_id', bpId);
         formData.append('auto_activate', document.getElementById('pub-auto-activate').checked ? '1' : '0');
         if (startTime) formData.append('start_time', new Date(startTime).toISOString());
         if (endTime) formData.append('end_time', new Date(endTime).toISOString());
