@@ -125,6 +125,9 @@
             <option value="2">Phase 2: Evaluasi</option>
             <option value="3">Phase 3: Scale</option>
           </select>
+          <select class="form-input form-select" id="filter-account" style="width:auto;">
+            <option value="">Semua Akun Iklan</option>
+          </select>
         </div>
 
         <div class="table-wrap">
@@ -135,6 +138,7 @@
                 <th>Phase</th>
                 <th>Budget/Hari</th>
                 <th>Spend</th>
+                <th>Hasil</th>
                 <th>CPR</th>
                 <th>CTR</th>
                 <th>Status</th>
@@ -142,7 +146,7 @@
               </tr>
             </thead>
             <tbody id="camp-table">
-              <tr><td colspan="8" style="text-align:center; padding:50px; color:var(--gray-5);">
+              <tr><td colspan="9" style="text-align:center; padding:50px; color:var(--gray-5);">
                 Memuat kampanye...
               </td></tr>
             </tbody>
@@ -364,7 +368,8 @@
     const { data } = await q;
     allCampaigns = data || [];
     updateStats(allCampaigns);
-    renderCampaigns(allCampaigns);
+    populateAccountFilter();
+    filterCampaigns();
   }
 
   function updateStats(data) {
@@ -377,12 +382,14 @@
   function filterCampaigns() {
     const search = document.getElementById('search-camp').value.toLowerCase();
     const phase = document.getElementById('filter-phase').value;
+    const account = document.getElementById('filter-account').value;
 
     let filtered = allCampaigns.filter(c => {
       const matchTab = currentTab === 'all' || c.status === currentTab || (currentTab === 'archived' && c.status === 'ARCHIVED');
       const matchSearch = !search || c.name.toLowerCase().includes(search);
       const matchPhase = !phase || String(c.current_phase) === phase;
-      return matchTab && matchSearch && matchPhase;
+      const matchAccount = !account || c.ad_account_id === account;
+      return matchTab && matchSearch && matchPhase && matchAccount;
     });
 
     renderCampaigns(filtered);
@@ -391,7 +398,7 @@
   function renderCampaigns(data) {
     const tbody = document.getElementById('camp-table');
     if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:50px; color:var(--gray-5);">
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:50px; color:var(--gray-5);">
         Tidak ada kampanye ditemukan</td></tr>`;
       return;
     }
@@ -408,13 +415,23 @@
         seen2b.add(c.meta_campaign_id);
         // Kumpulkan semua adset grup ini
         const group = data.filter(x => x.phase_type === '2b' && x.meta_campaign_id === c.meta_campaign_id);
-        const totalSpend = group.reduce((s, x) => s + (insightsMap[x.id]?.spend ?? x.spend_today ?? 0), 0);
+        const totalSpend = group.reduce((s, x) => {
+          const insLoaded = x.id in insightsMap;
+          return s + (insLoaded ? (insightsMap[x.id]?.spend ?? 0) : (insightsMap[x.id]?.spend ?? x.spend_today ?? 0));
+        }, 0);
         const totalBudget = group.reduce((s, x) => s + (x.daily_budget || 0), 0);
-        const avgCpr = (() => { const cprs = group.map(x => insightsMap[x.id]?.cpr ?? x.cpr).filter(v => v); return cprs.length ? cprs.reduce((a,b)=>a+b,0)/cprs.length : null; })();
+        const avgCpr = (() => {
+          const cprs = group.map(x => (x.id in insightsMap) ? insightsMap[x.id]?.cpr : (insightsMap[x.id]?.cpr ?? x.cpr)).filter(v => v != null);
+          return cprs.length ? cprs.reduce((a,b)=>a+b,0)/cprs.length : null;
+        })();
         const anyActive = group.some(x => x.status === 'ACTIVE');
+        const totalResults = group.reduce((s, x) => {
+          const insLoaded = x.id in insightsMap;
+          return s + (insLoaded ? (insightsMap[x.id]?.results_count ?? 0) : (insightsMap[x.id]?.results_count ?? x.results_today ?? 0));
+        }, 0);
         // Nama: strip " — Phase 2b Manfaat" dll → ambil parent name + "— Phase 2b"
         const parentName = c.name.replace(/ — Phase 2b.*$/, '') + ' — Phase 2b';
-        rows.push({ ...c, _group: group, _isGroup: true, _parentName: parentName, _totalSpend: totalSpend, _totalBudget: totalBudget, _avgCpr: avgCpr, _anyActive: anyActive });
+        rows.push({ ...c, _group: group, _isGroup: true, _parentName: parentName, _totalSpend: totalSpend, _totalBudget: totalBudget, _avgCpr: avgCpr, _anyActive: anyActive, _totalResults: totalResults });
       } else {
         rows.push(c);
       }
@@ -436,6 +453,7 @@
           <td><span class="badge badge-primary">P2: Evaluasi</span></td>
           <td>${formatRupiah(c._totalBudget)}</td>
           <td>${formatRupiah(c._totalSpend)}</td>
+          <td>${c._totalResults > 0 ? c._totalResults : '-'}</td>
           <td>${c._avgCpr ? formatRupiah(Math.round(c._avgCpr)) : '-'}</td>
           <td>-</td>
           <td>${statusBadge}</td>
@@ -452,10 +470,13 @@
         </tr>`;
       }
 
+      // Kalau insightsMap sudah di-load, pakai live data saja (jangan fallback ke DB stale)
+      const insLoaded = c.id in insightsMap;
       const ins = insightsMap[c.id] || {};
-      const spend = ins.spend ?? c.spend_today;
-      const cpr = ins.cpr ?? c.cpr;
-      const ctr = ins.ctr ?? c.ctr;
+      const spend = insLoaded ? ins.spend : (ins.spend ?? c.spend_today);
+      const cpr = insLoaded ? ins.cpr : (ins.cpr ?? c.cpr);
+      const ctr = insLoaded ? ins.ctr : (ins.ctr ?? c.ctr);
+      const results = insLoaded ? ins.results_count : (ins.results_count ?? c.results_today);
       return `
       <tr>
         <td>
@@ -467,8 +488,14 @@
             P${c.current_phase || 1}: ${phaseLabel[c.current_phase] || 'Testing'}
           </span>
         </td>
-        <td>${formatRupiah(c.daily_budget)}</td>
+        <td>
+          <div style="display:flex; align-items:center; gap:6px;">
+            ${formatRupiah(c.daily_budget)}
+            <button onclick="openEditBudget('${c.id}')" style="background:none;border:none;cursor:pointer;color:var(--gray-5);font-size:13px;padding:0;line-height:1;" title="Edit budget">✏️</button>
+          </div>
+        </td>
         <td>${formatRupiah(spend)}</td>
+        <td>${results > 0 ? results : '-'}</td>
         <td>${cpr ? formatRupiah(cpr) : '-'}</td>
         <td>${ctr ? parseFloat(ctr).toFixed(2) + '%' : '-'}</td>
         <td>
@@ -785,6 +812,94 @@
   };
 
   init();
+
+  // ── Filter Akun Iklan ──
+  function populateAccountFilter() {
+    const sel = document.getElementById('filter-account');
+    const accounts = [...new Set(allCampaigns.map(c => c.ad_account_id).filter(Boolean))];
+    // Simpan nilai yang sedang dipilih
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Semua Akun Iklan</option>';
+    accounts.forEach(acc => {
+      const opt = document.createElement('option');
+      opt.value = acc;
+      opt.textContent = acc;
+      sel.appendChild(opt);
+    });
+    if (current) sel.value = current;
+  }
+
+  document.getElementById('filter-account').addEventListener('change', filterCampaigns);
+
+  // ── Edit Budget ──
+  let editBudgetTarget = null;
+
+  function openEditBudget(id) {
+    const c = allCampaigns.find(x => x.id === id);
+    if (!c) return;
+    editBudgetTarget = c;
+    document.getElementById('edit-budget-name').textContent = c.name;
+    document.getElementById('edit-budget-input').value = c.daily_budget || '';
+    document.getElementById('modal-edit-budget').classList.remove('hidden');
+  }
+
+  document.getElementById('edit-budget-cancel').addEventListener('click', () => {
+    document.getElementById('modal-edit-budget').classList.add('hidden');
+    editBudgetTarget = null;
+  });
+
+  document.getElementById('edit-budget-save').addEventListener('click', async () => {
+    if (!editBudgetTarget) return;
+    const budget = parseInt(document.getElementById('edit-budget-input').value);
+    if (!budget || budget < 1000) return showToast('Budget minimal Rp 1.000', 'warning');
+
+    const btn = document.getElementById('edit-budget-save');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    try {
+      const res = await fetch('/api/meta-campaigns', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_budget',
+          id: editBudgetTarget.id,
+          meta_campaign_id: editBudgetTarget.meta_campaign_id,
+          meta_adset_id: editBudgetTarget.meta_adset_id,
+          daily_budget: budget,
+          user_id: currentProfile.id
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal update budget');
+      showToast('Budget berhasil diupdate!', 'success');
+      document.getElementById('modal-edit-budget').classList.add('hidden');
+      editBudgetTarget = null;
+      await loadCampaigns();
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Simpan';
+    }
+  });
 </script>
+
+<!-- Modal Edit Budget -->
+<div class="modal-overlay hidden" id="modal-edit-budget">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit Budget</h3>
+      <button class="modal-close" id="edit-budget-cancel">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="edit-budget-name" style="font-weight:600; margin-bottom:16px; color:var(--text);"></p>
+      <label class="form-label">Budget Harian (Rp)</label>
+      <input type="number" class="form-input" id="edit-budget-input" placeholder="50000" min="1000" step="1000" />
+      <p style="font-size:12px; color:var(--gray-5); margin-top:6px;">Perubahan akan langsung diterapkan ke Meta Ads.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="edit-budget-cancel2" onclick="document.getElementById('modal-edit-budget').classList.add('hidden')">Batal</button>
+      <button class="btn btn-primary" id="edit-budget-save">Simpan</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
