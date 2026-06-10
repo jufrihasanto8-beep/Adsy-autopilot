@@ -258,9 +258,7 @@
   }
 
   async function loadCampaigns(profile) {
-    let q = sb.from('campaigns').select('*')
-      .or('phase_type.is.null,phase_type.neq.2b')  // exclude adset Phase 2b, include null
-      .order('created_at', { ascending: false }).limit(5);
+    let q = sb.from('campaigns').select('*').order('created_at', { ascending: false });
     if (profile.role !== 'admin') q = q.eq('user_id', profile.id);
     const { data } = await q;
     renderDashCampaigns(data || []);
@@ -269,17 +267,35 @@
   function renderDashCampaigns(data) {
     const tbody = document.getElementById('campaign-table');
     if (!data || data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-5);">Belum ada campaign aktif</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-5);">Belum ada kampanye</td></tr>`;
       return;
     }
+
+    // Deduplicate Phase 2b: group by meta_campaign_id, ambil 1 baris representatif
+    const rows = [];
+    const seen2b = new Set();
+    for (const c of data) {
+      if (c.phase_type === '2b') {
+        if (seen2b.has(c.meta_campaign_id)) continue;
+        seen2b.add(c.meta_campaign_id);
+        const group = data.filter(x => x.phase_type === '2b' && x.meta_campaign_id === c.meta_campaign_id);
+        const totalSpend = group.reduce((s, x) => s + (x.spend_today || 0), 0);
+        const parentName = c.name.replace(/ — Phase 2b.*$/, '') + ' — Phase 2b';
+        rows.push({ ...c, _name: parentName, _spend: totalSpend, _cpr: null });
+      } else {
+        rows.push({ ...c, _name: c.name, _spend: c.spend_today || 0, _cpr: c.cpr });
+      }
+    }
+
     const phaseLabels = { 1: 'Testing', 2: 'Evaluasi', 3: 'Scale' };
-    tbody.innerHTML = data.slice(0, 5).map(c => `
+    const phaseBadge = { 1: 'badge-warning', 2: 'badge-primary', 3: 'badge-success' };
+    tbody.innerHTML = rows.slice(0, 5).map(c => `
       <tr onclick="window.location.href='campaigns.html'" style="cursor:pointer">
-        <td><strong>${c.name}</strong></td>
-        <td><span class="badge badge-primary">Phase ${c.current_phase || 1}: ${phaseLabels[c.current_phase] || 'Testing'}</span></td>
-        <td>${formatRupiah(c.spend || c.spend_today)}</td>
-        <td>${c.cpr ? formatRupiah(c.cpr) : '-'}</td>
-        <td><span class="badge badge-success"><span class="badge-dot"></span> Aktif</span></td>
+        <td><strong>${c._name}</strong></td>
+        <td><span class="badge ${phaseBadge[c.current_phase] || 'badge-gray'}">P${c.current_phase || 1}: ${phaseLabels[c.current_phase] || 'Testing'}</span></td>
+        <td>${formatRupiah(c._spend)}</td>
+        <td>${c._cpr ? formatRupiah(c._cpr) : '-'}</td>
+        <td><span class="badge ${c.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}"><span class="badge-dot"></span>${c.status === 'ACTIVE' ? 'Aktif' : 'Paused'}</span></td>
       </tr>`).join('');
   }
 
