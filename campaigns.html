@@ -10,6 +10,19 @@
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/components.css" />
+  <style>
+    .ap-toggle {
+      width: 28px; height: 16px; border-radius: 8px; background: var(--gray-3);
+      position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0;
+    }
+    .ap-toggle::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 12px; height: 12px; border-radius: 50%; background: #fff;
+      transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .ap-toggle-on { background: var(--primary); }
+    .ap-toggle-on::after { transform: translateX(12px); }
+  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -499,10 +512,16 @@
         <td>${cpr ? formatRupiah(cpr) : '-'}</td>
         <td>${ctr ? parseFloat(ctr).toFixed(2) + '%' : '-'}</td>
         <td>
-          <span class="badge ${c.status === 'ACTIVE' ? 'badge-success' : c.status === 'PAUSED' ? 'badge-warning' : 'badge-gray'}">
-            <span class="badge-dot"></span>
-            ${c.status === 'ACTIVE' ? 'Aktif' : c.status === 'PAUSED' ? 'Paused' : c.status}
-          </span>
+          <div style="display:flex; flex-direction:column; gap:5px; align-items:flex-start;">
+            <span class="badge ${c.status === 'ACTIVE' ? 'badge-success' : c.status === 'PAUSED' ? 'badge-warning' : 'badge-gray'}">
+              <span class="badge-dot"></span>
+              ${c.status === 'ACTIVE' ? 'Aktif' : c.status === 'PAUSED' ? 'Paused' : c.status}
+            </span>
+            <label style="display:flex; align-items:center; gap:5px; cursor:pointer;" title="${c.autopilot_enabled ? 'Autopilot aktif' : 'Autopilot nonaktif'}">
+              <div class="ap-toggle ${c.autopilot_enabled ? 'ap-toggle-on' : ''}" onclick="toggleAutopilot('${c.id}', ${c.autopilot_enabled})"></div>
+              <span style="font-size:11px; color:${c.autopilot_enabled ? 'var(--primary)' : 'var(--gray-5)'};">🤖 Auto</span>
+            </label>
+          </div>
         </td>
         <td>
           <div style="display:flex; gap:6px;">
@@ -837,6 +856,21 @@
 
   // ── Edit Budget ──
   let editBudgetTarget = null;
+
+  window.toggleAutopilot = async function(id, currentState) {
+    const newState = !currentState;
+    try {
+      const { error } = await sb.from('campaigns').update({ autopilot_enabled: newState }).eq('id', id);
+      if (error) throw error;
+      // Update local data tanpa full reload
+      const camp = allCampaigns.find(c => c.id === id);
+      if (camp) camp.autopilot_enabled = newState;
+      filterCampaigns();
+      showToast(`Autopilot ${newState ? 'diaktifkan' : 'dinonaktifkan'}`, 'success');
+    } catch (e) {
+      showToast('Gagal update autopilot: ' + e.message, 'error');
+    }
+  };
 
   window.openEditBudget = function(id) {
     const c = allCampaigns.find(x => x.id === id);
