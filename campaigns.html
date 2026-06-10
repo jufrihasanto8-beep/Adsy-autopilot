@@ -466,8 +466,8 @@
           const insLoaded = x.id in insightsMap;
           return s + (insLoaded ? (insightsMap[x.id]?.results_count ?? 0) : (insightsMap[x.id]?.results_count ?? x.results_today ?? 0));
         }, 0);
-        // Nama: strip " — Phase 2b Manfaat" dll → ambil parent name + "— Phase 2b"
-        const parentName = c.name.replace(/ — Phase 2b.*$/, '') + ' — Phase 2b';
+        // Nama: strip adset label setelah "Phase 2X" — support format lama (2b) dan baru (2A/2B/2C)
+        const parentName = c.name.replace(/(— Phase 2[A-Za-z]) .+$/, '$1');
         rows.push({ ...c, _group: group, _isGroup: true, _parentName: parentName, _totalSpend: totalSpend, _totalBudget: totalBudget, _avgCpr: avgCpr, _anyActive: anyActive, _totalResults: totalResults });
       } else {
         rows.push(c);
@@ -477,7 +477,7 @@
     tbody.innerHTML = rows.map(c => {
       if (c._isGroup) {
         const g = c._group;
-        const adsetLabels = g.map(x => x.name.replace(/.*— Phase 2b /, '')).join(', ');
+        const adsetLabels = g.map(x => x.name.replace(/.*— Phase 2[A-Za-z] /, '')).join(', ');
         const statusBadge = c._anyActive
           ? `<span class="badge badge-success"><span class="badge-dot"></span>Aktif</span>`
           : `<span class="badge badge-warning"><span class="badge-dot"></span>Paused</span>`;
