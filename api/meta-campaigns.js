@@ -146,8 +146,9 @@ async function updateBudget(req, res) {
   const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
   if (!token) throw new Error('Token Meta belum dikonfigurasi');
 
-  // Update di Meta — CBO: update campaign, ABO: update adset
-  const targetId = meta_adset_id || meta_campaign_id;
+  // CBO (Phase 1, 2a): budget di campaign level
+  // ABO (Phase 2b): budget di adset level
+  const targetId = (req.body.phase_type === '2b' && meta_adset_id) ? meta_adset_id : meta_campaign_id;
   if (targetId && targetId !== 'null') {
     const metaRes = await fetch(`${META_API}/${targetId}`, {
       method: 'POST',
