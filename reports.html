@@ -159,6 +159,7 @@
             <div class="card-title">Ringkasan Aksi Autopilot</div>
             <div class="card-sub">Semua aksi yang dijalankan sistem di periode ini</div>
           </div>
+          <div id="action-log-info" style="font-size:13px; color:var(--gray-5);"></div>
         </div>
         <div class="table-wrap">
           <table>
@@ -176,6 +177,7 @@
             </tbody>
           </table>
         </div>
+        <div id="action-pagination" style="display:flex; align-items:center; justify-content:center; gap:6px; padding:16px 20px; border-top:1px solid var(--gray-2);"></div>
       </div>
     </div>
   </main>
@@ -271,32 +273,53 @@
       </tr>`).join('');
   }
 
+  const ACTION_PAGE_SIZE = 10;
+  let allActionLogs = [];
+  let actionCurrentPage = 1;
+
+  const actionLabel = {
+    pause: '⏸ Pause', resume: '▶ Resume', scale: '📈 Scale',
+    increase_budget: '📈 Naikkan Budget', decrease_budget: '📉 Turunkan Budget',
+    phase_advance: '🚀 Naik Phase', duplicate: '📋 Duplikat', winner: '🏆 Winner'
+  };
+  const actionBadge = {
+    pause: 'badge-warning', resume: 'badge-success', scale: 'badge-success',
+    increase_budget: 'badge-success', decrease_budget: 'badge-warning',
+    phase_advance: 'badge-primary', duplicate: 'badge-primary', winner: 'badge-success'
+  };
+
   async function loadActionLog(since) {
     let q = sb.from('action_logs').select('*')
       .neq('action_type', 'create')
       .gte('created_at', since.toISOString())
-      .order('created_at', { ascending: false }).limit(50);
+      .order('created_at', { ascending: false });
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
     const { data } = await q;
 
+    allActionLogs = data || [];
+    actionCurrentPage = 1;
+    renderActionLogPage();
+  }
+
+  function renderActionLogPage() {
     const tbody = document.getElementById('action-table');
-    if (!data || data.length === 0) {
+    const paginationEl = document.getElementById('action-pagination');
+    const infoEl = document.getElementById('action-log-info');
+
+    if (allActionLogs.length === 0) {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--gray-5);">Belum ada aksi autopilot di periode ini</td></tr>`;
+      paginationEl.innerHTML = '';
+      infoEl.textContent = '';
       return;
     }
 
-    const actionLabel = {
-      pause: '⏸ Pause', resume: '▶ Resume', scale: '📈 Scale',
-      increase_budget: '📈 Naikkan Budget', decrease_budget: '📉 Turunkan Budget',
-      phase_advance: '🚀 Naik Phase', duplicate: '📋 Duplikat', winner: '🏆 Winner'
-    };
-    const actionBadge = {
-      pause: 'badge-warning', resume: 'badge-success', scale: 'badge-success',
-      increase_budget: 'badge-success', decrease_budget: 'badge-warning',
-      phase_advance: 'badge-primary', duplicate: 'badge-primary', winner: 'badge-success'
-    };
+    const totalPages = Math.ceil(allActionLogs.length / ACTION_PAGE_SIZE);
+    const start = (actionCurrentPage - 1) * ACTION_PAGE_SIZE;
+    const pageData = allActionLogs.slice(start, start + ACTION_PAGE_SIZE);
 
-    tbody.innerHTML = data.map(log => {
+    infoEl.textContent = `${start + 1}–${Math.min(start + ACTION_PAGE_SIZE, allActionLogs.length)} dari ${allActionLogs.length} log`;
+
+    tbody.innerHTML = pageData.map(log => {
       const desc = log.description || '-';
       const short = desc.length > 60 ? desc.substring(0, 58) + '…' : desc;
       const needsTitle = desc.length > 60;
@@ -311,7 +334,40 @@
         <td><span class="badge ${log.status === 'success' ? 'badge-success' : 'badge-danger'}">${log.status === 'success' ? 'Sukses' : 'Gagal'}</span></td>
       </tr>`;
     }).join('');
+
+    // Render pagination
+    if (totalPages <= 1) { paginationEl.innerHTML = ''; return; }
+
+    const btnStyle = (active) => `style="min-width:32px; height:32px; border-radius:6px; border:1px solid ${active ? '#2563EB' : 'var(--gray-2)'}; background:${active ? '#2563EB' : '#fff'}; color:${active ? '#fff' : 'var(--gray-6)'}; font-size:13px; font-weight:${active ? '600' : '400'}; cursor:pointer; padding:0 8px;"`;
+
+    let pages = [];
+    // Show max 7 page buttons with ellipsis
+    if (totalPages <= 7) {
+      pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+    } else {
+      pages = [1];
+      if (actionCurrentPage > 3) pages.push('…');
+      for (let i = Math.max(2, actionCurrentPage - 1); i <= Math.min(totalPages - 1, actionCurrentPage + 1); i++) pages.push(i);
+      if (actionCurrentPage < totalPages - 2) pages.push('…');
+      pages.push(totalPages);
+    }
+
+    paginationEl.innerHTML = `
+      <button onclick="window.goActionPage(${actionCurrentPage - 1})" ${actionCurrentPage === 1 ? 'disabled' : ''} ${btnStyle(false)}>‹</button>
+      ${pages.map(p => p === '…'
+        ? `<span style="color:var(--gray-5); padding:0 4px;">…</span>`
+        : `<button onclick="window.goActionPage(${p})" ${btnStyle(p === actionCurrentPage)}>${p}</button>`
+      ).join('')}
+      <button onclick="window.goActionPage(${actionCurrentPage + 1})" ${actionCurrentPage === totalPages ? 'disabled' : ''} ${btnStyle(false)}>›</button>
+    `;
   }
+
+  window.goActionPage = function(page) {
+    const totalPages = Math.ceil(allActionLogs.length / ACTION_PAGE_SIZE);
+    if (page < 1 || page > totalPages) return;
+    actionCurrentPage = page;
+    renderActionLogPage();
+  };
 
   async function loadCharts(since, days) {
     let q = sb.from('campaigns').select('name, spend_today, ctr, cpr').order('spend_today', { ascending: false }).limit(8);
