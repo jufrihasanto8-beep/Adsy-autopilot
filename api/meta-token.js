@@ -38,14 +38,21 @@ export default async function handler(req, res) {
     const longLivedToken = metaData.access_token;
     const expiresIn      = metaData.expires_in; // ~5183944 detik (~60 hari)
 
-    // Simpan long-lived token ke Supabase
-    await sb.from('app_config').update({ meta_token: longLivedToken })
-      .eq('user_id', user_id);
+    // Hitung tanggal expired (default 60 hari kalau Meta tidak return expires_in)
+    const expiresSec = expiresIn || 60 * 24 * 60 * 60;
+    const tokenExpiresAt = new Date(Date.now() + expiresSec * 1000).toISOString();
+
+    // Simpan long-lived token + tanggal expired ke Supabase
+    await sb.from('app_config').update({
+      meta_token: longLivedToken,
+      token_expires_at: tokenExpiresAt
+    }).eq('user_id', user_id);
 
     return res.status(200).json({
       success: true,
       access_token: longLivedToken,
-      expires_in: expiresIn
+      expires_in: expiresIn,
+      token_expires_at: tokenExpiresAt
     });
 
   } catch (err) {
