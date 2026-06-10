@@ -296,14 +296,21 @@
       phase_advance: 'badge-primary', duplicate: 'badge-primary', winner: 'badge-success'
     };
 
-    tbody.innerHTML = data.map(log => `
+    tbody.innerHTML = data.map(log => {
+      const desc = log.description || '-';
+      const short = desc.length > 60 ? desc.substring(0, 58) + '…' : desc;
+      const needsTitle = desc.length > 60;
+      return `
       <tr>
         <td style="font-size:12px; color:var(--gray-5); white-space:nowrap;">${formatDate(log.created_at)}</td>
         <td><strong>${log.campaign_name || '-'}</strong></td>
         <td><span class="badge ${actionBadge[log.action_type] || 'badge-gray'}">${actionLabel[log.action_type] || log.action_type}</span></td>
-        <td style="font-size:12px; color:var(--gray-5);">${log.description || '-'}</td>
+        <td style="font-size:12px; color:var(--gray-5); max-width:280px;" ${needsTitle ? `title="${desc.replace(/"/g, '&quot;')}"` : ''}>
+          ${short}
+        </td>
         <td><span class="badge ${log.status === 'success' ? 'badge-success' : 'badge-danger'}">${log.status === 'success' ? 'Sukses' : 'Gagal'}</span></td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   }
 
   async function loadCharts(since, days) {
