@@ -40,7 +40,10 @@ export default async function handler(req, res) {
         if (insight.error || !insight.data || insight.data.length === 0) continue;
 
         const d = insight.data[0];
-        const results = d.actions?.find(a => a.action_type === 'link_click')?.value || 0;
+        // Hitung results: purchase → lead (tidak pakai link_click)
+        const results = d.actions?.find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value
+          || d.actions?.find(a => a.action_type === 'lead')?.value
+          || 0;
         const cpr = results > 0 ? parseFloat(d.spend) / results : null;
 
         // Update campaign
@@ -108,7 +111,7 @@ async function fetchRangeInsights(req, res) {
       const impressions = parseInt(d.impressions || 0);
       const ctr = parseFloat(d.ctr || 0);
 
-      // Hitung results: priority purchase → lead → link_click
+      // Hitung results: priority purchase → lead (tidak pakai link_click sebagai fallback)
       const actions = d.actions || [];
       const getAction = (...types) => {
         for (const t of types) {
@@ -117,7 +120,7 @@ async function fetchRangeInsights(req, res) {
         }
         return 0;
       };
-      const resultCount = getAction('offsite_conversion.fb_pixel_purchase', 'lead', 'link_click');
+      const resultCount = getAction('offsite_conversion.fb_pixel_purchase', 'lead');
       const cpr = resultCount > 0 ? Math.round(spend / resultCount) : null;
 
       totalSpend += spend;
