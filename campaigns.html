@@ -714,8 +714,41 @@
     }
   };
 
+  // ── Loading modal Phase 2 ──
+  const phase2Steps = [
+    { text: 'Menganalisis performa kampanye Phase 1...', duration: 2000 },
+    { text: 'Membuat kampanye Phase 2a (COST_CAP)...', duration: 3000 },
+    { text: 'Mencari keyword audience di Meta...', duration: 3000 },
+    { text: 'Menganalisis audience dengan AI...', duration: 4000 },
+    { text: 'Membuat 3 adset Phase 2b (Manfaat, Perilaku, Hobi)...', duration: 3000 },
+    { text: 'Menyimpan data ke database...', duration: 2000 },
+  ];
+
+  function showPhase2Loading() {
+    document.getElementById('modal-phase2-loading').classList.remove('hidden');
+    let i = 0;
+    const stepEl = document.getElementById('phase2-step-text');
+    const barEl = document.getElementById('phase2-progress-bar');
+
+    function nextStep() {
+      if (i >= phase2Steps.length) return;
+      stepEl.textContent = phase2Steps[i].text;
+      const pct = Math.round(((i + 1) / phase2Steps.length) * 100);
+      barEl.style.width = pct + '%';
+      i++;
+      if (i < phase2Steps.length) setTimeout(nextStep, phase2Steps[i - 1].duration);
+    }
+    nextStep();
+  }
+
+  function hidePhase2Loading() {
+    document.getElementById('modal-phase2-loading').classList.add('hidden');
+    document.getElementById('phase2-progress-bar').style.width = '0%';
+  }
+
   async function doAdvancePhase(id, productId) {
-    showToast('Membuat kampanye Phase 2...', 'info');
+    closeModal('modal-advance');
+    showPhase2Loading();
     try {
       const res = await fetch('/api/autopilot-run', {
         method: 'POST',
@@ -724,9 +757,11 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal');
+      hidePhase2Loading();
       showToast('Phase 2 berhasil dibuat!', 'success');
       await loadCampaigns();
     } catch (err) {
+      hidePhase2Loading();
       showToast('Gagal: ' + err.message, 'error');
     }
   }
@@ -968,6 +1003,26 @@
     }
   });
 </script>
+
+<!-- Modal Loading Phase 2 -->
+<div class="modal-overlay hidden" id="modal-phase2-loading" style="z-index:9999;">
+  <div class="modal" style="max-width:420px; text-align:center;">
+    <div class="modal-body" style="padding:40px 32px;">
+      <!-- Spinner -->
+      <div style="width:64px;height:64px;border-radius:50%;border:4px solid var(--gray-3);border-top-color:var(--primary);animation:spin .8s linear infinite;margin:0 auto 24px;"></div>
+      <h3 style="font-size:18px;font-weight:700;margin-bottom:8px;">Membuat Phase 2</h3>
+      <p id="phase2-step-text" style="font-size:13px;color:var(--gray-5);margin-bottom:24px;min-height:20px;">Memulai proses...</p>
+      <!-- Progress bar -->
+      <div style="background:var(--gray-3);border-radius:99px;height:6px;overflow:hidden;">
+        <div id="phase2-progress-bar" style="height:100%;background:var(--primary);border-radius:99px;width:0%;transition:width .5s ease;"></div>
+      </div>
+      <p style="font-size:11px;color:var(--gray-5);margin-top:12px;">Proses ini memakan waktu 30–60 detik.<br>Jangan tutup halaman ini.</p>
+    </div>
+  </div>
+</div>
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
 
 <!-- Modal Edit Budget -->
 <div class="modal-overlay hidden" id="modal-edit-budget">
