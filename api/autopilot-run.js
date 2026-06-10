@@ -881,6 +881,7 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
     }); } catch(e) {}
 
     // 6. Buat campaign ABO
+    const phaseLabel = label.toUpperCase();
     const newCampRes = await fetch(`${META_API}/act_${accountId}/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -902,7 +903,6 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
     if (!newCampaignId) throw new Error('Gagal buat campaign 2b: ID tidak ada di response');
 
     const budgetPerAdset = subPhaseConfig.budget_per_adset ?? 50000;
-    const phaseLabel = label.toUpperCase();
 
     // 7. Buat adset sesuai blueprint config (default: Manfaat/Perilaku/Hobi)
     const blueprintAdsets = subPhaseConfig.adsets?.length
