@@ -552,6 +552,7 @@
             }
             <button class="btn btn-outline btn-sm" onclick="viewDetail('${c.id}')">Detail</button>
             ${c.current_phase === 1 && !c.initial_budget ? `<button class="btn btn-outline btn-sm" style="color:var(--primary);" onclick="advancePhase('${c.id}', '${c.name}')">→ Phase 2</button>` : ''}
+            ${c.current_phase === 1 && c.initial_budget && !allCampaigns.some(x => x.name.startsWith(c.name + ' — Phase 2')) ? `<button class="btn btn-outline btn-sm" style="color:var(--warning);" onclick="retryPhase2('${c.id}', '${c.name.replace(/'/g, "\\'")}')">⟳ Retry Phase 2</button>` : ''}
             ${c.is_winner ? `<button class="btn btn-outline btn-sm" style="color:#7C3AED;border-color:#7C3AED;" onclick="openDuplicate('${c.id}', \`${c.name.replace(/`/g, "'")}\`)">⧉ Duplikat</button>` : ''}
             <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteCampaign('${c.id}', '${c.meta_campaign_id}', '${c.name}')">Hapus</button>
           </div>
@@ -734,6 +735,14 @@
       };
       openModal('modal-advance');
     }
+  };
+
+  // ── Retry Phase 2 — reset lock lalu advance ulang ──
+  window.retryPhase2 = async function(id, name) {
+    if (!confirm(`Phase 2 sebelumnya gagal dibuat untuk "${name}".\n\nReset dan coba lagi?`)) return;
+    const sb = getSupabase();
+    await sb.from('campaigns').update({ initial_budget: null }).eq('id', id);
+    await advancePhase(id, name);
   };
 
   // ── Loading modal Phase 2 ──
