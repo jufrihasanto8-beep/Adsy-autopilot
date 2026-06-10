@@ -231,9 +231,9 @@ async function checkPhaseAdvancement(camp, targetCpr, daysRunning, token, logs) 
   let newPhase = camp.current_phase;
   const cpr = camp.cpr;
 
-  // Phase 1 → 2: gate 8k impressions + min 3 hari + seleksi CPR
+  // Phase 1 → 2: min 3 hari + seleksi CPR (tidak ada syarat impresi minimum)
   // Skip kalau Phase 1 sudah winning (initial_budget tersimpan) — dikelola oleh runBlueprintRules
-  if (camp.current_phase === 1 && daysRunning >= 3 && camp.impressions >= 8000 && !camp.initial_budget) {
+  if (camp.current_phase === 1 && daysRunning >= 3 && !camp.initial_budget) {
     if (!targetCpr) {
       // Tidak ada target CPR → langsung maju
       newPhase = 2;
