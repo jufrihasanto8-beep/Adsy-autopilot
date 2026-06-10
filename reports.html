@@ -59,13 +59,17 @@
         <h2>Laporan</h2>
         <p>Analisis performa kampanye & efektivitas autopilot</p>
       </div>
-      <div class="topbar-right">
-        <select class="form-input form-select" id="date-range" style="width:auto;">
-          <option value="7">7 hari terakhir</option>
-          <option value="14">14 hari terakhir</option>
-          <option value="30" selected>30 hari terakhir</option>
-          <option value="90">3 bulan terakhir</option>
-        </select>
+      <div class="topbar-right" style="flex-wrap:wrap; gap:8px;">
+        <div style="display:flex; align-items:center; gap:4px;">
+          <button class="btn btn-outline date-preset-btn" data-days="7" style="font-size:12px; padding:5px 10px;">7H</button>
+          <button class="btn btn-outline date-preset-btn" data-days="30" style="font-size:12px; padding:5px 10px;">30H</button>
+          <button class="btn btn-outline date-preset-btn" data-days="90" style="font-size:12px; padding:5px 10px;">3BL</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <input type="date" id="date-from" class="form-input" style="width:140px; font-size:13px;" />
+          <span style="color:var(--gray-5); font-size:13px;">–</span>
+          <input type="date" id="date-to" class="form-input" style="width:140px; font-size:13px;" />
+        </div>
         <button class="btn btn-outline" id="btn-export">⬇ Export CSV</button>
       </div>
     </header>
@@ -244,7 +248,24 @@
     currentProfile = await renderUserInfo();
     initSidebar();
 
-    document.getElementById('date-range').addEventListener('change', loadAll);
+    // Default: 30 hari terakhir
+    const today = new Date().toISOString().split('T')[0];
+    const thirtyAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
+    document.getElementById('date-from').value = thirtyAgo;
+    document.getElementById('date-to').value = today;
+
+    document.getElementById('date-from').addEventListener('change', loadAll);
+    document.getElementById('date-to').addEventListener('change', loadAll);
+    document.querySelectorAll('.date-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const days = parseInt(btn.dataset.days);
+        const t = new Date().toISOString().split('T')[0];
+        const f = new Date(Date.now() - days*24*60*60*1000).toISOString().split('T')[0];
+        document.getElementById('date-from').value = f;
+        document.getElementById('date-to').value = t;
+        loadAll();
+      });
+    });
     document.getElementById('btn-export').addEventListener('click', exportCSV);
     document.getElementById('btn-load-region').addEventListener('click', loadRegionBreakdown);
     document.getElementById('region-campaign-filter').addEventListener('change', loadRegionBreakdown);
@@ -252,22 +273,27 @@
     await loadAll();
   }
 
-  async function loadAll() {
-    const days = parseInt(document.getElementById('date-range').value);
-    const since = new Date();
-    since.setDate(since.getDate() - days);
+  function getDateRange() {
+    const from = document.getElementById('date-from').value;
+    const to = document.getElementById('date-to').value;
+    const since = new Date(from + 'T00:00:00+07:00');
+    const until = new Date(to + 'T23:59:59+07:00');
+    return { since, until, from, to };
+  }
 
+  async function loadAll() {
+    const { since, until, from, to } = getDateRange();
     await Promise.all([
-      loadStats(since),
-      loadCampaignReport(since),
-      loadActionLog(since),
-      loadCharts(since, days)
+      loadStats(since, until),
+      loadCampaignReport(),
+      loadActionLog(since, until),
+      loadCharts()
     ]);
   }
 
   let campaignData = [];
 
-  async function loadStats(since) {
+  async function loadStats(since, until) {
     let q = sb.from('campaigns').select('spend_today, results_today, cpr, ctr, autopilot_enabled, current_phase');
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
     const { data } = await q;
@@ -284,7 +310,8 @@
 
     let aq = sb.from('action_logs').select('*', { count: 'exact', head: true })
       .neq('action_type', 'create')
-      .gte('created_at', since.toISOString());
+      .gte('created_at', since.toISOString())
+      .lte('created_at', until.toISOString());
     if (currentProfile.role !== 'admin') aq = aq.eq('user_id', currentProfile.id);
     const { count } = await aq;
     document.getElementById('r-actions').textContent = count || 0;
@@ -292,7 +319,7 @@
 
   let allCampaignsForRegion = [];
 
-  async function loadCampaignReport(since) {
+  async function loadCampaignReport() {
     let q = sb.from('campaigns').select('*').order('spend_today', { ascending: false });
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
     const { data } = await q;
@@ -327,19 +354,15 @@
   }
 
   async function loadRegionBreakdown() {
-    const days = parseInt(document.getElementById('date-range').value);
+    const { from, to } = getDateRange();
     const campaignId = document.getElementById('region-campaign-filter').value;
-
-    // Map days to Meta date_preset
-    const presetMap = { 7: 'last_7_days', 14: 'last_14_days', 30: 'last_30_days', 90: 'last_90_days' };
-    const datePreset = presetMap[days] || 'last_30_days';
 
     document.getElementById('region-empty').style.display = 'none';
     document.getElementById('region-content').style.display = 'none';
     document.getElementById('region-loading').style.display = 'block';
 
     try {
-      let url = `/api/meta-insights?breakdown=region&user_id=${currentProfile.id}&date_preset=${datePreset}`;
+      let url = `/api/meta-insights?breakdown=region&user_id=${currentProfile.id}&since=${from}&until=${to}`;
       if (campaignId) url += `&campaign_id=${campaignId}`;
 
       const r = await fetch(url);
@@ -429,10 +452,11 @@
     phase_advance: 'badge-primary', duplicate: 'badge-primary', winner: 'badge-success'
   };
 
-  async function loadActionLog(since) {
+  async function loadActionLog(since, until) {
     let q = sb.from('action_logs').select('*')
       .neq('action_type', 'create')
       .gte('created_at', since.toISOString())
+      .lte('created_at', until.toISOString())
       .order('created_at', { ascending: false });
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
     const { data } = await q;
@@ -510,7 +534,7 @@
     renderActionLogPage();
   };
 
-  async function loadCharts(since, days) {
+  async function loadCharts() {
     let q = sb.from('campaigns').select('name, spend_today, ctr, cpr').order('spend_today', { ascending: false }).limit(8);
     if (currentProfile.role !== 'admin') q = q.eq('user_id', currentProfile.id);
     const { data } = await q;
