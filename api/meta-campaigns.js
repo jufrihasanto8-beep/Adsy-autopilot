@@ -8,7 +8,10 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') return await syncCampaigns(req, res);
     if (req.method === 'POST') return await createCampaign(req, res);
-    if (req.method === 'PATCH') return await toggleStatus(req, res);
+    if (req.method === 'PATCH') {
+      if (req.body.action === 'update_budget') return await updateBudget(req, res);
+      return await toggleStatus(req, res);
+    }
     if (req.method === 'DELETE') return await deleteCampaign(req, res);
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
@@ -132,6 +135,36 @@ async function toggleStatus(req, res) {
   await sb.from('campaigns').update({ status }).eq('id', id);
 
   return res.status(200).json({ success: true, status });
+}
+
+// ── PATCH action=update_budget: Update budget kampanye ──
+async function updateBudget(req, res) {
+  const { id, meta_campaign_id, meta_adset_id, daily_budget, user_id } = req.body;
+  if (!daily_budget || daily_budget < 1000) throw new Error('Budget minimal Rp 1.000');
+
+  const { data: config } = await sb.from('app_config').select('meta_token').eq('user_id', user_id).single();
+  const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
+  if (!token) throw new Error('Token Meta belum dikonfigurasi');
+
+  // Update di Meta — CBO: update campaign, ABO: update adset
+  const targetId = meta_adset_id || meta_campaign_id;
+  if (targetId && targetId !== 'null') {
+    const metaRes = await fetch(`${META_API}/${targetId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ daily_budget: String(Math.round(daily_budget)), access_token: token })
+    });
+    const metaData = await metaRes.json();
+    if (metaData.error) {
+      const e = metaData.error;
+      throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code})`);
+    }
+  }
+
+  // Update di Supabase
+  await sb.from('campaigns').update({ daily_budget, initial_budget: daily_budget }).eq('id', id);
+
+  return res.status(200).json({ success: true, daily_budget });
 }
 
 // ── DELETE: Hapus kampanye dari Meta + Supabase ──
