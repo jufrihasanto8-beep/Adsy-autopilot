@@ -614,7 +614,9 @@
       setLastUpdated();
       if (!silent) showToast('Data diperbarui!', 'success');
     } catch (err) {
-      showToast('Gagal refresh: ' + err.message, 'error');
+      if (!silent) showToast('Gagal sync Meta: ' + err.message, 'error');
+      // Tetap load kampanye dari DB meskipun sync Meta gagal
+      await loadCampaigns();
     } finally {
       btn.disabled = false; btn.textContent = '🔄 Refresh';
     }
