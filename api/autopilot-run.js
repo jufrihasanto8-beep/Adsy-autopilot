@@ -1018,7 +1018,7 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
       user_id: camp.user_id,
       campaign_name: camp.name + ' — Phase 2b',
       action_type: 'create',
-      description: `Kampanye Phase 2${phaseLabel} (ABO Interest) dibuat — ${categories.length} adset @ Rp ${budgetPerAdset.toLocaleString('id-ID')}/adset`,
+      description: `Kampanye Phase 2${phaseLabel} (${isCBO ? 'CBO' : 'ABO'} Interest) dibuat — ${adsetGroups.length} adset`,
       status: 'success'
     };
     await sb.from('action_logs').insert(logEntry);
