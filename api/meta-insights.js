@@ -5,7 +5,10 @@ const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_K
 const META_API = 'https://graph.facebook.com/v18.0';
 
 export default async function handler(req, res) {
-  if (req.method === 'GET' && req.query.breakdown === 'region') return await fetchRegionBreakdown(req, res);
+  if (req.method === 'GET' && req.query.breakdown === 'region')    return await fetchRegionBreakdown(req, res);
+  if (req.method === 'GET' && req.query.breakdown === 'daily')     return await fetchDailyTrend(req, res);
+  if (req.method === 'GET' && req.query.breakdown === 'demo')      return await fetchDemoBreakdown(req, res);
+  if (req.method === 'GET' && req.query.breakdown === 'placement') return await fetchPlacementBreakdown(req, res);
   if (req.method === 'GET') return await fetchRangeInsights(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -193,4 +196,120 @@ async function fetchRegionBreakdown(req, res) {
 
   const regions = Object.values(regionMap).sort((a, b) => b.spend - a.spend);
   return res.status(200).json({ regions, campaign_id: campaign_id || null, since, until });
+}
+
+// ── Helper: ambil token + campaigns ──
+async function getTokenAndCampaigns(user_id, campaign_id) {
+  const { data: config } = await sb.from('app_config').select('meta_token').eq('user_id', user_id).single();
+  const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
+  let campaigns = [];
+  if (campaign_id) {
+    const { data } = await sb.from('campaigns').select('id,name,meta_campaign_id').eq('id', campaign_id).not('meta_campaign_id','is',null).single();
+    if (data) campaigns = [data];
+  } else {
+    const { data } = await sb.from('campaigns').select('id,name,meta_campaign_id').eq('user_id', user_id).not('meta_campaign_id','is',null);
+    campaigns = data || [];
+  }
+  return { token, campaigns };
+}
+
+function buildTimeParam(since, until) {
+  return (since && until)
+    ? `time_range=${encodeURIComponent(JSON.stringify({ since, until }))}`
+    : `date_preset=last_30_days`;
+}
+
+function getResults(actions) {
+  return parseInt(
+    (actions || []).find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value ||
+    (actions || []).find(a => a.action_type === 'lead')?.value || 0
+  );
+}
+
+// ── GET: Trend harian spend + hasil ──
+async function fetchDailyTrend(req, res) {
+  const { user_id, campaign_id, since, until } = req.query;
+  if (!user_id) return res.status(400).json({ error: 'user_id required' });
+  const { token, campaigns } = await getTokenAndCampaigns(user_id, campaign_id);
+  if (!token) return res.status(400).json({ error: 'Token Meta belum dikonfigurasi' });
+  if (!campaigns.length) return res.status(200).json({ daily: [] });
+
+  const timeParam = buildTimeParam(since, until);
+  const dateMap = {};
+
+  await Promise.all(campaigns.map(async (camp) => {
+    try {
+      const url = `${META_API}/${camp.meta_campaign_id}/insights?fields=spend,actions&time_increment=1&${timeParam}&access_token=${encodeURIComponent(token)}`;
+      const json = await (await fetch(url)).json();
+      if (!json.data) return;
+      for (const item of json.data) {
+        const d = item.date_start;
+        if (!dateMap[d]) dateMap[d] = { date: d, spend: 0, results: 0 };
+        dateMap[d].spend   += parseFloat(item.spend || 0);
+        dateMap[d].results += getResults(item.actions);
+      }
+    } catch (e) {}
+  }));
+
+  const daily = Object.values(dateMap).sort((a, b) => a.date.localeCompare(b.date));
+  return res.status(200).json({ daily });
+}
+
+// ── GET: Breakdown umur & gender ──
+async function fetchDemoBreakdown(req, res) {
+  const { user_id, campaign_id, since, until } = req.query;
+  if (!user_id) return res.status(400).json({ error: 'user_id required' });
+  const { token, campaigns } = await getTokenAndCampaigns(user_id, campaign_id);
+  if (!token) return res.status(400).json({ error: 'Token Meta belum dikonfigurasi' });
+  if (!campaigns.length) return res.status(200).json({ demo: [] });
+
+  const timeParam = buildTimeParam(since, until);
+  const demoMap = {};
+
+  await Promise.all(campaigns.map(async (camp) => {
+    try {
+      const url = `${META_API}/${camp.meta_campaign_id}/insights?fields=spend,actions&breakdowns=age,gender&${timeParam}&access_token=${encodeURIComponent(token)}`;
+      const json = await (await fetch(url)).json();
+      if (!json.data) return;
+      for (const item of json.data) {
+        const key = `${item.age}__${item.gender}`;
+        if (!demoMap[key]) demoMap[key] = { age: item.age, gender: item.gender, spend: 0, results: 0 };
+        demoMap[key].spend   += parseFloat(item.spend || 0);
+        demoMap[key].results += getResults(item.actions);
+      }
+    } catch (e) {}
+  }));
+
+  const demo = Object.values(demoMap).sort((a, b) => a.age.localeCompare(b.age));
+  return res.status(200).json({ demo });
+}
+
+// ── GET: Breakdown placement ──
+async function fetchPlacementBreakdown(req, res) {
+  const { user_id, campaign_id, since, until } = req.query;
+  if (!user_id) return res.status(400).json({ error: 'user_id required' });
+  const { token, campaigns } = await getTokenAndCampaigns(user_id, campaign_id);
+  if (!token) return res.status(400).json({ error: 'Token Meta belum dikonfigurasi' });
+  if (!campaigns.length) return res.status(200).json({ placements: [] });
+
+  const timeParam = buildTimeParam(since, until);
+  const placeMap = {};
+
+  await Promise.all(campaigns.map(async (camp) => {
+    try {
+      const url = `${META_API}/${camp.meta_campaign_id}/insights?fields=spend,impressions,actions&breakdowns=publisher_platform,platform_position&${timeParam}&access_token=${encodeURIComponent(token)}`;
+      const json = await (await fetch(url)).json();
+      if (!json.data) return;
+      for (const item of json.data) {
+        const key = `${item.publisher_platform}__${item.platform_position}`;
+        if (!placeMap[key]) placeMap[key] = { platform: item.publisher_platform, position: item.platform_position, spend: 0, impressions: 0, results: 0 };
+        placeMap[key].spend       += parseFloat(item.spend || 0);
+        placeMap[key].impressions += parseInt(item.impressions || 0);
+        placeMap[key].results     += getResults(item.actions);
+      }
+    } catch (e) {}
+  }));
+
+  const placements = Object.values(placeMap).sort((a, b) => b.spend - a.spend);
+  return res.status(200).json({ placements });
 }
