@@ -5,6 +5,7 @@ const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_K
 const META_API = 'https://graph.facebook.com/v18.0';
 
 export default async function handler(req, res) {
+  if (req.method === 'GET' && req.query.breakdown === 'region') return await fetchRegionBreakdown(req, res);
   if (req.method === 'GET') return await fetchRangeInsights(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -137,4 +138,54 @@ async function fetchRangeInsights(req, res) {
     totals: { spend: totalSpend, results: totalResults },
     date_preset: datePreset
   });
+}
+
+// ── GET: Fetch spend breakdown per region (provinsi) ──
+async function fetchRegionBreakdown(req, res) {
+  const { user_id, campaign_id, date_preset = 'last_30_days' } = req.query;
+  if (!user_id) return res.status(400).json({ error: 'user_id required' });
+
+  const { data: config } = await sb.from('app_config').select('meta_token').eq('user_id', user_id).single();
+  const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
+  if (!token) return res.status(400).json({ error: 'Token Meta belum dikonfigurasi' });
+
+  let campaigns = [];
+  if (campaign_id) {
+    const { data } = await sb.from('campaigns')
+      .select('id, name, meta_campaign_id')
+      .eq('id', campaign_id)
+      .not('meta_campaign_id', 'is', null)
+      .single();
+    if (data) campaigns = [data];
+  } else {
+    const { data } = await sb.from('campaigns')
+      .select('id, name, meta_campaign_id')
+      .eq('user_id', user_id)
+      .not('meta_campaign_id', 'is', null);
+    campaigns = data || [];
+  }
+
+  if (!campaigns.length) return res.status(200).json({ regions: [] });
+
+  // Fetch region breakdown per campaign in parallel
+  const regionMap = {};
+  await Promise.all(campaigns.map(async (camp) => {
+    try {
+      const fields = 'spend,impressions,clicks';
+      const url = `${META_API}/${camp.meta_campaign_id}/insights?fields=${fields}&breakdowns=region&date_preset=${date_preset}&access_token=${encodeURIComponent(token)}`;
+      const r = await fetch(url);
+      const json = await r.json();
+      if (!json.data) return;
+      for (const item of json.data) {
+        const region = item.region || 'Lainnya';
+        if (!regionMap[region]) regionMap[region] = { region, spend: 0, impressions: 0, clicks: 0 };
+        regionMap[region].spend += parseFloat(item.spend || 0);
+        regionMap[region].impressions += parseInt(item.impressions || 0);
+        regionMap[region].clicks += parseInt(item.clicks || 0);
+      }
+    } catch (e) { /* skip */ }
+  }));
+
+  const regions = Object.values(regionMap).sort((a, b) => b.spend - a.spend);
+  return res.status(200).json({ regions, campaign_id: campaign_id || null, date_preset });
 }
