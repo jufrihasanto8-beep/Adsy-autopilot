@@ -250,6 +250,18 @@
           </div>
         </div>
 
+        <!-- Blueprint Selector -->
+        <div style="margin-top:16px;display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--primary-light);border-radius:8px;border:1px solid #BFDBFE;">
+          <div style="font-size:20px;">🧬</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:2px;">Blueprint Autopilot</div>
+            <div id="blueprint-preview" style="font-size:12px;color:var(--text-sub);">Memuat...</div>
+          </div>
+          <select class="form-input form-select" id="pub-blueprint" style="width:200px;font-size:13px;">
+            <option value="">Memuat...</option>
+          </select>
+        </div>
+
         <!-- Product Knowledge Preview -->
         <div id="product-preview" style="display:none; margin-top:16px; padding:14px; background:var(--primary-light); border-radius:var(--radius-sm); border-left:3px solid var(--primary);">
           <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Product Knowledge</div>
@@ -303,20 +315,6 @@
               <div class="card-title">4. Pengaturan Kampanye</div>
               <div class="card-sub">Objective, budget, bid strategy, dan jadwal</div>
             </div>
-          </div>
-
-          <!-- Blueprint Selector -->
-          <div style="margin-bottom:16px;padding:14px 16px;background:var(--primary-light);border-radius:8px;border:1px solid #BFDBFE;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-              <div>
-                <div style="font-size:13px;font-weight:700;">🧬 Blueprint Autopilot</div>
-                <div style="font-size:12px;color:var(--text-sub);margin-top:2px;">Strategi yang dijalankan autopilot untuk kampanye ini</div>
-              </div>
-              <select class="form-input form-select" id="pub-blueprint" style="width:220px;font-size:13px;">
-                <option value="">Memuat blueprint...</option>
-              </select>
-            </div>
-            <div id="blueprint-preview" style="font-size:12px;color:var(--text-sub);"></div>
           </div>
 
           <!-- Row 1: Nama + Objective -->
@@ -488,15 +486,31 @@
     if (!bp) { el.innerHTML = ''; return; }
     const cfg = bp.config || {};
     const p1 = cfg.phase1 || {};
-    const p2a = cfg.phase2a || {};
-    const p2b = cfg.phase2b || {};
     const p3 = cfg.phase3 || {};
     const parts = [
       `P1: ${p1.adsets?.length || 1} adset · evaluasi ${p1.evaluation?.duration_days || 3} hari`,
-      p2a.enabled !== false ? `P2a: Cost Cap Rp ${(p2a.budget || 5000000).toLocaleString('id-ID')}` : '',
-      p2b.enabled !== false ? `P2b: ABO ${p2b.adsets?.length || 3} adset @ Rp ${(p2b.budget_per_adset || 50000).toLocaleString('id-ID')}` : '',
-      `P3: scale ${p3.scale_pct || 3}%/hari`
-    ].filter(Boolean);
+    ];
+
+    // Support new format (cfg.phase2) and old format (cfg.phase2a/phase2b)
+    if (cfg.phase2?.strategy) {
+      const s = cfg.phase2.strategy;
+      const cc = cfg.phase2.cost_cap || {};
+      const abo = cfg.phase2.abo || {};
+      const sim = cfg.phase2.simple || {};
+      if (s === 'cost_cap_abo')   parts.push(`P2: Cost Cap Rp ${(cc.budget || 5000000).toLocaleString('id-ID')} + ABO ${abo.adsets?.length || 3} adset`);
+      else if (s === 'cost_cap_only') parts.push(`P2: Cost Cap Rp ${(cc.budget || 5000000).toLocaleString('id-ID')}`);
+      else if (s === 'abo_interest')  parts.push(`P2: ABO ${abo.adsets?.length || 3} adset @ Rp ${(abo.budget_per_adset || 50000).toLocaleString('id-ID')}`);
+      else if (s === 'lookalike')     parts.push(`P2: Lookalike Rp ${(sim.budget || 100000).toLocaleString('id-ID')}`);
+      else if (s === 'broad')         parts.push(`P2: Broad Rp ${(sim.budget || 100000).toLocaleString('id-ID')}`);
+      else if (s === 'skip')          parts.push('P2: Skip');
+    } else if (cfg.phase2a || cfg.phase2b) {
+      const p2a = cfg.phase2a || {};
+      const p2b = cfg.phase2b || {};
+      if (p2a.enabled !== false) parts.push(`P2a: Cost Cap Rp ${(p2a.budget || 5000000).toLocaleString('id-ID')}`);
+      if (p2b.enabled !== false) parts.push(`P2b: ABO ${p2b.adsets?.length || 3} adset`);
+    }
+
+    parts.push(`P3: scale ${p3.scale_pct || 3}%/hari`);
     el.innerHTML = parts.join(' &nbsp;·&nbsp; ');
   }
 

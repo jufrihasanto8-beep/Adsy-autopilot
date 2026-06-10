@@ -235,38 +235,41 @@
         </div>
       </div>
 
-      <!-- Phase 2a -->
+      <!-- Phase 2 -->
       <div style="background:#FFFBEB;border-radius:8px;padding:16px;border-left:3px solid var(--warning);">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div style="font-size:12px;font-weight:700;color:#B45309;text-transform:uppercase;letter-spacing:.5px;">PHASE 2A — Cost Cap</div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
-            <input type="checkbox" id="bp-p2a-enabled" checked onchange="bpToggleP2a(this.checked)" />
-            <span>Aktifkan</span>
-          </label>
-        </div>
-        <div id="bp-p2a-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">Budget (Rp)</label>
-            <input type="number" class="form-input" id="bp-p2a-budget" value="5000000" step="500000" />
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label class="form-label" style="font-size:11px;">Bid Cap = CPR Phase 1 × …</label>
-            <input type="number" class="form-input" id="bp-p2a-bid" value="1.1" step="0.05" min="1" />
-          </div>
-        </div>
-      </div>
+        <div style="font-size:12px;font-weight:700;color:#B45309;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;">PHASE 2 — Evaluasi</div>
 
-      <!-- Phase 2b -->
-      <div style="background:#FFFBEB;border-radius:8px;padding:16px;border-left:3px solid var(--warning);">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div style="font-size:12px;font-weight:700;color:#B45309;text-transform:uppercase;letter-spacing:.5px;">PHASE 2B — ABO Interest</div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
-            <input type="checkbox" id="bp-p2b-enabled" checked onchange="bpToggleP2b(this.checked)" />
-            <span>Aktifkan</span>
-          </label>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label" style="font-size:11px;">Strategi Phase 2</label>
+          <select class="form-input form-select" id="bp-p2-strategy" onchange="bpOnP2Strategy(this.value)">
+            <option value="">-- Pilih Strategi --</option>
+            <option value="cost_cap_abo">Cost Cap + ABO Interest</option>
+            <option value="cost_cap_only">Hanya Cost Cap</option>
+            <option value="abo_interest">Hanya ABO Interest</option>
+            <option value="lookalike">Lookalike Audience</option>
+            <option value="broad">Broad (tanpa targeting)</option>
+            <option value="skip">Skip Phase 2 → langsung Phase 3</option>
+          </select>
         </div>
-        <div id="bp-p2b-fields">
-          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;">Adset Phase 2b</div>
+
+        <!-- Cost Cap config -->
+        <div id="bp-p2a-config" style="display:none;background:rgba(180,83,9,0.06);border-radius:6px;padding:12px;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;color:#B45309;margin-bottom:8px;">COST CAP</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:11px;">Budget (Rp)</label>
+              <input type="number" class="form-input" id="bp-p2a-budget" value="5000000" step="500000" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:11px;">Bid Cap = CPR Phase 1 × …</label>
+              <input type="number" class="form-input" id="bp-p2a-bid" value="1.1" step="0.05" min="1" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ABO Interest config -->
+        <div id="bp-p2b-config" style="display:none;background:rgba(180,83,9,0.06);border-radius:6px;padding:12px;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;color:#B45309;margin-bottom:8px;">ABO INTEREST — Adset</div>
           <div id="bp-p2b-adsets" style="display:flex;flex-direction:column;gap:8px;"></div>
           <button type="button" class="btn btn-outline btn-sm" onclick="bpAddP2bAdset()" style="margin-top:8px;font-size:12px;">+ Tambah Adset</button>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
@@ -280,6 +283,21 @@
             </div>
           </div>
         </div>
+
+        <!-- Lookalike / Broad config -->
+        <div id="bp-p2-simple-config" style="display:none;background:rgba(180,83,9,0.06);border-radius:6px;padding:12px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:11px;">Budget Adset (Rp)</label>
+              <input type="number" class="form-input" id="bp-p2-simple-budget" value="100000" step="10000" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-size:11px;">Evaluasi setelah (hari)</label>
+              <input type="number" class="form-input" id="bp-p2-simple-days" value="7" min="1" max="30" />
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Phase 3 -->
@@ -496,36 +514,58 @@
   window.bpAddP2bAdset = () => { bpP2bAdsets.push({ type: 'interest', label: '' }); bpRenderP2bAdsets(); };
   window.bpRemoveP2bAdset = (i) => { bpP2bAdsets.splice(i, 1); bpRenderP2bAdsets(); };
 
-  window.bpToggleP2a = (on) => { document.getElementById('bp-p2a-fields').style.display = on ? 'grid' : 'none'; };
-  window.bpToggleP2b = (on) => { document.getElementById('bp-p2b-fields').style.display = on ? '' : 'none'; };
+  window.bpOnP2Strategy = function(strategy) {
+    document.getElementById('bp-p2a-config').style.display   = (strategy === 'cost_cap_abo' || strategy === 'cost_cap_only') ? '' : 'none';
+    document.getElementById('bp-p2b-config').style.display   = (strategy === 'cost_cap_abo' || strategy === 'abo_interest')  ? '' : 'none';
+    document.getElementById('bp-p2-simple-config').style.display = (strategy === 'lookalike' || strategy === 'broad')        ? '' : 'none';
+  };
 
   function openBlueprintModal(bp = null) {
     bpEditId = bp?.id || null;
     document.getElementById('bp-modal-title').textContent = bp ? 'Edit Blueprint' : 'Buat Blueprint';
 
     const cfg = bp?.config || {};
-    const p1  = cfg.phase1 || {};
-    const p2a = cfg.phase2a || {};
-    const p2b = cfg.phase2b || {};
+    const p1  = cfg.phase1  || {};
     const p3  = cfg.phase3  || {};
+
+    // Support both new format (cfg.phase2) and old format (cfg.phase2a / cfg.phase2b)
+    let strategy = '';
+    let p2cost = {}, p2abo = {}, p2simple = {};
+    if (cfg.phase2?.strategy) {
+      strategy  = cfg.phase2.strategy;
+      p2cost    = cfg.phase2.cost_cap  || {};
+      p2abo     = cfg.phase2.abo       || {};
+      p2simple  = cfg.phase2.simple    || {};
+    } else if (cfg.phase2a || cfg.phase2b) {
+      // migrate old format
+      const p2a = cfg.phase2a || {};
+      const p2b = cfg.phase2b || {};
+      if (p2a.enabled !== false && p2b.enabled !== false) strategy = 'cost_cap_abo';
+      else if (p2a.enabled !== false) strategy = 'cost_cap_only';
+      else if (p2b.enabled !== false) strategy = 'abo_interest';
+      else strategy = 'skip';
+      p2cost   = { budget: p2a.budget, bid_multiplier: p2a.bid_multiplier };
+      p2abo    = { adsets: p2b.adsets, budget_per_adset: p2b.budget_per_adset, evaluation_days: p2b.evaluation_days };
+    }
 
     document.getElementById('bp-name').value = bp?.name || '';
     document.getElementById('bp-desc').value = bp?.description || '';
     document.getElementById('bp-p1-days').value    = p1.evaluation?.duration_days ?? 3;
     document.getElementById('bp-p1-pause').value   = p1.evaluation?.pause_cpr_multiplier ?? 2.5;
     document.getElementById('bp-p1-advance').value = p1.evaluation?.advance_cpr_multiplier ?? 1.1;
-    document.getElementById('bp-p2a-enabled').checked = p2a.enabled !== false;
-    document.getElementById('bp-p2a-budget').value = p2a.budget ?? 5000000;
-    document.getElementById('bp-p2a-bid').value    = p2a.bid_multiplier ?? 1.1;
-    document.getElementById('bp-p2b-enabled').checked = p2b.enabled !== false;
-    document.getElementById('bp-p2b-budget').value = p2b.budget_per_adset ?? 50000;
-    document.getElementById('bp-p2b-days').value   = p2b.evaluation_days ?? 7;
-    document.getElementById('bp-p3-scale').value   = p3.scale_pct ?? 3;
-    document.getElementById('bp-p3-maxscale').value= p3.max_scale_pct ?? 30;
-    document.getElementById('bp-p3-pause').value   = p3.pause_cpr_multiplier ?? 2.0;
+    document.getElementById('bp-p2-strategy').value = strategy;
+    document.getElementById('bp-p2a-budget').value  = p2cost.budget ?? 5000000;
+    document.getElementById('bp-p2a-bid').value     = p2cost.bid_multiplier ?? 1.1;
+    document.getElementById('bp-p2b-budget').value  = p2abo.budget_per_adset ?? 50000;
+    document.getElementById('bp-p2b-days').value    = p2abo.evaluation_days ?? 7;
+    document.getElementById('bp-p2-simple-budget').value = p2simple.budget ?? 100000;
+    document.getElementById('bp-p2-simple-days').value   = p2simple.evaluation_days ?? 7;
+    document.getElementById('bp-p3-scale').value    = p3.scale_pct ?? 3;
+    document.getElementById('bp-p3-maxscale').value = p3.max_scale_pct ?? 30;
+    document.getElementById('bp-p3-pause').value    = p3.pause_cpr_multiplier ?? 2.0;
 
-    bpP1Adsets  = p1.adsets?.length  ? JSON.parse(JSON.stringify(p1.adsets))  : [{ type: 'interest' }];
-    bpP2bAdsets = p2b.adsets?.length ? JSON.parse(JSON.stringify(p2b.adsets)) : [
+    bpP1Adsets  = p1.adsets?.length   ? JSON.parse(JSON.stringify(p1.adsets))   : [{ type: 'interest' }];
+    bpP2bAdsets = p2abo.adsets?.length ? JSON.parse(JSON.stringify(p2abo.adsets)) : [
       { type: 'interest', label: 'Manfaat' },
       { type: 'interest', label: 'Perilaku' },
       { type: 'interest', label: 'Hobi' }
@@ -533,8 +573,7 @@
 
     bpRenderP1Adsets();
     bpRenderP2bAdsets();
-    bpToggleP2a(p2a.enabled !== false);
-    bpToggleP2b(p2b.enabled !== false);
+    bpOnP2Strategy(strategy);
     openModal('modal-blueprint');
   }
 
@@ -543,29 +582,40 @@
     if (!name) return showToast('Nama blueprint wajib diisi', 'warning');
     if (!bpP1Adsets.length) return showToast('Minimal 1 adset di Phase 1', 'warning');
 
-    const p2aEnabled = document.getElementById('bp-p2a-enabled').checked;
-    const p2bEnabled = document.getElementById('bp-p2b-enabled').checked;
+    const strategy = document.getElementById('bp-p2-strategy').value;
+    if (!strategy) return showToast('Pilih strategi Phase 2 terlebih dahulu', 'warning');
+
+    const p2config = { strategy };
+    if (strategy === 'cost_cap_abo' || strategy === 'cost_cap_only') {
+      p2config.cost_cap = {
+        budget:         parseInt(document.getElementById('bp-p2a-budget').value) || 5000000,
+        bid_multiplier: parseFloat(document.getElementById('bp-p2a-bid').value) || 1.1,
+      };
+    }
+    if (strategy === 'cost_cap_abo' || strategy === 'abo_interest') {
+      p2config.abo = {
+        adsets:           bpP2bAdsets,
+        budget_per_adset: parseInt(document.getElementById('bp-p2b-budget').value) || 50000,
+        evaluation_days:  parseInt(document.getElementById('bp-p2b-days').value)   || 7,
+      };
+    }
+    if (strategy === 'lookalike' || strategy === 'broad') {
+      p2config.simple = {
+        budget:          parseInt(document.getElementById('bp-p2-simple-budget').value) || 100000,
+        evaluation_days: parseInt(document.getElementById('bp-p2-simple-days').value)   || 7,
+      };
+    }
 
     const config = {
       phase1: {
         adsets: bpP1Adsets,
         evaluation: {
-          duration_days:          parseInt(document.getElementById('bp-p1-days').value)    || 3,
-          pause_cpr_multiplier:   parseFloat(document.getElementById('bp-p1-pause').value) || 2.5,
+          duration_days:          parseInt(document.getElementById('bp-p1-days').value)      || 3,
+          pause_cpr_multiplier:   parseFloat(document.getElementById('bp-p1-pause').value)   || 2.5,
           advance_cpr_multiplier: parseFloat(document.getElementById('bp-p1-advance').value) || 1.1,
         }
       },
-      phase2a: {
-        enabled:        p2aEnabled,
-        budget:         parseInt(document.getElementById('bp-p2a-budget').value) || 5000000,
-        bid_multiplier: parseFloat(document.getElementById('bp-p2a-bid').value) || 1.1,
-      },
-      phase2b: {
-        enabled:         p2bEnabled,
-        adsets:          bpP2bAdsets,
-        budget_per_adset: parseInt(document.getElementById('bp-p2b-budget').value) || 50000,
-        evaluation_days:  parseInt(document.getElementById('bp-p2b-days').value)   || 7,
-      },
+      phase2: p2config,
       phase3: {
         scale_pct:            parseInt(document.getElementById('bp-p3-scale').value)    || 3,
         max_scale_pct:        parseInt(document.getElementById('bp-p3-maxscale').value) || 30,
@@ -626,15 +676,22 @@
     el.innerHTML = data.map(bp => {
       const cfg = bp.config || {};
       const p1adsets = cfg.phase1?.adsets?.length || 1;
-      const p2bAdsets = cfg.phase2b?.adsets?.length || 0;
-      const p2bEnabled = cfg.phase2b?.enabled !== false;
-      const p2aEnabled = cfg.phase2a?.enabled !== false;
       const scale = cfg.phase3?.scale_pct || 3;
+
+      // Support both new and old config format for summary
+      let p2label = '';
+      if (cfg.phase2?.strategy) {
+        const labels = { cost_cap_abo: 'Cost Cap + ABO', cost_cap_only: 'Cost Cap', abo_interest: 'ABO Interest', lookalike: 'Lookalike', broad: 'Broad', skip: 'Skip' };
+        p2label = labels[cfg.phase2.strategy] || cfg.phase2.strategy;
+      } else if (cfg.phase2a || cfg.phase2b) {
+        const hasCostCap = cfg.phase2a?.enabled !== false;
+        const hasAbo     = cfg.phase2b?.enabled !== false;
+        p2label = hasCostCap && hasAbo ? 'Cost Cap + ABO' : hasCostCap ? 'Cost Cap' : hasAbo ? 'ABO Interest' : 'Skip';
+      }
 
       const summary = [
         `P1: ${p1adsets} adset`,
-        p2aEnabled ? 'P2a: Cost Cap' : '',
-        p2bEnabled ? `P2b: ${p2bAdsets} adset` : '',
+        p2label ? `P2: ${p2label}` : '',
         `P3: Scale ${scale}%`
       ].filter(Boolean).join(' · ');
 
