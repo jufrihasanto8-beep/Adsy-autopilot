@@ -358,6 +358,7 @@
       });
     });
 
+    await loadAdAccountLabels();
     await loadCampaigns();
     setLastUpdated();
   }
@@ -814,16 +815,23 @@
   init();
 
   // ── Filter Akun Iklan ──
+  let adAccountLabels = {}; // account_id → label
+
+  async function loadAdAccountLabels() {
+    const { data } = await sb.from('ad_accounts').select('account_id, label').eq('user_id', currentProfile.id);
+    adAccountLabels = {};
+    (data || []).forEach(a => { adAccountLabels[a.account_id] = a.label || a.account_id; });
+  }
+
   function populateAccountFilter() {
     const sel = document.getElementById('filter-account');
     const accounts = [...new Set(allCampaigns.map(c => c.ad_account_id).filter(Boolean))];
-    // Simpan nilai yang sedang dipilih
     const current = sel.value;
     sel.innerHTML = '<option value="">Semua Akun Iklan</option>';
     accounts.forEach(acc => {
       const opt = document.createElement('option');
       opt.value = acc;
-      opt.textContent = acc;
+      opt.textContent = adAccountLabels[acc] || acc;
       sel.appendChild(opt);
     });
     if (current) sel.value = current;
