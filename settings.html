@@ -482,6 +482,56 @@
   </div>
 </div>
 
+<!-- MODAL ADD PIXEL -->
+<div class="modal-overlay hidden" id="modal-pixel">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <h3>Tambah Meta Pixel</h3>
+      <div class="modal-close">✕</div>
+    </div>
+    <div class="modal-body">
+      <div id="pixel-loading" style="display:none; text-align:center; padding:20px; color:var(--text-sub);">
+        <div class="loading-spinner" style="margin:0 auto 12px;"></div>
+        Mengambil pixels dari Meta...
+      </div>
+      <div id="pixel-select-wrap" style="display:none;">
+        <div class="form-group">
+          <label class="form-label">Pilih Pixel</label>
+          <div class="searchable-select" id="pixel-ss-wrap">
+            <input type="text" class="form-input" id="pixel-ss-search" placeholder="🔍 Cari & pilih pixel..." autocomplete="off" readonly />
+            <input type="hidden" id="pixel-ss-select" />
+            <div class="ss-dropdown" id="pixel-ss-dropdown" style="display:none;">
+              <input type="text" class="ss-search" id="pixel-ss-filter" placeholder="Ketik untuk cari..." autocomplete="off" />
+              <div class="ss-list" id="pixel-ss-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="pixel-manual-wrap">
+        <div class="form-group">
+          <label class="form-label">Pixel ID <span>*</span></label>
+          <input type="text" class="form-input" id="pixel-id-input" placeholder="Contoh: 1234567890123456" />
+          <div class="form-hint">Ambil dari Meta Events Manager → pilih pixel → Settings</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nama Pixel</label>
+          <input type="text" class="form-input" id="pixel-name-input" placeholder="Contoh: Pixel Utama" />
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="switch-wrap">
+          <label class="switch"><input type="checkbox" id="pixel-default" /><span class="switch-slider"></span></label>
+          <span class="switch-label">Jadikan pixel default untuk akun ini</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn btn-outline modal-close">Batal</button>
+        <button class="btn btn-primary" id="btn-save-pixel">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL ADD URL -->
 <div class="modal-overlay hidden" id="modal-url">
   <div class="modal" style="max-width:460px;">
@@ -962,7 +1012,7 @@
 
   // ── AD ACCOUNTS ──
   async function loadAccounts() {
-    const { data } = await sb.from('ad_accounts').select('*, ad_urls(*), ad_pages(*)').eq('user_id', currentProfile.id).order('created_at');
+    const { data } = await sb.from('ad_accounts').select('*, ad_urls(*), ad_pages(*), ad_pixels(*)').eq('user_id', currentProfile.id).order('created_at');
     allAccounts = data || [];
     renderAccounts();
   }
@@ -977,8 +1027,9 @@
     section.style.display = '';
 
     el.innerHTML = allAccounts.map(acc => {
-      const urls  = acc.ad_urls  || [];
-      const pages = (acc.ad_pages || []).sort((a, b) => b.is_default - a.is_default);
+      const urls   = acc.ad_urls   || [];
+      const pages  = (acc.ad_pages  || []).sort((a, b) => b.is_default - a.is_default);
+      const pixels = (acc.ad_pixels || []).sort((a, b) => b.is_default - a.is_default);
       return `
       <div class="card" style="margin-bottom:16px;">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px;">
@@ -987,7 +1038,7 @@
             <div style="font-size:12px; color:var(--text-sub); margin-top:4px; display:flex; gap:12px; flex-wrap:wrap;">
               <span>📱 <strong>${acc.account_id}</strong></span>
               <span>📄 Pages: <strong>${pages.length || 0}</strong></span>
-              ${acc.pixel_id ? `<span>🎯 Pixel: <strong>${acc.pixel_id}</strong></span>` : ''}
+              <span>🎯 Pixels: <strong>${pixels.length || 0}</strong></span>
             </div>
           </div>
           <div style="display:flex; gap:8px;">
@@ -1015,6 +1066,27 @@
                 </div>`).join('')}
             </div>` : `
             <div style="font-size:13px; color:var(--gray-5); padding:8px 0;">Belum ada page — klik "+ Tambah Page"</div>`}
+        </div>
+
+        <!-- PIXELS SECTION -->
+        <div style="border-top:1px solid var(--gray-3); padding-top:14px; margin-top:14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+            <div style="font-size:12px; font-weight:600; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.5px;">Meta Pixel</div>
+            <button class="btn btn-ghost btn-sm" onclick="openAddPixel('${acc.id}','${acc.account_id}')" style="font-size:12px;">+ Tambah Pixel</button>
+          </div>
+          ${pixels.length ? `
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              ${pixels.map(px => `
+                <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--gray-1); border-radius:8px;">
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:13px; font-weight:600;">${px.pixel_name || 'Pixel'} ${px.is_default ? '<span class="badge badge-primary" style="font-size:10px; margin-left:4px;">Default</span>' : ''}</div>
+                    <div style="font-size:11px; color:var(--text-sub);">ID: ${px.pixel_id}</div>
+                  </div>
+                  ${!px.is_default ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="setDefaultPixel('${px.id}','${acc.id}')">Set Default</button>` : ''}
+                  <button class="btn btn-ghost btn-sm" style="color:var(--danger); font-size:18px; padding:0 6px;" onclick="deletePixel('${px.id}')">×</button>
+                </div>`).join('')}
+            </div>` : `
+            <div style="font-size:13px; color:var(--gray-5); padding:8px 0;">Belum ada pixel — klik "+ Tambah Pixel"</div>`}
         </div>
 
         <!-- URL SECTION -->
@@ -1054,6 +1126,7 @@
       document.getElementById('token-info').style.display = v ? '' : 'none';
     });
     document.getElementById('btn-save-page').addEventListener('click', savePage);
+    document.getElementById('btn-save-pixel').addEventListener('click', savePixel);
     document.getElementById('btn-save-url').addEventListener('click', saveUrl);
     document.getElementById('btn-invite-user')?.addEventListener('click', () => openModal('modal-invite'));
     document.getElementById('btn-create-user')?.addEventListener('click', createUser);
@@ -1236,6 +1309,133 @@
     const { error } = await sb.from('ad_pages').delete().eq('id', id);
     if (error) return showToast('Gagal hapus: ' + error.message, 'error');
     showToast('Page dihapus', 'success');
+    await loadAccounts();
+  };
+
+  // ── PIXELS ──
+  let activePixelAccountId  = null;
+  let activePixelMetaAccId  = null;
+
+  window.openAddPixel = async function(accountId, metaAccountId) {
+    activePixelAccountId = accountId;
+    activePixelMetaAccId = metaAccountId;
+    document.getElementById('pixel-id-input').value   = '';
+    document.getElementById('pixel-name-input').value = '';
+    document.getElementById('pixel-default').checked  = false;
+    document.getElementById('pixel-select-wrap').style.display = 'none';
+    document.getElementById('pixel-manual-wrap').style.display = '';
+    document.getElementById('pixel-ss-dropdown').style.display = 'none';
+    document.getElementById('pixel-ss-search').value  = '';
+    document.getElementById('pixel-ss-select').value  = '';
+    openModal('modal-pixel');
+
+    // Auto-fetch pixels dari Meta
+    const token = await getToken();
+    if (!token || !metaAccountId) return;
+    document.getElementById('pixel-loading').style.display = '';
+    try {
+      const res  = await fetch(`${META}/${metaAccountId}/adspixels?fields=id,name&access_token=${token}`);
+      const data = await res.json();
+      document.getElementById('pixel-loading').style.display = 'none';
+      const pixels = data.data || [];
+      if (pixels.length) {
+        const options = [...pixels.map(p => ({ id: p.id, name: p.name || `Pixel ${p.id}` })),
+          { id: '__manual__', name: '✏️ Masukkan ID manual...' }];
+        document.getElementById('pixel-select-wrap').style.display = '';
+        document.getElementById('pixel-manual-wrap').style.display = 'none';
+        initPixelSearchableSelect(options);
+      }
+    } catch (e) {
+      document.getElementById('pixel-loading').style.display = 'none';
+    }
+  };
+
+  function initPixelSearchableSelect(items) {
+    const input    = document.getElementById('pixel-ss-search');
+    const hidden   = document.getElementById('pixel-ss-select');
+    const filterEl = document.getElementById('pixel-ss-filter');
+    const listEl   = document.getElementById('pixel-ss-list');
+    const dropdown = document.getElementById('pixel-ss-dropdown');
+    input.value = ''; hidden.value = '';
+
+    function renderList(q = '') {
+      const filtered = items.filter(x => !q || x.name.toLowerCase().includes(q.toLowerCase()) || x.id.includes(q));
+      listEl.innerHTML = filtered.length
+        ? filtered.map(x => `<div class="ss-item" data-id="${x.id}" data-name="${escHtml(x.name)}">${escHtml(x.name)} <span class="ss-id">${x.id !== '__manual__' ? x.id : ''}</span></div>`).join('')
+        : '<div class="ss-empty">Tidak ditemukan</div>';
+      listEl.querySelectorAll('.ss-item').forEach(el => {
+        el.onmousedown = e => {
+          e.preventDefault();
+          hidden.value = el.dataset.id;
+          input.value  = el.dataset.name + (el.dataset.id !== '__manual__' ? ` (${el.dataset.id})` : '');
+          dropdown.style.display = 'none'; filterEl.value = '';
+          if (el.dataset.id === '__manual__') {
+            document.getElementById('pixel-manual-wrap').style.display = '';
+            document.getElementById('pixel-id-input').focus();
+          } else {
+            document.getElementById('pixel-manual-wrap').style.display = 'none';
+            document.getElementById('pixel-id-input').value   = el.dataset.id;
+            document.getElementById('pixel-name-input').value = el.dataset.name;
+          }
+        };
+      });
+    }
+
+    input.onclick = () => {
+      const isOpen = dropdown.style.display !== 'none';
+      dropdown.style.display = isOpen ? 'none' : '';
+      if (!isOpen) { filterEl.focus(); renderList(); }
+    };
+    filterEl.oninput = () => renderList(filterEl.value);
+
+    if (window._pixelSSOutsideClick) document.removeEventListener('click', window._pixelSSOutsideClick);
+    window._pixelSSOutsideClick = e => {
+      const wrap = document.getElementById('pixel-ss-wrap');
+      if (wrap && !wrap.contains(e.target)) dropdown.style.display = 'none';
+    };
+    document.addEventListener('click', window._pixelSSOutsideClick);
+    renderList();
+  }
+
+  async function savePixel() {
+    const pixelId   = document.getElementById('pixel-id-input').value.trim();
+    const pixelName = document.getElementById('pixel-name-input').value.trim();
+    const isDefault = document.getElementById('pixel-default').checked;
+    if (!pixelId) return showToast('Pixel ID wajib diisi', 'warning');
+
+    const btn = document.getElementById('btn-save-pixel');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    if (isDefault) {
+      await sb.from('ad_pixels').update({ is_default: false }).eq('ad_account_id', activePixelAccountId);
+    }
+    const { error } = await sb.from('ad_pixels').insert({
+      user_id: currentProfile.id,
+      ad_account_id: activePixelAccountId,
+      pixel_id: pixelId,
+      pixel_name: pixelName || null,
+      is_default: isDefault
+    });
+
+    btn.disabled = false; btn.textContent = 'Simpan';
+    if (error) return showToast('Gagal: ' + error.message, 'error');
+    showToast('Pixel ditambahkan!', 'success');
+    closeModal('modal-pixel');
+    await loadAccounts();
+  }
+
+  window.setDefaultPixel = async function(id, accountId) {
+    await sb.from('ad_pixels').update({ is_default: false }).eq('ad_account_id', accountId);
+    await sb.from('ad_pixels').update({ is_default: true }).eq('id', id);
+    showToast('Pixel default diperbarui', 'success');
+    await loadAccounts();
+  };
+
+  window.deletePixel = async function(id) {
+    if (!confirm('Hapus pixel ini?')) return;
+    const { error } = await sb.from('ad_pixels').delete().eq('id', id);
+    if (error) return showToast('Gagal hapus: ' + error.message, 'error');
+    showToast('Pixel dihapus', 'success');
     await loadAccounts();
   };
 

@@ -412,6 +412,9 @@
         <select class="form-input form-select" id="pub-page" style="width:170px; display:none;">
           <option value="">Pilih Page</option>
         </select>
+        <select class="form-input form-select" id="pub-pixel" style="width:170px; display:none;">
+          <option value="">Pilih Pixel</option>
+        </select>
         <select class="form-input form-select" id="pub-url" style="width:170px;">
           <option value="">Pilih URL Tujuan</option>
         </select>
@@ -595,9 +598,9 @@
       urlSel.innerHTML = urls.length
         ? urls.map(u => `<option value="${u.id}" ${u.is_default ? 'selected' : ''}>${u.label}</option>`).join('')
         : `<option value="">Belum ada URL — isi di Pengaturan</option>`;
-      // Load Pages
-      const pageSel = document.getElementById('pub-page');
       if (acc) {
+        // Load Pages
+        const pageSel = document.getElementById('pub-page');
         const { data: pages } = await sb.from('ad_pages').select('*').eq('ad_account_id', acc.id).order('is_default', { ascending: false });
         if (pages?.length > 1) {
           pageSel.style.display = '';
@@ -606,6 +609,15 @@
           pageSel.style.display = 'none';
           pageSel.innerHTML = pages?.length ? `<option value="${pages[0].page_id}" selected>${pages[0].page_name || pages[0].page_id}</option>` : '<option value="">-</option>';
         }
+        // Load Pixels
+        const pixelSel = document.getElementById('pub-pixel');
+        const { data: pixels } = await sb.from('ad_pixels').select('*').eq('ad_account_id', acc.id).order('is_default', { ascending: false });
+        if (pixels?.length > 1) {
+          pixelSel.innerHTML = pixels.map(px => `<option value="${px.pixel_id}" ${px.is_default ? 'selected' : ''}>${px.pixel_name || px.pixel_id}</option>`).join('');
+        } else {
+          pixelSel.innerHTML = pixels?.length ? `<option value="${pixels[0].pixel_id}" selected>${pixels[0].pixel_name || pixels[0].pixel_id}</option>` : '<option value="">Tidak ada pixel</option>';
+        }
+        updatePixelVisibility();
       }
     });
   }
@@ -926,8 +938,10 @@
           formData.append('file_name', item.file.name);
         }
 
-        const selectedPageId = document.getElementById('pub-page').value;
-        if (selectedPageId) formData.append('page_id', selectedPageId);
+        const selectedPageId  = document.getElementById('pub-page').value;
+        const selectedPixelId = document.getElementById('pub-pixel').value;
+        if (selectedPageId)  formData.append('page_id', selectedPageId);
+        if (selectedPixelId) formData.append('pixel_id', selectedPixelId);
         formData.append('headline', item.headline);
         formData.append('primary_text', item.primaryText);
         formData.append('description', item.description || '');
@@ -977,6 +991,17 @@
       setTimeout(() => window.location.href = 'campaigns.html', 2000);
     }
   }
+
+  // ── Pixel visibility (hanya tampil untuk Sales/Leads) ──
+  function updatePixelVisibility() {
+    const objective = document.getElementById('pub-objective')?.value || '';
+    const needsPixel = ['OUTCOME_SALES', 'OUTCOME_LEADS'].includes(objective);
+    const pixelSel = document.getElementById('pub-pixel');
+    const hasPixels = pixelSel && pixelSel.options.length > 0 && pixelSel.options[0].value;
+    if (pixelSel) pixelSel.style.display = (needsPixel && hasPixels) ? '' : 'none';
+  }
+
+  document.getElementById('pub-objective')?.addEventListener('change', updatePixelVisibility);
 
   // ── Budget type toggle ──
   let budgetType = 'ABO';

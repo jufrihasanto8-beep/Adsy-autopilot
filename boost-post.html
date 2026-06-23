@@ -254,6 +254,9 @@
         <select class="form-input form-select" id="pub-page" style="width:170px; display:none;">
           <option value="">Pilih Page</option>
         </select>
+        <select class="form-input form-select" id="pub-pixel" style="width:170px; display:none;">
+          <option value="">Pilih Pixel</option>
+        </select>
         <button class="btn btn-dark" id="btn-publish">🚀 Boost ke Meta</button>
       </div>
     </div>
@@ -361,6 +364,16 @@
         pageSel.style.display = 'none';
         pageSel.innerHTML = pages?.length ? `<option value="${pages[0].page_id}" selected>${pages[0].page_name || pages[0].page_id}</option>` : '<option value="">-</option>';
       }
+      // Load Pixels
+      const pixelSel = document.getElementById('pub-pixel');
+      const { data: pixels } = await sb.from('ad_pixels').select('*').eq('ad_account_id', acc.id).order('is_default', { ascending: false });
+      if (pixels?.length > 1) {
+        pixelSel.style.display = '';
+        pixelSel.innerHTML = pixels.map(px => `<option value="${px.pixel_id}" ${px.is_default ? 'selected' : ''}>${px.pixel_name || px.pixel_id}</option>`).join('');
+      } else {
+        pixelSel.style.display = 'none';
+        pixelSel.innerHTML = pixels?.length ? `<option value="${pixels[0].pixel_id}" selected>${pixels[0].pixel_name || pixels[0].pixel_id}</option>` : '<option value="">-</option>';
+      }
     });
   }
 
@@ -461,14 +474,16 @@
       const endTime = document.getElementById('pub-end').value;
       const autoActivate = document.getElementById('pub-auto-activate').checked;
 
-      const selectedPageId = document.getElementById('pub-page').value;
+      const selectedPageId  = document.getElementById('pub-page').value;
+      const selectedPixelId = document.getElementById('pub-pixel').value;
       const body = {
         action: 'boost-post',
         post_ids: validPostIds,
         product_id: selectedProduct.id,
         ad_account_db_id: accDbId,
         user_id: currentProfile.id,
-        ...(selectedPageId ? { page_id: selectedPageId } : {}),
+        ...(selectedPageId  ? { page_id:  selectedPageId  } : {}),
+        ...(selectedPixelId ? { pixel_id: selectedPixelId } : {}),
         objective,
         daily_budget: parseInt(budget),
         budget_type: budgetType,
@@ -509,6 +524,16 @@
       btn.innerHTML = '🚀 Boost ke Meta';
     }
   }
+
+  // ── Pixel visibility ──
+  function updatePixelVisibility() {
+    const objective  = document.getElementById('pub-objective')?.value || '';
+    const needsPixel = ['OUTCOME_SALES', 'OUTCOME_LEADS'].includes(objective);
+    const pixelSel   = document.getElementById('pub-pixel');
+    const hasPixels  = pixelSel && pixelSel.options.length > 0 && pixelSel.options[0].value;
+    if (pixelSel) pixelSel.style.display = (needsPixel && hasPixels) ? '' : 'none';
+  }
+  document.getElementById('pub-objective')?.addEventListener('change', updatePixelVisibility);
 
   // ── Budget Type ──
   window.setBudgetType = function(type) {
