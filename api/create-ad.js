@@ -68,7 +68,8 @@ export default async function handler(req, res) {
     }
 
     // Get account config
-    const pageIdOverride = fields.page_id?.[0] || null;
+    const pageIdOverride  = fields.page_id?.[0]  || null;
+    const pixelIdOverride = fields.pixel_id?.[0] || null;
 
     const { data: accData } = await sb.from('ad_accounts')
       .select('account_id, page_id, pixel_id').eq('id', adAccountDbId).single();
@@ -79,9 +80,9 @@ export default async function handler(req, res) {
 
     const token     = cfgData?.meta_token || process.env.META_ACCESS_TOKEN;
     const accountId = accData.account_id;
-    // page_id: pakai dari frontend (multi-page) atau fallback ke kolom lama
-    const pageId    = pageIdOverride || accData.page_id;
-    const pixelId   = accData.pixel_id || null;
+    // page_id & pixel_id: pakai dari frontend (multi) atau fallback ke kolom lama
+    const pageId    = pageIdOverride  || accData.page_id;
+    const pixelId   = pixelIdOverride || accData.pixel_id || null;
     const destUrl   = adType === 'ctwa'
       ? 'https://wa.me/' + (waNumber || '')
       : (urlData?.url || 'https://wa.me/');
@@ -598,7 +599,8 @@ async function handleBoostPost(res, body) {
     bid_strategy = 'LOWEST_COST_WITHOUT_CAP', bid_value,
     campaign_name: campaignNameInput, blueprint_id, auto_activate,
     start_time, end_time,
-    page_id: pageIdOverride
+    page_id: pageIdOverride,
+    pixel_id: pixelIdOverride
   } = body;
 
   if (!post_ids?.length) throw new Error('post_ids wajib ada');
@@ -614,9 +616,8 @@ async function handleBoostPost(res, body) {
   if (!token) throw new Error('Meta access token belum dikonfigurasi di Pengaturan');
 
   const accountId = accData.account_id;
-  // page_id: pakai dari frontend (multi-page) atau fallback ke kolom lama
-  const pageId    = pageIdOverride || accData.page_id;
-  const pixelId   = accData.pixel_id || null;
+  const pageId    = pageIdOverride  || accData.page_id;
+  const pixelId   = pixelIdOverride || accData.pixel_id || null;
   const adStatus  = auto_activate ? 'ACTIVE' : 'PAUSED';
 
   const { data: product } = await sb.from('products').select('name, target_cpr').eq('id', product_id).single();
