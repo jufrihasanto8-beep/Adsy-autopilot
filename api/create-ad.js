@@ -11,6 +11,19 @@ export const config = { api: { bodyParser: false } };
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // Route JSON requests (boost-post action) — tidak pakai formidable
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('application/json')) {
+    try {
+      const body = await readJsonBody(req);
+      if (body.action === 'boost-post') return await handleBoostPost(res, body);
+      return res.status(400).json({ error: 'Unknown action' });
+    } catch (err) {
+      console.error('boost-post error:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
   try {
     const form = formidable({ maxFileSize: 200 * 1024 * 1024 });
     const [fields, files] = await form.parse(req);
@@ -421,7 +434,7 @@ export default async function handler(req, res) {
         headline, primary_text: primaryText,
         description: description || '', status: 'testing',
         meta_creative_id: creativeId, meta_ad_id: metaAdId,
-        file_name: file?.originalFilename || file?.newFilename || null,
+        file_name: originalFileName || file?.originalFilename || file?.newFilename || null,
         content_library_id: contentLibraryId || null
       });
     } catch (e) { console.error('ad_copies insert failed (non-fatal):', e.message); }
@@ -572,6 +585,271 @@ function objectiveConfig(objective) {
     OUTCOME_AWARENESS:  { optimizationGoal: 'REACH',                billingEvent: 'IMPRESSIONS' },
   };
   return map[objective] || map.OUTCOME_TRAFFIC;
+}
+
+// ── Boost Post: iklankan existing post via object_story_id ──
+async function handleBoostPost(res, body) {
+  const {
+    post_ids, ad_account_db_id, user_id, product_id,
+    objective = 'OUTCOME_TRAFFIC', daily_budget, budget_type = 'ABO',
+    bid_strategy = 'LOWEST_COST_WITHOUT_CAP', bid_value,
+    campaign_name: campaignNameInput, blueprint_id, auto_activate,
+    start_time, end_time
+  } = body;
+
+  if (!post_ids?.length) throw new Error('post_ids wajib ada');
+  if (!ad_account_db_id) throw new Error('ad_account_db_id wajib ada');
+
+  const { data: accData } = await sb.from('ad_accounts')
+    .select('account_id, page_id, pixel_id').eq('id', ad_account_db_id).single();
+  if (!accData) throw new Error('Ad account tidak ditemukan');
+
+  const { data: cfgData } = await sb.from('app_config')
+    .select('meta_token').eq('user_id', user_id).single();
+  const token = cfgData?.meta_token || process.env.META_ACCESS_TOKEN;
+  if (!token) throw new Error('Meta access token belum dikonfigurasi di Pengaturan');
+
+  const accountId = accData.account_id;
+  const pageId    = accData.page_id;
+  const pixelId   = accData.pixel_id || null;
+  const adStatus  = auto_activate ? 'ACTIVE' : 'PAUSED';
+
+  const { data: product } = await sb.from('products').select('name, target_cpr').eq('id', product_id).single();
+  const finalCampaignName = campaignNameInput || `${product?.name || 'Iklan'} - ${new Date().toLocaleDateString('id-ID')}`;
+
+  // ── 1. Buat Campaign ──
+  const campPayloadMeta = {
+    name: finalCampaignName,
+    objective,
+    status: adStatus,
+    special_ad_categories: [],
+    access_token: token
+  };
+  if (budget_type === 'CBO') {
+    campPayloadMeta.daily_budget = daily_budget;
+    campPayloadMeta.bid_strategy = bid_strategy;
+    if (bid_value && bid_strategy !== 'LOWEST_COST_WITHOUT_CAP') {
+      if (bid_strategy === 'MINIMUM_ROAS') campPayloadMeta.roas_average_floor = parseFloat(bid_value) * 100;
+      else campPayloadMeta.bid_amount = parseInt(bid_value);
+    }
+  } else {
+    campPayloadMeta.is_adset_budget_sharing_enabled = false;
+  }
+
+  const campRes  = await fetch(`${META_API}/${accountId}/campaigns`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(campPayloadMeta)
+  });
+  const campData = await campRes.json();
+  if (campData.error) {
+    const e = campData.error;
+    throw new Error(`Meta campaign: ${e.error_user_msg || e.message} (code: ${e.code})`);
+  }
+  const metaCampaignId = campData.id;
+
+  // ── 2. Buat Ad Set ──
+  const SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
+  const { data: globalCfg } = await sb.from('global_settings').select('*').eq('id', SETTINGS_ID).single();
+
+  const locMode          = globalCfg?.ad_location_mode || 'include';
+  const selectedProvinces = globalCfg?.ad_selected_provinces || [];
+  let geoLocations         = { countries: ['ID'] };
+  let excludedGeoLocations = null;
+
+  if (selectedProvinces.length > 0) {
+    const regionKeys = await resolveProvinceKeys(selectedProvinces, token);
+    if (regionKeys.length > 0) {
+      if (locMode === 'exclude') excludedGeoLocations = { regions: regionKeys };
+      else geoLocations = { regions: regionKeys };
+    }
+  }
+
+  const { optimizationGoal, billingEvent } = objectiveConfig(objective);
+  const adsetPayload = {
+    name: `${finalCampaignName} - Ad Set`,
+    campaign_id: metaCampaignId,
+    billing_event: billingEvent,
+    optimization_goal: optimizationGoal,
+    targeting: {
+      geo_locations: geoLocations,
+      ...(excludedGeoLocations ? { excluded_geo_locations: excludedGeoLocations } : {}),
+      age_min: 21,
+      age_max: 65
+    },
+    status: adStatus,
+    access_token: token
+  };
+
+  // Placement
+  const plMode = globalCfg?.ad_placement_mode || 'AUTO';
+  if (plMode === 'MANUAL' && globalCfg?.ad_manual_placements?.length) {
+    const pl = globalCfg.ad_manual_placements;
+    const fbPositions = [], igPositions = [], msgPositions = [], anPositions = [];
+    if (pl.includes('fb_feed'))        fbPositions.push('feed');
+    if (pl.includes('fb_story'))       fbPositions.push('story');
+    if (pl.includes('fb_marketplace')) fbPositions.push('marketplace');
+    if (pl.includes('fb_search'))      fbPositions.push('search');
+    if (pl.includes('ig_stream'))      igPositions.push('stream');
+    if (pl.includes('ig_story'))       igPositions.push('story');
+    if (pl.includes('ig_reels'))       igPositions.push('reels');
+    if (pl.includes('ig_explore'))     igPositions.push('explore');
+    if (pl.includes('msg_home'))       msgPositions.push('messenger_home');
+    if (pl.includes('msg_story'))      msgPositions.push('story');
+    if (pl.includes('an_classic'))     anPositions.push('classic');
+    if (pl.includes('an_video'))       anPositions.push('instream_video');
+    const finalPlatforms = [];
+    if (fbPositions.length)  { finalPlatforms.push('facebook');         adsetPayload.targeting.facebook_positions  = fbPositions; }
+    if (igPositions.length)  { finalPlatforms.push('instagram');        adsetPayload.targeting.instagram_positions = igPositions; }
+    if (msgPositions.length) { finalPlatforms.push('messenger');        adsetPayload.targeting.messenger_positions = msgPositions; }
+    if (anPositions.length)  { finalPlatforms.push('audience_network'); adsetPayload.targeting.audience_network_positions = anPositions; }
+    if (pl.includes('plt_threads') && finalPlatforms.length) finalPlatforms.push('threads');
+    if (finalPlatforms.length) adsetPayload.targeting.publisher_platforms = finalPlatforms;
+  }
+
+  if (budget_type === 'ABO') {
+    adsetPayload.daily_budget = daily_budget;
+    adsetPayload.bid_strategy = bid_strategy;
+    if (bid_value && bid_strategy !== 'LOWEST_COST_WITHOUT_CAP') {
+      if (bid_strategy === 'MINIMUM_ROAS') adsetPayload.roas_average_floor = parseFloat(bid_value) * 100;
+      else adsetPayload.bid_amount = parseInt(bid_value);
+    }
+  }
+
+  const promotedObj = getPromotedObject(objective, pageId, pixelId);
+  if (promotedObj) adsetPayload.promoted_object = promotedObj;
+  if (start_time) adsetPayload.start_time = start_time;
+  if (end_time)   adsetPayload.end_time   = end_time;
+
+  const adsetRes  = await fetch(`${META_API}/${accountId}/adsets`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(adsetPayload)
+  });
+  const adsetData = await adsetRes.json();
+  if (adsetData.error) {
+    const e = adsetData.error;
+    throw new Error(`Meta ad set: ${e.error_user_msg || e.message} (code: ${e.code})`);
+  }
+  const metaAdsetId = adsetData.id;
+
+  // ── 3. Untuk setiap post_id: buat creative + ad ──
+  const results = [];
+  for (const postId of post_ids) {
+    try {
+      // object_story_id = {page_id}_{post_id}
+      const objectStoryId = `${pageId}_${postId}`;
+
+      const creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Creative - Post ${postId}`,
+          object_story_id: objectStoryId,
+          access_token: token
+        })
+      });
+      const creativeData = await creativeRes.json();
+      if (creativeData.error) {
+        const e = creativeData.error;
+        throw new Error(`${e.error_user_msg || e.message} (code: ${e.code})`);
+      }
+
+      const adRes  = await fetch(`${META_API}/${accountId}/ads`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Ad - Post ${postId}`,
+          adset_id: metaAdsetId,
+          creative: { creative_id: creativeData.id },
+          status: adStatus,
+          access_token: token
+        })
+      });
+      const adData = await adRes.json();
+      if (adData.error) {
+        const e = adData.error;
+        throw new Error(`${e.error_user_msg || e.message} (code: ${e.code})`);
+      }
+
+      results.push({ post_id: postId, creative_id: creativeData.id, ad_id: adData.id, success: true });
+
+    } catch (err) {
+      console.error(`boost-post: gagal post ${postId}:`, err.message);
+      results.push({ post_id: postId, success: false, error: err.message });
+    }
+  }
+
+  // ── 4. Simpan Campaign ke Supabase ──
+  let sbCampaignId = null;
+  try {
+    const campPayload = {
+      user_id, name: finalCampaignName,
+      ad_account_id: accountId,
+      status: adStatus,
+      current_phase: 1,
+      autopilot_enabled: true,
+      meta_campaign_id: metaCampaignId,
+      meta_adset_id: metaAdsetId,
+      daily_budget,
+      campaign_type: 'boost_post'
+    };
+    if (product_id)           campPayload.product_id  = product_id;
+    if (product?.target_cpr)  campPayload.target_cpr  = product.target_cpr;
+    if (blueprint_id)         campPayload.blueprint_id = blueprint_id;
+
+    const { data: camp, error: campErr } = await sb.from('campaigns').insert(campPayload).select('id').single();
+    if (campErr) console.error('campaigns insert error (non-fatal):', campErr.message);
+    else sbCampaignId = camp?.id;
+  } catch (e) { console.error('campaigns insert failed (non-fatal):', e.message); }
+
+  // ── 5. Simpan ad_copies (per post yang berhasil) ──
+  for (const r of results.filter(r => r.success)) {
+    try {
+      await sb.from('ad_copies').insert({
+        campaign_id: sbCampaignId,
+        user_id,
+        headline: `Post ${r.post_id}`,
+        primary_text: '',
+        description: '',
+        status: 'testing',
+        meta_creative_id: r.creative_id,
+        meta_ad_id: r.ad_id,
+        file_name: `post_${r.post_id}`
+      });
+    } catch (e) { console.error('ad_copies insert non-fatal:', e.message); }
+  }
+
+  // ── 6. action_logs ──
+  try {
+    const successCount = results.filter(r => r.success).length;
+    await sb.from('action_logs').insert({
+      user_id, campaign_name: finalCampaignName,
+      action_type: 'create',
+      description: `Boost ${successCount} post berhasil dipublish`,
+      status: 'success'
+    });
+  } catch (e) {}
+
+  // ── 7. WA notif ──
+  const successCount = results.filter(r => r.success).length;
+  sendWANotif(user_id, finalCampaignName, `${successCount} post di-boost`, adStatus).catch(() => {});
+
+  return res.status(200).json({
+    success: true,
+    meta_campaign_id: metaCampaignId,
+    meta_adset_id: metaAdsetId,
+    campaign_id: sbCampaignId,
+    results
+  });
+}
+
+async function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+      try { resolve(JSON.parse(body)); }
+      catch (e) { reject(new Error('Invalid JSON body')); }
+    });
+    req.on('error', reject);
+  });
 }
 
 function ctaMap(cta) {
