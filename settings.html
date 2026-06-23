@@ -1118,6 +1118,9 @@
     document.getElementById('page-default').checked = false;
     document.getElementById('page-select-wrap').style.display = 'none';
     document.getElementById('page-manual-wrap').style.display = '';
+    document.getElementById('page-ss-dropdown').style.display = 'none';
+    document.getElementById('page-ss-search').value = '';
+    document.getElementById('page-ss-select').value = '';
     openModal('modal-page');
 
     // Coba fetch pages dari Meta token
@@ -1151,10 +1154,10 @@
     function renderList(q = '') {
       const filtered = items.filter(x => !q || x.name.toLowerCase().includes(q.toLowerCase()) || x.id.includes(q));
       listEl.innerHTML = filtered.length
-        ? filtered.map(x => `<div class="ss-item" data-id="${x.id}" data-name="${x.name}">${x.name} <span class="ss-id">${x.id !== '__manual__' ? x.id : ''}</span></div>`).join('')
+        ? filtered.map(x => `<div class="ss-item" data-id="${x.id}" data-name="${escHtml(x.name)}">${escHtml(x.name)} <span class="ss-id">${x.id !== '__manual__' ? x.id : ''}</span></div>`).join('')
         : '<div class="ss-empty">Tidak ditemukan</div>';
       listEl.querySelectorAll('.ss-item').forEach(el => {
-        el.addEventListener('mousedown', e => {
+        el.onmousedown = e => {
           e.preventDefault();
           hidden.value = el.dataset.id;
           input.value  = el.dataset.name + (el.dataset.id !== '__manual__' ? ` (${el.dataset.id})` : '');
@@ -1167,19 +1170,31 @@
             document.getElementById('page-id-input').value   = el.dataset.id;
             document.getElementById('page-name-input').value = el.dataset.name;
           }
-        });
+        };
       });
     }
 
-    input.addEventListener('click', () => {
-      dropdown.style.display = dropdown.style.display === 'none' ? '' : 'none';
-      if (dropdown.style.display !== 'none') { filterEl.focus(); renderList(); }
-    });
-    filterEl.addEventListener('input', () => renderList(filterEl.value));
-    document.addEventListener('click', e => {
-      if (!document.getElementById('page-ss-wrap').contains(e.target)) dropdown.style.display = 'none';
-    });
+    // Pakai .onclick bukan addEventListener — supaya tidak dobel setiap modal dibuka
+    input.onclick = () => {
+      const isOpen = dropdown.style.display !== 'none';
+      dropdown.style.display = isOpen ? 'none' : '';
+      if (!isOpen) { filterEl.focus(); renderList(); }
+    };
+    filterEl.oninput = () => renderList(filterEl.value);
+
+    // Close on outside click — pakai named handler supaya bisa di-replace
+    if (window._pageSSOutsideClick) document.removeEventListener('click', window._pageSSOutsideClick);
+    window._pageSSOutsideClick = e => {
+      const wrap = document.getElementById('page-ss-wrap');
+      if (wrap && !wrap.contains(e.target)) dropdown.style.display = 'none';
+    };
+    document.addEventListener('click', window._pageSSOutsideClick);
+
     renderList();
+  }
+
+  function escHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   async function savePage() {
