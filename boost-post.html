@@ -251,6 +251,9 @@
         <select class="form-input form-select" id="pub-account" style="width:220px;">
           <option value="">Pilih Ad Account</option>
         </select>
+        <select class="form-input form-select" id="pub-page" style="width:170px; display:none;">
+          <option value="">Pilih Page</option>
+        </select>
         <button class="btn btn-dark" id="btn-publish">🚀 Boost ke Meta</button>
       </div>
     </div>
@@ -345,6 +348,20 @@
     }
     sel.innerHTML = `<option value="">Pilih Ad Account</option>` +
       userAdAccounts.map(a => `<option value="${a.id}">${a.label} (${a.account_id})</option>`).join('');
+
+    sel.addEventListener('change', async () => {
+      const acc = userAdAccounts.find(a => a.id === sel.value);
+      const pageSel = document.getElementById('pub-page');
+      if (!acc) { pageSel.style.display = 'none'; return; }
+      const { data: pages } = await sb.from('ad_pages').select('*').eq('ad_account_id', acc.id).order('is_default', { ascending: false });
+      if (pages?.length > 1) {
+        pageSel.style.display = '';
+        pageSel.innerHTML = pages.map(p => `<option value="${p.page_id}" ${p.is_default ? 'selected' : ''}>${p.page_name || p.page_id}</option>`).join('');
+      } else {
+        pageSel.style.display = 'none';
+        pageSel.innerHTML = pages?.length ? `<option value="${pages[0].page_id}" selected>${pages[0].page_name || pages[0].page_id}</option>` : '<option value="">-</option>';
+      }
+    });
   }
 
   // ── Post ID Rows ──
@@ -444,12 +461,14 @@
       const endTime = document.getElementById('pub-end').value;
       const autoActivate = document.getElementById('pub-auto-activate').checked;
 
+      const selectedPageId = document.getElementById('pub-page').value;
       const body = {
         action: 'boost-post',
         post_ids: validPostIds,
         product_id: selectedProduct.id,
         ad_account_db_id: accDbId,
         user_id: currentProfile.id,
+        ...(selectedPageId ? { page_id: selectedPageId } : {}),
         objective,
         daily_budget: parseInt(budget),
         budget_type: budgetType,
