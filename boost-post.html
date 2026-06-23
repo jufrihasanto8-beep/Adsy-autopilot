@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boost Post — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <style>
+    .post-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--gray-1);
+      border: 1.5px solid var(--gray-3);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+      transition: var(--transition);
+    }
+    .post-row:focus-within { border-color: var(--primary); background: var(--primary-light); }
+    .post-row-num { font-size: 11px; color: var(--text-sub); width: 18px; text-align: center; flex-shrink: 0; font-weight: 600; }
+    .post-row-icon { font-size: 16px; flex-shrink: 0; }
+    .post-row input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      outline: none;
+      min-width: 0;
+    }
+    .post-row input::placeholder { color: var(--text-sub); font-weight: 400; }
+    .publish-bar {
+      position: sticky;
+      bottom: 0;
+      background: white;
+      border-top: 1px solid var(--gray-3);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 50;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+    }
+    .publish-info { font-size: 13px; color: var(--text-sub); }
+    .publish-info strong { color: var(--text); font-size: 15px; display: block; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="/assets/autopilot.png" style="width:36px;height:36px;object-fit:contain;border-radius:8px;" alt="Adsy" />
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
+      <div class="nav-item" data-page="ctwa.html"><span class="nav-icon">💬</span> Buat Iklan CTWA</div>
+      <div class="nav-item active" data-page="boost-post.html"><span class="nav-icon">🚀</span> Boost Post</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-item" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
+      <div class="nav-item" data-page="products.html"><span class="nav-icon">📦</span> Produk</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content" style="padding-bottom:80px;">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>Boost Post</h2>
+        <p>Iklankan post existing dari Facebook/Instagram langsung pakai Post ID</p>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- SECTION 1: PRODUK & BLUEPRINT -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">1. Pilih Produk</div>
+            <div class="card-sub">Untuk menentukan target CPR dan Autopilot</div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Produk <span>*</span></label>
+          <select class="form-input form-select" id="select-product">
+            <option value="">-- Pilih Produk --</option>
+          </select>
+        </div>
+
+        <!-- Blueprint Selector -->
+        <div style="margin-top:16px;display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--primary-light);border-radius:8px;border:1px solid #BFDBFE;">
+          <div style="font-size:20px;">🧬</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:2px;">Blueprint Autopilot</div>
+            <div id="blueprint-preview" style="font-size:12px;color:var(--text-sub);">Memuat...</div>
+          </div>
+          <select class="form-input form-select" id="pub-blueprint" style="width:200px;font-size:13px;">
+            <option value="">Memuat...</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- SECTION 2: POST IDs -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">2. Input Post ID</div>
+            <div class="card-sub">
+              Ambil dari URL iklan: <code style="background:var(--gray-2);padding:2px 6px;border-radius:4px;font-size:12px;">facebook.com/PAGE_ID/posts/<strong>POST_ID</strong></code>
+            </div>
+          </div>
+          <span class="badge badge-success" id="post-count-badge" style="display:none;">0 post</span>
+        </div>
+
+        <div id="post-id-list"></div>
+
+        <button class="btn btn-outline btn-sm" id="btn-add-post" style="margin-top:8px;">
+          + Tambah Post ID
+        </button>
+      </div>
+
+      <!-- SECTION 3: PENGATURAN KAMPANYE -->
+      <div id="campaign-settings-wrap" style="display:none;">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">3. Pengaturan Kampanye</div>
+              <div class="card-sub">Objective, budget, bid strategy, dan jadwal</div>
+            </div>
+          </div>
+
+          <!-- Row 1: Nama + Objective -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Nama Kampanye</label>
+              <input type="text" class="form-input" id="pub-campaign-name" placeholder="Otomatis dari nama produk jika kosong" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Tujuan Kampanye (Objective)</label>
+              <select class="form-input form-select" id="pub-objective">
+                <option value="OUTCOME_TRAFFIC">Traffic — Kunjungan website / WA</option>
+                <option value="OUTCOME_LEADS">Leads — Form / DM</option>
+                <option value="OUTCOME_SALES">Sales — Konversi pembelian</option>
+                <option value="OUTCOME_ENGAGEMENT">Engagement — Like, komentar</option>
+                <option value="OUTCOME_AWARENESS">Awareness — Jangkauan luas</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Row 2: Budget Type + Budget + Bid Strategy + Bid Value -->
+          <div style="display:grid; grid-template-columns:160px 1fr 200px 1fr; gap:16px; margin-bottom:16px; align-items:end;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Tipe Budget</label>
+              <div style="display:flex; border:1.5px solid var(--gray-3); border-radius:8px; overflow:hidden;">
+                <button type="button" id="btn-abo" onclick="setBudgetType('ABO')" style="flex:1; padding:8px; font-size:12px; font-weight:600; border:none; cursor:pointer; background:var(--primary); color:white;">ABO</button>
+                <button type="button" id="btn-cbo" onclick="setBudgetType('CBO')" style="flex:1; padding:8px; font-size:12px; font-weight:600; border:none; cursor:pointer; background:white; color:var(--text-sub);">CBO</button>
+              </div>
+              <div class="form-hint" id="budget-type-hint">Budget per Ad Set</div>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Budget Harian</label>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:13px; font-weight:600; color:var(--text);">Rp</span>
+                <input type="number" class="form-input" id="pub-budget" placeholder="Misal: 50000" min="10000" step="5000" />
+              </div>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Bid Strategy</label>
+              <select class="form-input form-select" id="pub-bid-strategy" onchange="onBidStrategyChange()">
+                <option value="LOWEST_COST_WITHOUT_CAP">Lowest Cost (default)</option>
+                <option value="LOWEST_COST_WITH_BID_CAP">Bid Cap</option>
+                <option value="COST_CAP">Cost Cap</option>
+                <option value="MINIMUM_ROAS">Minimum ROAS</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0; display:none;" id="bid-value-wrap">
+              <label class="form-label" id="bid-value-label">Nilai Bid</label>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:13px; font-weight:600; color:var(--text);" id="bid-value-prefix">Rp</span>
+                <input type="number" class="form-input" id="pub-bid-value" placeholder="0" min="0" step="1000" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 3: Jadwal -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Mulai Tayang <span style="font-weight:400; color:var(--text-sub);">(opsional, default sekarang)</span></label>
+              <input type="datetime-local" class="form-input" id="pub-start" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Selesai Tayang <span style="font-weight:400; color:var(--text-sub);">(opsional)</span></label>
+              <input type="datetime-local" class="form-input" id="pub-end" />
+            </div>
+          </div>
+
+          <!-- Toggle aktif -->
+          <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--gray-3); display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <div style="font-size:13px; font-weight:600;">Langsung aktifkan setelah publish</div>
+              <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">Jika off, iklan dibuat dalam status Paused — aktifkan manual di Ads Manager atau via Autopilot</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="pub-auto-activate" />
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- STICKY PUBLISH BAR -->
+    <div class="publish-bar" id="sticky-publish-bar" style="display:none;">
+      <div class="publish-info">
+        <strong id="publish-count-text">0 post ID</strong>
+        1 kampanye · 1 ad set · semua post dalam 1 kampanye
+      </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <select class="form-input form-select" id="pub-account" style="width:220px;">
+          <option value="">Pilih Ad Account</option>
+        </select>
+        <button class="btn btn-dark" id="btn-publish">🚀 Boost ke Meta</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast } from './js/sidebar.js';
+  import { getSupabase } from './js/supabase.js';
+
+  let sb;
+  let currentProfile = null;
+  let selectedProduct = null;
+  let postItems = [];
+  let userAdAccounts = [];
+  let budgetType = 'ABO';
+
+  async function init() {
+    sb = await getSupabase();
+    const session = await requireAuth();
+    if (!session) return;
+    currentProfile = await renderUserInfo();
+    initSidebar();
+
+    await Promise.all([loadProducts(), loadBlueprints(), loadAdAccounts()]);
+
+    document.getElementById('btn-add-post').addEventListener('click', addPostRow);
+    document.getElementById('btn-publish').addEventListener('click', publishAll);
+
+    // Start with one empty row
+    addPostRow();
+  }
+
+  // ── Products ──
+  async function loadProducts() {
+    const { data } = await sb.from('products').select('*').eq('is_active', true).order('name');
+    const sel = document.getElementById('select-product');
+    sel.innerHTML = '<option value="">-- Pilih Produk --</option>' +
+      (data || []).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    sel.addEventListener('change', async () => {
+      if (!sel.value) { selectedProduct = null; return; }
+      const { data: p } = await sb.from('products').select('*').eq('id', sel.value).single();
+      selectedProduct = p;
+    });
+  }
+
+  // ── Blueprints ──
+  async function loadBlueprints() {
+    const { data } = await sb.from('autopilot_blueprints').select('*').order('created_at');
+    const sel = document.getElementById('pub-blueprint');
+    if (!data?.length) { sel.innerHTML = '<option value="">Tidak ada blueprint</option>'; return; }
+    sel.innerHTML = data.map(bp =>
+      `<option value="${bp.id}" ${bp.is_system ? 'selected' : ''}>${bp.name}${bp.is_system ? ' (Default)' : ''}</option>`
+    ).join('');
+    sel.addEventListener('change', () => renderBlueprintPreview(data.find(b => b.id === sel.value)));
+    renderBlueprintPreview(data.find(b => b.is_system) || data[0]);
+  }
+
+  function renderBlueprintPreview(bp) {
+    const el = document.getElementById('blueprint-preview');
+    if (!bp) { el.innerHTML = ''; return; }
+    const cfg = bp.config || {};
+    const p1 = cfg.phase1 || {};
+    const p3 = cfg.phase3 || {};
+    const parts = [`P1: ${p1.adsets?.length || 1} adset · evaluasi ${p1.evaluation?.duration_days || 3} hari`];
+    if (Array.isArray(cfg.phase2) && cfg.phase2.length) {
+      cfg.phase2.forEach((sp, i) => {
+        const alpha = String.fromCharCode(65 + i);
+        if (sp.strategy === 'cost_cap') parts.push(`P2${alpha}: Cost Cap Rp ${(sp.budget||5000000).toLocaleString('id-ID')}`);
+        else if (sp.strategy === 'cbo_interest') parts.push(`P2${alpha}: CBO Interest ${sp.adsets?.length||3} adset`);
+        else if (sp.strategy === 'abo_interest') parts.push(`P2${alpha}: ABO ${sp.adsets?.length||3} adset @ Rp ${(sp.budget_per_adset||50000).toLocaleString('id-ID')}`);
+        else if (sp.strategy === 'lookalike') parts.push(`P2${alpha}: Lookalike`);
+        else if (sp.strategy === 'broad') parts.push(`P2${alpha}: Broad`);
+      });
+    }
+    parts.push(`P3: scale ${p3.scale_pct || 3}%/hari`);
+    el.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+  }
+
+  // ── Ad Accounts ──
+  async function loadAdAccounts() {
+    const { data } = await sb.from('ad_accounts').select('*').eq('user_id', currentProfile.id).order('created_at');
+    userAdAccounts = data || [];
+    const sel = document.getElementById('pub-account');
+    if (!userAdAccounts.length) {
+      sel.innerHTML = `<option value="">Belum ada ad account — isi di Pengaturan</option>`;
+      return;
+    }
+    sel.innerHTML = `<option value="">Pilih Ad Account</option>` +
+      userAdAccounts.map(a => `<option value="${a.id}">${a.label} (${a.account_id})</option>`).join('');
+  }
+
+  // ── Post ID Rows ──
+  function addPostRow() {
+    const item = { id: crypto.randomUUID(), postId: '' };
+    postItems.push(item);
+    renderPostItems();
+    updateUI();
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('.post-id-input');
+      inputs[inputs.length - 1]?.focus();
+    }, 50);
+  }
+
+  window.removePostRow = function(id) {
+    postItems = postItems.filter(i => i.id !== id);
+    renderPostItems();
+    updateUI();
+  };
+
+  window.updatePostId = function(id, value) {
+    const item = postItems.find(i => i.id === id);
+    if (item) {
+      // Strip URL if user pastes full FB URL — extract just the post ID
+      const urlMatch = value.match(/\/posts\/(\d+)/);
+      item.postId = urlMatch ? urlMatch[1] : value.trim().replace(/\D/g, '') || value.trim();
+    }
+    updateUI();
+  };
+
+  window.onPostRowKeydown = function(event, id) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addPostRow();
+    }
+  };
+
+  function renderPostItems() {
+    const list = document.getElementById('post-id-list');
+    if (!postItems.length) { list.innerHTML = ''; return; }
+    list.innerHTML = postItems.map((item, idx) => `
+      <div class="post-row" id="row-${item.id}">
+        <span class="post-row-num">${idx + 1}</span>
+        <span class="post-row-icon">🔗</span>
+        <input
+          type="text"
+          class="post-id-input"
+          placeholder="Contoh: 1064336092554968 atau paste URL lengkap"
+          value="${item.postId}"
+          oninput="updatePostId('${item.id}', this.value)"
+          onkeydown="onPostRowKeydown(event, '${item.id}')"
+        />
+        ${postItems.length > 1
+          ? `<button class="btn btn-ghost btn-sm" style="color:var(--danger);flex-shrink:0;" onclick="removePostRow('${item.id}')">✕</button>`
+          : ''}
+      </div>
+    `).join('');
+  }
+
+  function updateUI() {
+    const validCount = postItems.filter(i => i.postId.length > 5).length;
+    const show = validCount > 0;
+
+    document.getElementById('campaign-settings-wrap').style.display = show ? '' : 'none';
+    document.getElementById('sticky-publish-bar').style.display = show ? '' : 'none';
+    document.getElementById('post-count-badge').style.display = show ? '' : 'none';
+
+    if (show) {
+      document.getElementById('post-count-badge').textContent = `${validCount} post`;
+      document.getElementById('publish-count-text').textContent = `${validCount} post ID siap di-boost`;
+    }
+  }
+
+  // ── Publish ──
+  async function publishAll() {
+    const validPostIds = postItems.map(i => i.postId).filter(id => id.length > 5);
+    if (!validPostIds.length) return showToast('Masukkan minimal 1 Post ID', 'warning');
+    if (!selectedProduct) return showToast('Pilih produk dulu', 'warning');
+
+    const accDbId = document.getElementById('pub-account').value;
+    if (!accDbId) return showToast('Pilih Ad Account dulu', 'warning');
+
+    const budget = document.getElementById('pub-budget').value;
+    if (!budget || parseFloat(budget) < 10000) return showToast('Budget minimal Rp 10.000/hari', 'warning');
+
+    const btn = document.getElementById('btn-publish');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="loading-spinner"></div> Publishing...';
+
+    try {
+      const bpId = document.getElementById('pub-blueprint').value;
+      const campaignNameInput = document.getElementById('pub-campaign-name').value.trim();
+      const objective = document.getElementById('pub-objective').value;
+      const bidStrategy = document.getElementById('pub-bid-strategy').value;
+      const bidValue = document.getElementById('pub-bid-value').value;
+      const startTime = document.getElementById('pub-start').value;
+      const endTime = document.getElementById('pub-end').value;
+      const autoActivate = document.getElementById('pub-auto-activate').checked;
+
+      const body = {
+        action: 'boost-post',
+        post_ids: validPostIds,
+        product_id: selectedProduct.id,
+        ad_account_db_id: accDbId,
+        user_id: currentProfile.id,
+        objective,
+        daily_budget: parseInt(budget),
+        budget_type: budgetType,
+        bid_strategy: bidStrategy,
+        campaign_name: campaignNameInput,
+        auto_activate: autoActivate,
+      };
+      if (bpId) body.blueprint_id = bpId;
+      if (bidValue) body.bid_value = bidValue;
+      if (startTime) body.start_time = new Date(startTime).toISOString();
+      if (endTime) body.end_time = new Date(endTime).toISOString();
+
+      const res = await fetch('/api/create-ad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+
+      const successCount = data.results?.filter(r => r.success).length ?? validPostIds.length;
+      const failCount = data.results?.filter(r => !r.success).length ?? 0;
+
+      if (failCount > 0) {
+        const failedIds = data.results.filter(r => !r.success).map(r => r.post_id).join(', ');
+        showToast(`${successCount} berhasil, ${failCount} gagal: ${failedIds}`, 'warning');
+      } else {
+        showToast(`${successCount} post berhasil di-boost ke Meta!`, 'success');
+      }
+
+      if (successCount > 0) {
+        setTimeout(() => window.location.href = 'campaigns.html', 2000);
+      }
+    } catch (err) {
+      showToast(`Gagal boost: ${err.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '🚀 Boost ke Meta';
+    }
+  }
+
+  // ── Budget Type ──
+  window.setBudgetType = function(type) {
+    budgetType = type;
+    document.getElementById('btn-abo').style.background = type === 'ABO' ? 'var(--primary)' : 'white';
+    document.getElementById('btn-abo').style.color = type === 'ABO' ? 'white' : 'var(--text-sub)';
+    document.getElementById('btn-cbo').style.background = type === 'CBO' ? 'var(--primary)' : 'white';
+    document.getElementById('btn-cbo').style.color = type === 'CBO' ? 'white' : 'var(--text-sub)';
+    document.getElementById('budget-type-hint').textContent = type === 'CBO' ? 'Budget di level Campaign' : 'Budget per Ad Set';
+  };
+
+  // ── Bid Strategy ──
+  window.onBidStrategyChange = function() {
+    const strategy = document.getElementById('pub-bid-strategy').value;
+    const wrap = document.getElementById('bid-value-wrap');
+    const label = document.getElementById('bid-value-label');
+    const prefix = document.getElementById('bid-value-prefix');
+    const input = document.getElementById('pub-bid-value');
+    if (strategy === 'LOWEST_COST_WITHOUT_CAP') {
+      wrap.style.display = 'none';
+    } else {
+      wrap.style.display = '';
+      if (strategy === 'LOWEST_COST_WITH_BID_CAP') {
+        label.textContent = 'Bid Cap (per klik/impresi)';
+        prefix.textContent = 'Rp'; input.placeholder = 'Misal: 500';
+      } else if (strategy === 'COST_CAP') {
+        label.textContent = 'Cost Cap (target CPR)';
+        prefix.textContent = 'Rp'; input.placeholder = 'Misal: 30000';
+      } else if (strategy === 'MINIMUM_ROAS') {
+        label.textContent = 'Minimum ROAS';
+        prefix.textContent = '×'; input.placeholder = 'Misal: 3';
+      }
+    }
+  };
+
+  init();
+</script>
+</body>
+</html>
