@@ -68,6 +68,8 @@ export default async function handler(req, res) {
     }
 
     // Get account config
+    const pageIdOverride = fields.page_id?.[0] || null;
+
     const { data: accData } = await sb.from('ad_accounts')
       .select('account_id, page_id, pixel_id').eq('id', adAccountDbId).single();
     if (!accData) throw new Error('Ad account tidak ditemukan');
@@ -77,7 +79,8 @@ export default async function handler(req, res) {
 
     const token     = cfgData?.meta_token || process.env.META_ACCESS_TOKEN;
     const accountId = accData.account_id;
-    const pageId    = accData.page_id;
+    // page_id: pakai dari frontend (multi-page) atau fallback ke kolom lama
+    const pageId    = pageIdOverride || accData.page_id;
     const pixelId   = accData.pixel_id || null;
     const destUrl   = adType === 'ctwa'
       ? 'https://wa.me/' + (waNumber || '')
@@ -594,7 +597,8 @@ async function handleBoostPost(res, body) {
     objective = 'OUTCOME_TRAFFIC', daily_budget, budget_type = 'ABO',
     bid_strategy = 'LOWEST_COST_WITHOUT_CAP', bid_value,
     campaign_name: campaignNameInput, blueprint_id, auto_activate,
-    start_time, end_time
+    start_time, end_time,
+    page_id: pageIdOverride
   } = body;
 
   if (!post_ids?.length) throw new Error('post_ids wajib ada');
@@ -610,7 +614,8 @@ async function handleBoostPost(res, body) {
   if (!token) throw new Error('Meta access token belum dikonfigurasi di Pengaturan');
 
   const accountId = accData.account_id;
-  const pageId    = accData.page_id;
+  // page_id: pakai dari frontend (multi-page) atau fallback ke kolom lama
+  const pageId    = pageIdOverride || accData.page_id;
   const pixelId   = accData.pixel_id || null;
   const adStatus  = auto_activate ? 'ACTIVE' : 'PAUSED';
 
