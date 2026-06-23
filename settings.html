@@ -1049,10 +1049,15 @@
 
         <!-- PAGES SECTION -->
         <div style="border-top:1px solid var(--gray-3); padding-top:14px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-            <div style="font-size:12px; font-weight:600; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.5px;">Facebook Pages</div>
-            <button class="btn btn-ghost btn-sm" onclick="openAddPage('${acc.id}')" style="font-size:12px;">+ Tambah Page</button>
+          <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none;" onclick="toggleSection(this)">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:11px; color:var(--gray-5); transition:transform 0.2s; display:inline-block;" class="section-chevron">▼</span>
+              <div style="font-size:12px; font-weight:600; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.5px;">Facebook Pages</div>
+              <span class="badge badge-gray" style="font-size:10px;">${pages.length}</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); openAddPage('${acc.id}')" style="font-size:12px;">+ Tambah Page</button>
           </div>
+          <div class="section-body" style="margin-top:10px;">
           ${pages.length ? `
             <div style="display:flex; flex-direction:column; gap:8px;">
               ${pages.map(p => `
@@ -1066,14 +1071,20 @@
                 </div>`).join('')}
             </div>` : `
             <div style="font-size:13px; color:var(--gray-5); padding:8px 0;">Belum ada page — klik "+ Tambah Page"</div>`}
+          </div>
         </div>
 
         <!-- PIXELS SECTION -->
         <div style="border-top:1px solid var(--gray-3); padding-top:14px; margin-top:14px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-            <div style="font-size:12px; font-weight:600; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.5px;">Meta Pixel</div>
-            <button class="btn btn-ghost btn-sm" onclick="openAddPixel('${acc.id}','${acc.account_id}')" style="font-size:12px;">+ Tambah Pixel</button>
+          <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none;" onclick="toggleSection(this)">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:11px; color:var(--gray-5); transition:transform 0.2s; display:inline-block;" class="section-chevron">▼</span>
+              <div style="font-size:12px; font-weight:600; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.5px;">Meta Pixel</div>
+              <span class="badge badge-gray" style="font-size:10px;">${pixels.length}</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); openAddPixel('${acc.id}','${acc.account_id}')" style="font-size:12px;">+ Tambah Pixel</button>
           </div>
+          <div class="section-body" style="margin-top:10px;">
           ${pixels.length ? `
             <div style="display:flex; flex-direction:column; gap:8px;">
               ${pixels.map(px => `
@@ -1087,14 +1098,20 @@
                 </div>`).join('')}
             </div>` : `
             <div style="font-size:13px; color:var(--gray-5); padding:8px 0;">Belum ada pixel — klik "+ Tambah Pixel"</div>`}
+          </div>
         </div>
 
         <!-- URL SECTION -->
         <div style="border-top:1px solid var(--gray-3); padding-top:14px; margin-top:14px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-            <div style="font-size:12px; font-weight:600; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.5px;">URL Tujuan Iklan</div>
-            <button class="btn btn-ghost btn-sm" onclick="openAddUrl('${acc.id}')" style="font-size:12px;">+ Tambah URL</button>
+          <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none;" onclick="toggleSection(this)">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:11px; color:var(--gray-5); transition:transform 0.2s; display:inline-block;" class="section-chevron">▼</span>
+              <div style="font-size:12px; font-weight:600; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.5px;">URL Tujuan Iklan</div>
+              <span class="badge badge-gray" style="font-size:10px;">${urls.length}</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); openAddUrl('${acc.id}')" style="font-size:12px;">+ Tambah URL</button>
           </div>
+          <div class="section-body" style="margin-top:10px;">
           ${urls.length ? `
             <div style="display:flex; flex-direction:column; gap:8px;">
               ${urls.map(u => `
@@ -1108,6 +1125,7 @@
                 </div>`).join('')}
             </div>` : `
             <div style="font-size:13px; color:var(--gray-5); padding:8px 0;">Belum ada URL — klik "+ Tambah URL"</div>`}
+          </div>
         </div>
       </div>`;
     }).join('');
@@ -1200,6 +1218,7 @@
     const token = await getToken();
     if (!token) return;
     document.getElementById('page-loading').style.display = '';
+    document.getElementById('page-manual-wrap').style.display = 'none';
     try {
       const res  = await fetch(`${META}/me/accounts?fields=id,name&limit=50&access_token=${token}`);
       const data = await res.json();
@@ -1270,6 +1289,14 @@
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  window.toggleSection = function(headerEl) {
+    const body = headerEl.nextElementSibling;
+    const chevron = headerEl.querySelector('.section-chevron');
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : '';
+    if (chevron) chevron.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+  };
+
   async function savePage() {
     const pageId   = document.getElementById('page-id-input').value.trim();
     const pageName = document.getElementById('page-name-input').value.trim();
@@ -1333,6 +1360,7 @@
     const token = await getToken();
     if (!token || !metaAccountId) return;
     document.getElementById('pixel-loading').style.display = '';
+    document.getElementById('pixel-manual-wrap').style.display = 'none';
     try {
       const res  = await fetch(`${META}/${metaAccountId}/adspixels?fields=id,name&access_token=${token}`);
       const data = await res.json();
