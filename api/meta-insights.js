@@ -73,8 +73,14 @@ export default async function handler(req, res) {
 // ── GET: Fetch insights untuk range tanggal tertentu (untuk display, tidak disimpan ke DB) ──
 async function fetchRangeInsights(req, res) {
   const userId = req.query.user_id;
-  const datePreset = req.query.date_preset || 'today'; // today, yesterday, last_7_days, last_30_days
+  const since = req.query.since;
+  const until = req.query.until;
+  const datePreset = req.query.date_preset || 'today';
   if (!userId) return res.status(400).json({ error: 'user_id required' });
+  // Gunakan time_range jika since/until tersedia, fallback ke date_preset
+  const timeParam = (since && until)
+    ? `time_range=${encodeURIComponent(JSON.stringify({ since, until }))}`
+    : `date_preset=${datePreset}`;
 
   const { data: config } = await sb.from('app_config').select('meta_token').eq('user_id', userId).single();
   const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
@@ -97,7 +103,7 @@ async function fetchRangeInsights(req, res) {
       const targetId = camp.meta_adset_id || camp.meta_campaign_id;
       const level = camp.meta_adset_id ? 'adset' : 'campaign';
       const insightRes = await fetch(
-        `${META_API}/${targetId}/insights?fields=${fields}&date_preset=${datePreset}&level=${level}&access_token=${encodeURIComponent(token)}`
+        `${META_API}/${targetId}/insights?fields=${fields}&${timeParam}&level=${level}&access_token=${encodeURIComponent(token)}`
       );
       const insight = await insightRes.json();
 
