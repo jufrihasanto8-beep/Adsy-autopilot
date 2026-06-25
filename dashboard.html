@@ -62,12 +62,33 @@
       <div class="topbar-right">
         <div style="display:flex; align-items:center; gap:10px;">
           <span id="last-updated" style="font-size:12px; color:var(--gray-5);"></span>
-          <select id="date-preset" class="form-input form-select" style="width:auto; font-size:13px; padding:7px 12px;">
-            <option value="today">Hari Ini</option>
-            <option value="yesterday">Kemarin</option>
-            <option value="last_7_days">7 Hari</option>
-            <option value="last_30_days">30 Hari</option>
-          </select>
+          <div class="drp-wrap">
+            <button class="drp-trigger" onclick="drpToggle()" id="drp-trigger">
+              📅 <span id="drp-label">Hari Ini</span> ▾
+            </button>
+            <div class="drp-dropdown" id="drp-dropdown">
+              <div class="drp-dropdown-inner">
+                <div class="drp-presets">
+                  <button class="drp-preset active" onclick="drpPreset(1,'Hari Ini',this)">Hari Ini</button>
+                  <button class="drp-preset" onclick="drpPresetYesterday(this)">Kemarin</button>
+                  <button class="drp-preset" onclick="drpPreset(7,'7 Hari Terakhir',this)">7 Hari Terakhir</button>
+                  <button class="drp-preset" onclick="drpPreset(14,'14 Hari Terakhir',this)">14 Hari Terakhir</button>
+                  <button class="drp-preset" onclick="drpPreset(30,'30 Hari Terakhir',this)">30 Hari Terakhir</button>
+                  <button class="drp-preset" onclick="drpPreset(90,'90 Hari Terakhir',this)">90 Hari Terakhir</button>
+                  <button class="drp-preset" onclick="drpPresetThisMonth(this)">Bulan Ini</button>
+                  <button class="drp-preset" onclick="drpPresetLastMonth(this)">Bulan Lalu</button>
+                </div>
+                <div class="drp-cal" id="drp-cal"></div>
+              </div>
+              <div class="drp-footer">
+                <div class="drp-selected-txt"><span id="drp-sel-start">—</span> → <span id="drp-sel-end">—</span></div>
+                <div style="display:flex;gap:8px;">
+                  <button class="drp-cancel" onclick="drpClose()">Batal</button>
+                  <button class="drp-apply" onclick="drpApply()">Terapkan</button>
+                </div>
+              </div>
+            </div>
+          </div>
           <button class="btn btn-outline btn-sm" id="btn-refresh" onclick="refreshData()">🔄 Refresh</button>
         </div>
         <div class="topbar-icon-btn" title="Notifikasi">🔔</div>
@@ -190,6 +211,27 @@
 <div class="toast-container"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ── DRP (Date Range Picker) ── */
+let drpSelStart=null,drpSelEnd=null,drpPickingEnd=false;
+let drpViewYear=new Date().getFullYear(),drpViewMonth=new Date().getMonth();
+const DRP_MONTHS=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const DRP_DAYS=['Mo','Tu','We','Th','Fr','Sa','Su'];
+function drpFmt(d){if(!d)return'—';return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});}
+function drpFmtISO(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function drpToggle(){const dd=document.getElementById('drp-dropdown');dd.classList.toggle('open');document.getElementById('drp-trigger').classList.toggle('active',dd.classList.contains('open'));if(dd.classList.contains('open')){drpRender();document.addEventListener('click',drpOutside);}else document.removeEventListener('click',drpOutside);}
+function drpClose(){document.getElementById('drp-dropdown').classList.remove('open');document.getElementById('drp-trigger').classList.remove('active');document.removeEventListener('click',drpOutside);}
+function drpOutside(e){if(!document.getElementById('drp-dropdown').contains(e.target)&&!document.getElementById('drp-trigger').contains(e.target))drpClose();}
+function drpSetBtn(btn){document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');}
+function drpPreset(days,label,btn){drpSelStart=new Date(Date.now()-(days-1)*864e5);drpSelStart.setHours(0,0,0,0);drpSelEnd=new Date();drpSelEnd.setHours(23,59,59,999);drpSetBtn(btn);drpUpdateSel();drpApply();}
+function drpPresetThisMonth(btn){drpSelStart=new Date(new Date().getFullYear(),new Date().getMonth(),1);drpSelEnd=new Date();drpSelEnd.setHours(23,59,59,999);drpSetBtn(btn);drpUpdateSel();drpApply();}
+function drpPresetLastMonth(btn){const n=new Date();drpSelStart=new Date(n.getFullYear(),n.getMonth()-1,1);drpSelEnd=new Date(n.getFullYear(),n.getMonth(),0);drpSelEnd.setHours(23,59,59,999);drpSetBtn(btn);drpUpdateSel();drpApply();}
+function drpPresetYesterday(btn){drpSelStart=new Date(Date.now()-864e5);drpSelStart.setHours(0,0,0,0);drpSelEnd=new Date(Date.now()-864e5);drpSelEnd.setHours(23,59,59,999);drpSetBtn(btn);drpUpdateSel();drpApply();}
+function drpUpdateSel(){document.getElementById('drp-sel-start').textContent=drpFmt(drpSelStart);document.getElementById('drp-sel-end').textContent=drpFmt(drpSelEnd);}
+function drpClickDay(y,m,d){const c=new Date(y,m,d);if(!drpSelStart||(drpSelStart&&drpSelEnd)){drpSelStart=c;drpSelEnd=null;drpPickingEnd=true;}else{if(c<drpSelStart){drpSelEnd=drpSelStart;drpSelStart=c;}else drpSelEnd=c;drpPickingEnd=false;}drpUpdateSel();drpRender();}
+function drpNav(dir){drpViewMonth+=dir;if(drpViewMonth>11){drpViewMonth=0;drpViewYear++;}if(drpViewMonth<0){drpViewMonth=11;drpViewYear--;}drpRender();}
+function drpRender(){const y=drpViewYear,m=drpViewMonth,firstDay=new Date(y,m,1).getDay(),startPad=firstDay===0?6:firstDay-1,dim=new Date(y,m+1,0).getDate(),prevDays=new Date(y,m,0).getDate(),today=new Date();today.setHours(0,0,0,0);let h=`<div class="drp-cal-hdr"><button class="drp-nav" onclick="drpNav(-1)">‹</button><div class="drp-cal-title">${DRP_MONTHS[m]} ${y}</div><button class="drp-nav" onclick="drpNav(1)">›</button></div><div class="drp-days-hdr">${DRP_DAYS.map(d=>`<span>${d}</span>`).join('')}</div><div class="drp-days">`;for(let i=startPad;i>0;i--)h+=`<button class="drp-day other-month" onclick="drpNav(-1)">${prevDays-i+1}</button>`;for(let d=1;d<=dim;d++){const cur=new Date(y,m,d),iT=cur.getTime()===today.getTime(),iS=drpSelStart&&cur.getTime()===new Date(drpSelStart.getFullYear(),drpSelStart.getMonth(),drpSelStart.getDate()).getTime(),iE=drpSelEnd&&cur.getTime()===new Date(drpSelEnd.getFullYear(),drpSelEnd.getMonth(),drpSelEnd.getDate()).getTime(),iR=drpSelStart&&drpSelEnd&&cur>drpSelStart&&cur<drpSelEnd;let cls='drp-day';if(iS&&iE)cls+=' selected';else if(iS)cls+=' range-start';else if(iE)cls+=' range-end';else if(iR)cls+=' in-range';else if(iS&&!drpSelEnd)cls+=' selected';if(iT)cls+=' today';h+=`<button class="${cls}" onclick="drpClickDay(${y},${m},${d})">${d}</button>`;}const total=startPad+dim,rem=total%7===0?0:7-(total%7);for(let d=1;d<=rem;d++)h+=`<button class="drp-day other-month" onclick="drpNav(1)">${d}</button>`;h+='</div>';document.getElementById('drp-cal').innerHTML=h;}
+</script>
 <script type="module">
   import { requireAuth, renderUserInfo } from './js/auth.js';
   import { initSidebar, showToast, formatRupiah, timeAgo } from './js/sidebar.js';
@@ -198,6 +240,19 @@
   let sb;
 
   let currentDashProfile = null;
+
+  // DRP init — default Hari Ini
+  drpSelStart = new Date(); drpSelStart.setHours(0,0,0,0);
+  drpSelEnd = new Date(); drpSelEnd.setHours(23,59,59,999);
+
+  window.drpApply = function() {
+    if (!drpSelStart) return;
+    drpSelEnd = drpSelEnd || new Date(); drpSelEnd.setHours(23,59,59,999);
+    const same = drpFmtISO(drpSelStart) === drpFmtISO(drpSelEnd);
+    document.getElementById('drp-label').textContent = same ? drpFmt(drpSelStart) : `${drpFmt(drpSelStart)} — ${drpFmt(drpSelEnd)}`;
+    drpClose();
+    refreshData();
+  };
 
   function setLastUpdated() {
     document.getElementById('last-updated').textContent = 'Diperbarui: ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -208,8 +263,9 @@
     btn.disabled = true;
     btn.textContent = '🔄 Loading...';
     try {
-      const datePreset = document.getElementById('date-preset').value;
-      const res = await fetch(`/api/meta-insights?user_id=${currentDashProfile.id}&date_preset=${datePreset}`);
+      const since = drpFmtISO(drpSelStart || new Date());
+      const until = drpFmtISO(drpSelEnd || new Date());
+      const res = await fetch(`/api/meta-insights?user_id=${currentDashProfile.id}&since=${since}&until=${until}`);
       const data = await res.json();
       if (data.totals) {
         document.getElementById('stat-spend').textContent = formatRupiah(data.totals.spend);
@@ -234,10 +290,6 @@
       btn.textContent = '🔄 Refresh';
     }
   };
-
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('date-preset')?.addEventListener('change', () => refreshData());
-  });
 
   async function checkTokenExpiry(profile) {
     const { data: cfg } = await sb.from('app_config')

@@ -11,37 +11,6 @@
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/components.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <style>
-    #datepicker-panel { display:none; position:absolute; right:0; top:calc(100% + 8px); background:#fff; border-radius:14px; box-shadow:0 8px 40px rgba(0,0,0,0.15); border:1px solid #E2E8F0; z-index:999; flex-direction:row; width:480px; overflow:hidden; }
-    .dp-presets { width:200px; border-right:1px solid #F1F5F9; padding:8px 0; overflow-y:auto; max-height:320px; }
-    .dp-preset-item { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; font-size:13px; color:#374151; }
-    .dp-preset-item:hover { background:#F8FAFC; }
-    .dp-preset-item.active { color:#2563EB; }
-    .dp-radio { width:16px; height:16px; border-radius:50%; border:2px solid #CBD5E1; flex-shrink:0; }
-    .dp-preset-item.active .dp-radio { border-color:#2563EB; background:#2563EB; box-shadow:inset 0 0 0 3px #fff; }
-    .dp-calendar { padding:16px 18px; flex:1; }
-    .dp-cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-    .dp-cal-header strong { font-size:14px; color:#111827; }
-    .dp-nav-btn { background:none; border:none; cursor:pointer; font-size:18px; color:#94A3B8; padding:2px 8px; border-radius:6px; line-height:1.4; }
-    .dp-nav-btn:hover { background:#F1F5F9; color:#374151; }
-    .dp-grid { display:grid; grid-template-columns:repeat(7, 1fr); row-gap:2px; }
-    .dp-day-header { height:28px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#94A3B8; }
-    .dp-day { height:34px; display:flex; align-items:center; justify-content:center; font-size:13px; cursor:pointer; color:#374151; position:relative; }
-    .dp-day::before { content:''; position:absolute; inset:0; background:transparent; }
-    .dp-day-inner { position:relative; z-index:1; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:50%; }
-    .dp-day:hover .dp-day-inner { background:#F1F5F9; }
-    .dp-day.other-month { color:#CBD5E1; cursor:default; }
-    .dp-day.other-month:hover .dp-day-inner { background:none; }
-    .dp-day.today .dp-day-inner { font-weight:700; color:#2563EB; }
-    .dp-day.sel-start .dp-day-inner, .dp-day.sel-end .dp-day-inner { background:#2563EB !important; color:#fff !important; }
-    .dp-day.in-range::before { background:rgba(37,99,235,0.1); }
-    .dp-day.in-range .dp-day-inner { color:#1D4ED8; }
-    .dp-day.sel-start::before { background:rgba(37,99,235,0.1); left:50%; }
-    .dp-day.sel-end::before { background:rgba(37,99,235,0.1); right:50%; }
-    .dp-day.sel-start.only::before, .dp-day.sel-end.only::before { background:transparent; }
-    #datepicker-trigger { display:flex; align-items:center; gap:8px; font-size:13px; white-space:nowrap; }
-    #datepicker-trigger svg { flex-shrink:0; opacity:0.5; }
-  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -94,14 +63,31 @@
       <div class="topbar-right">
         <input type="hidden" id="date-from" />
         <input type="hidden" id="date-to" />
-        <div style="position:relative;" id="datepicker-wrapper">
-          <button class="btn btn-outline" id="datepicker-trigger">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-            <span id="datepicker-label">Memuat...</span>
+        <div class="drp-wrap">
+          <button class="drp-trigger" onclick="drpToggle()" id="drp-trigger">
+            📅 <span id="drp-label">30 Hari Terakhir</span> ▾
           </button>
-          <div id="datepicker-panel">
-            <div class="dp-presets" id="dp-presets"></div>
-            <div class="dp-calendar" id="dp-calendar"></div>
+          <div class="drp-dropdown" id="drp-dropdown">
+            <div class="drp-dropdown-inner">
+              <div class="drp-presets">
+                <button class="drp-preset" onclick="drpPreset(1,'Hari Ini',this)">Hari Ini</button>
+                <button class="drp-preset" onclick="drpPresetYesterday(this)">Kemarin</button>
+                <button class="drp-preset" onclick="drpPreset(7,'7 Hari Terakhir',this)">7 Hari Terakhir</button>
+                <button class="drp-preset" onclick="drpPreset(14,'14 Hari Terakhir',this)">14 Hari Terakhir</button>
+                <button class="drp-preset active" onclick="drpPreset(30,'30 Hari Terakhir',this)">30 Hari Terakhir</button>
+                <button class="drp-preset" onclick="drpPreset(90,'90 Hari Terakhir',this)">90 Hari Terakhir</button>
+                <button class="drp-preset" onclick="drpPresetThisMonth(this)">Bulan Ini</button>
+                <button class="drp-preset" onclick="drpPresetLastMonth(this)">Bulan Lalu</button>
+              </div>
+              <div class="drp-cal" id="drp-cal"></div>
+            </div>
+            <div class="drp-footer">
+              <div class="drp-selected-txt"><span id="drp-sel-start">—</span> → <span id="drp-sel-end">—</span></div>
+              <div style="display:flex;gap:8px;">
+                <button class="drp-cancel" onclick="drpClose()">Batal</button>
+                <button class="drp-apply" onclick="drpApply()">Terapkan</button>
+              </div>
+            </div>
           </div>
         </div>
         <button class="btn btn-outline" id="btn-export">⬇ Export CSV</button>
@@ -397,6 +383,27 @@
 <div class="toast-container"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ── DRP (Date Range Picker) ── */
+let drpSelStart=null,drpSelEnd=null,drpPickingEnd=false;
+let drpViewYear=new Date().getFullYear(),drpViewMonth=new Date().getMonth();
+const DRP_MONTHS=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const DRP_DAYS=['Mo','Tu','We','Th','Fr','Sa','Su'];
+function drpFmt(d){if(!d)return'—';return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});}
+function drpFmtISO(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function drpToggle(){const dd=document.getElementById('drp-dropdown');dd.classList.toggle('open');document.getElementById('drp-trigger').classList.toggle('active',dd.classList.contains('open'));if(dd.classList.contains('open')){drpRender();document.addEventListener('click',drpOutside);}else document.removeEventListener('click',drpOutside);}
+function drpClose(){document.getElementById('drp-dropdown').classList.remove('open');document.getElementById('drp-trigger').classList.remove('active');document.removeEventListener('click',drpOutside);}
+function drpOutside(e){if(!document.getElementById('drp-dropdown').contains(e.target)&&!document.getElementById('drp-trigger').contains(e.target))drpClose();}
+function drpSetBtn(btn){document.querySelectorAll('.drp-preset').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');}
+function drpPreset(days,label,btn){drpSelStart=new Date(Date.now()-(days-1)*864e5);drpSelStart.setHours(0,0,0,0);drpSelEnd=new Date();drpSelEnd.setHours(23,59,59,999);drpSetBtn(btn);drpUpdateSel();drpApply();}
+function drpPresetThisMonth(btn){drpSelStart=new Date(new Date().getFullYear(),new Date().getMonth(),1);drpSelEnd=new Date();drpSelEnd.setHours(23,59,59,999);drpSetBtn(btn);drpUpdateSel();drpApply();}
+function drpPresetLastMonth(btn){const n=new Date();drpSelStart=new Date(n.getFullYear(),n.getMonth()-1,1);drpSelEnd=new Date(n.getFullYear(),n.getMonth(),0);drpSelEnd.setHours(23,59,59,999);drpSetBtn(btn);drpUpdateSel();drpApply();}
+function drpPresetYesterday(btn){drpSelStart=new Date(Date.now()-864e5);drpSelStart.setHours(0,0,0,0);drpSelEnd=new Date(Date.now()-864e5);drpSelEnd.setHours(23,59,59,999);drpSetBtn(btn);drpUpdateSel();drpApply();}
+function drpUpdateSel(){document.getElementById('drp-sel-start').textContent=drpFmt(drpSelStart);document.getElementById('drp-sel-end').textContent=drpFmt(drpSelEnd);}
+function drpClickDay(y,m,d){const c=new Date(y,m,d);if(!drpSelStart||(drpSelStart&&drpSelEnd)){drpSelStart=c;drpSelEnd=null;drpPickingEnd=true;}else{if(c<drpSelStart){drpSelEnd=drpSelStart;drpSelStart=c;}else drpSelEnd=c;drpPickingEnd=false;}drpUpdateSel();drpRender();}
+function drpNav(dir){drpViewMonth+=dir;if(drpViewMonth>11){drpViewMonth=0;drpViewYear++;}if(drpViewMonth<0){drpViewMonth=11;drpViewYear--;}drpRender();}
+function drpRender(){const y=drpViewYear,m=drpViewMonth,firstDay=new Date(y,m,1).getDay(),startPad=firstDay===0?6:firstDay-1,dim=new Date(y,m+1,0).getDate(),prevDays=new Date(y,m,0).getDate(),today=new Date();today.setHours(0,0,0,0);let h=`<div class="drp-cal-hdr"><button class="drp-nav" onclick="drpNav(-1)">‹</button><div class="drp-cal-title">${DRP_MONTHS[m]} ${y}</div><button class="drp-nav" onclick="drpNav(1)">›</button></div><div class="drp-days-hdr">${DRP_DAYS.map(d=>`<span>${d}</span>`).join('')}</div><div class="drp-days">`;for(let i=startPad;i>0;i--)h+=`<button class="drp-day other-month" onclick="drpNav(-1)">${prevDays-i+1}</button>`;for(let d=1;d<=dim;d++){const cur=new Date(y,m,d),iT=cur.getTime()===today.getTime(),iS=drpSelStart&&cur.getTime()===new Date(drpSelStart.getFullYear(),drpSelStart.getMonth(),drpSelStart.getDate()).getTime(),iE=drpSelEnd&&cur.getTime()===new Date(drpSelEnd.getFullYear(),drpSelEnd.getMonth(),drpSelEnd.getDate()).getTime(),iR=drpSelStart&&drpSelEnd&&cur>drpSelStart&&cur<drpSelEnd;let cls='drp-day';if(iS&&iE)cls+=' selected';else if(iS)cls+=' range-start';else if(iE)cls+=' range-end';else if(iR)cls+=' in-range';else if(iS&&!drpSelEnd)cls+=' selected';if(iT)cls+=' today';h+=`<button class="${cls}" onclick="drpClickDay(${y},${m},${d})">${d}</button>`;}const total=startPad+dim,rem=total%7===0?0:7-(total%7);for(let d=1;d<=rem;d++)h+=`<button class="drp-day other-month" onclick="drpNav(1)">${d}</button>`;h+='</div>';document.getElementById('drp-cal').innerHTML=h;}
+</script>
 <script type="module">
   import { requireAuth, renderUserInfo } from './js/auth.js';
   import { initSidebar, showToast, formatRupiah, formatNumber, formatDate } from './js/sidebar.js';
@@ -406,169 +413,18 @@
   let currentProfile = null;
   let spendChart, ctrChart, regionChart;
 
-  // ── Custom Date Range Picker ──
-  const DP_PRESETS = [
-    { id: 'today',          label: 'Hari Ini' },
-    { id: 'yesterday',      label: 'Kemarin' },
-    { id: 'today_yest',     label: 'Hari ini dan kemarin' },
-    { id: '7',              label: '7 hari terakhir' },
-    { id: '14',             label: '14 hari terakhir' },
-    { id: '30',             label: '30 hari terakhir' },
-    { id: 'this_month',     label: 'Bulan ini' },
-    { id: 'last_month',     label: 'Bulan lalu' },
-    { id: '90',             label: '3 Bulan terakhir' },
-  ];
-  const MONTH_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-  const DAY_ID   = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+  window.loadAll = async function() { return loadAll(); };
 
-  let dp = { start: null, end: null, picking: 'start', year: 0, month: 0, preset: '30' };
-
-  function dpToStr(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,'0');
-    const day = String(d.getDate()).padStart(2,'0');
-    return `${y}-${m}-${day}`;
-  }
-  function dpFmt(s) {
-    if (!s) return '';
-    const [y,m,d] = s.split('-');
-    return `${d}/${m}/${y}`;
-  }
-
-  function dpPresetRange(id) {
-    const t = new Date(); t.setHours(0,0,0,0);
-    const yest = new Date(t); yest.setDate(t.getDate()-1);
-    if (id === 'today')      return [dpToStr(t), dpToStr(t)];
-    if (id === 'yesterday')  return [dpToStr(yest), dpToStr(yest)];
-    if (id === 'today_yest') return [dpToStr(yest), dpToStr(t)];
-    if (id === 'this_month') return [dpToStr(new Date(t.getFullYear(), t.getMonth(), 1)), dpToStr(t)];
-    if (id === 'last_month') {
-      const s = new Date(t.getFullYear(), t.getMonth()-1, 1);
-      const e = new Date(t.getFullYear(), t.getMonth(), 0);
-      return [dpToStr(s), dpToStr(e)];
-    }
-    const days = parseInt(id);
-    const s = new Date(t); s.setDate(t.getDate() - days + 1);
-    return [dpToStr(s), dpToStr(t)];
-  }
-
-  function dpApplyPreset(id) {
-    const [s, e] = dpPresetRange(id);
-    dp.start = s; dp.end = e; dp.preset = id; dp.picking = 'start';
-    const endDate = new Date(e);
-    dp.year = endDate.getFullYear(); dp.month = endDate.getMonth();
-    dpUpdateInputs();
-    dpRenderPresets();
-    dpRenderCalendar();
-  }
-
-  function dpUpdateInputs() {
-    document.getElementById('date-from').value = dp.start || '';
-    document.getElementById('date-to').value   = dp.end   || '';
-    const lbl = document.getElementById('datepicker-label');
-    lbl.textContent = (dp.start && dp.end)
-      ? dpFmt(dp.start) + ' – ' + dpFmt(dp.end)
-      : dp.start ? dpFmt(dp.start) + ' – ...' : 'Pilih tanggal';
-  }
-
-  function dpRenderPresets() {
-    document.getElementById('dp-presets').innerHTML = DP_PRESETS.map(p => `
-      <div class="dp-preset-item ${dp.preset === p.id ? 'active' : ''}" onclick="window._dpPreset('${p.id}')">
-        <div class="dp-radio"></div><span>${p.label}</span>
-      </div>`).join('');
-  }
-
-  function dpRenderCalendar() {
-    const y = dp.year, m = dp.month;
-    const firstDow  = new Date(y, m, 1).getDay();
-    const daysInMon = new Date(y, m+1, 0).getDate();
-    const daysInPrev= new Date(y, m, 0).getDate();
-    const todayStr  = dpToStr(new Date());
-
-    let cells = DAY_ID.map(d => `<div class="dp-day-header">${d}</div>`).join('');
-
-    // prev month filler
-    for (let i = firstDow-1; i >= 0; i--)
-      cells += `<div class="dp-day other-month"><div class="dp-day-inner">${daysInPrev-i}</div></div>`;
-
-    // current month
-    for (let d = 1; d <= daysInMon; d++) {
-      const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const isStart = ds === dp.start;
-      const isEnd   = ds === dp.end;
-      const inRange = dp.start && dp.end && ds > dp.start && ds < dp.end;
-      const only    = isStart && isEnd;
-      let cls = 'dp-day';
-      if (ds === todayStr) cls += ' today';
-      if (isStart) cls += ' sel-start' + (only ? ' only' : '');
-      if (isEnd)   cls += ' sel-end'   + (only ? ' only' : '');
-      if (inRange) cls += ' in-range';
-      cells += `<div class="${cls}" onclick="window._dpDay('${ds}')"><div class="dp-day-inner">${d}</div></div>`;
-    }
-
-    // next month filler
-    const total = Math.ceil((firstDow + daysInMon) / 7) * 7;
-    for (let i = 1; i <= total - firstDow - daysInMon; i++)
-      cells += `<div class="dp-day other-month"><div class="dp-day-inner">${i}</div></div>`;
-
-    document.getElementById('dp-calendar').innerHTML = `
-      <div class="dp-cal-header">
-        <button class="dp-nav-btn" onclick="window._dpNav(-1)">‹</button>
-        <strong>${MONTH_ID[m]} ${y}</strong>
-        <button class="dp-nav-btn" onclick="window._dpNav(1)">›</button>
-      </div>
-      <div class="dp-grid">${cells}</div>`;
-  }
-
-  window._dpPreset = function(id) {
-    dpApplyPreset(id);
-    dpClose();
+  window.drpApply = function() {
+    if (!drpSelStart) return;
+    drpSelEnd = drpSelEnd || new Date(); drpSelEnd.setHours(23,59,59,999);
+    const same = drpFmtISO(drpSelStart) === drpFmtISO(drpSelEnd);
+    document.getElementById('drp-label').textContent = same ? drpFmt(drpSelStart) : `${drpFmt(drpSelStart)} — ${drpFmt(drpSelEnd)}`;
+    document.getElementById('date-from').value = drpFmtISO(drpSelStart);
+    document.getElementById('date-to').value = drpFmtISO(drpSelEnd);
+    drpClose();
     loadAll();
   };
-
-  window._dpDay = function(ds) {
-    dp.preset = null;
-    if (dp.picking === 'start') {
-      dp.start = ds; dp.end = null; dp.picking = 'end';
-      dpUpdateInputs(); dpRenderPresets(); dpRenderCalendar();
-    } else {
-      if (ds < dp.start) { dp.end = dp.start; dp.start = ds; }
-      else               { dp.end = ds; }
-      dp.picking = 'start';
-      dpUpdateInputs(); dpClose(); loadAll();
-    }
-  };
-
-  window._dpNav = function(dir) {
-    dp.month += dir;
-    if (dp.month < 0)  { dp.month = 11; dp.year--; }
-    if (dp.month > 11) { dp.month = 0;  dp.year++; }
-    dpRenderCalendar();
-  };
-
-  function dpOpen() {
-    const panel = document.getElementById('datepicker-panel');
-    panel.style.display = 'flex';
-    dpRenderPresets();
-    dpRenderCalendar();
-  }
-
-  function dpClose() {
-    document.getElementById('datepicker-panel').style.display = 'none';
-  }
-
-  function initDatepicker() {
-    // Default: 30 hari terakhir
-    dpApplyPreset('30');
-
-    document.getElementById('datepicker-trigger').addEventListener('click', (e) => {
-      e.stopPropagation();
-      const panel = document.getElementById('datepicker-panel');
-      panel.style.display === 'none' ? dpOpen() : dpClose();
-    });
-    document.getElementById('datepicker-panel').addEventListener('click', e => e.stopPropagation());
-    document.addEventListener('click', dpClose);
-  }
 
   async function init() {
     sb = await getSupabase();
@@ -577,7 +433,13 @@
     currentProfile = await renderUserInfo();
     initSidebar();
 
-    initDatepicker();
+    // DRP init — default 30 hari terakhir
+    drpSelStart = new Date(Date.now()-29*864e5); drpSelStart.setHours(0,0,0,0);
+    drpSelEnd = new Date(); drpSelEnd.setHours(23,59,59,999);
+    drpViewYear = drpSelStart.getFullYear();
+    drpViewMonth = drpSelStart.getMonth();
+    document.getElementById('date-from').value = drpFmtISO(drpSelStart);
+    document.getElementById('date-to').value = drpFmtISO(drpSelEnd);
     document.getElementById('btn-export').addEventListener('click', exportCSV);
     document.getElementById('btn-load-trend').addEventListener('click', loadDailyTrend);
     document.getElementById('trend-campaign-filter').addEventListener('change', loadDailyTrend);
