@@ -603,3 +603,40 @@
 .dropdown-item:hover { background: var(--gray-1); }
 .dropdown-item.danger { color: var(--danger); }
 .dropdown-item-icon { font-size: 15px; }
+
+/* ── DATE RANGE PICKER (DRP) ── */
+.drp-wrap{position:relative;}
+.drp-trigger{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:8px;border:1px solid var(--gray-3);background:var(--white);color:var(--text);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.drp-trigger:hover{border-color:var(--primary);color:var(--primary);}
+.drp-trigger.active{border-color:var(--primary);background:var(--primary-light);color:var(--primary);}
+.drp-dropdown{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;background:var(--white);border:1px solid var(--gray-3);border-radius:14px;box-shadow:var(--shadow-md);display:none;overflow:hidden;min-width:520px;}
+.drp-dropdown.open{display:flex;flex-direction:column;}
+.drp-dropdown-inner{display:flex;flex:1;}
+.drp-presets{width:155px;border-right:1px solid var(--gray-2);padding:10px 0;flex-shrink:0;}
+.drp-preset{display:block;width:100%;text-align:left;padding:8px 16px;font-size:12px;color:var(--text-sub);border:none;background:none;cursor:pointer;transition:all .12s;}
+.drp-preset:hover{background:var(--primary-light);color:var(--primary);}
+.drp-preset.active{color:var(--primary);font-weight:600;background:var(--primary-light);}
+.drp-cal{padding:16px;flex:1;}
+.drp-cal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.drp-cal-title{font-size:14px;font-weight:600;color:var(--text);}
+.drp-nav{width:28px;height:28px;border-radius:7px;border:1px solid var(--gray-3);background:none;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .12s;}
+.drp-nav:hover{border-color:var(--primary);color:var(--primary);}
+.drp-days-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px;}
+.drp-days-hdr span{text-align:center;font-size:11px;font-weight:600;color:var(--gray-5);padding:4px 0;}
+.drp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.drp-day{height:34px;border-radius:7px;border:none;background:none;color:var(--text);font-size:12px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center;}
+.drp-day:hover:not(.other-month){background:var(--primary-light);color:var(--primary);}
+.drp-day.other-month{color:var(--gray-4);}
+.drp-day.today{font-weight:700;color:var(--primary);}
+.drp-day.selected{background:var(--primary)!important;color:#fff!important;font-weight:600;}
+.drp-day.in-range{background:var(--primary-light);border-radius:0;color:var(--text);}
+.drp-day.range-start{border-radius:7px 0 0 7px;background:var(--primary);color:#fff;font-weight:600;}
+.drp-day.range-end{border-radius:0 7px 7px 0;background:var(--primary);color:#fff;font-weight:600;}
+.drp-day.range-start.range-end{border-radius:7px;}
+.drp-footer{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--gray-2);}
+.drp-selected-txt{font-size:11px;color:var(--gray-5);}
+.drp-selected-txt span{color:var(--text);font-weight:500;}
+.drp-apply{padding:6px 16px;border-radius:7px;border:none;background:var(--primary);color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .15s;}
+.drp-apply:hover{opacity:.85;}
+.drp-cancel{padding:6px 12px;border-radius:7px;border:1px solid var(--gray-3);background:none;color:var(--text-sub);font-size:12px;cursor:pointer;}
+.drp-cancel:hover{border-color:#ef4444;color:#ef4444;}
