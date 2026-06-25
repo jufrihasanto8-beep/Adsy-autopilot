@@ -99,6 +99,13 @@
         </div>
         <div class="stat-card">
           <div>
+            <div class="stat-label">Rata-rata CPR</div>
+            <div class="stat-value" id="stat-avg-cpr">-</div>
+          </div>
+          <div class="stat-icon yellow">🎯</div>
+        </div>
+        <div class="stat-card">
+          <div>
             <div class="stat-label">Konten di Library</div>
             <div class="stat-value" id="stat-library">-</div>
           </div>
@@ -207,7 +214,13 @@
       if (data.totals) {
         document.getElementById('stat-spend').textContent = formatRupiah(data.totals.spend);
       }
-      if (data.campaigns) renderDashCampaigns(data.campaigns);
+      if (data.campaigns) {
+        renderDashCampaigns(data.campaigns);
+        const validCprs = (data.campaigns || []).filter(c => c.cpr > 0);
+        const avgCpr = validCprs.length > 0
+          ? validCprs.reduce((s, c) => s + c.cpr, 0) / validCprs.length : 0;
+        document.getElementById('stat-avg-cpr').textContent = avgCpr > 0 ? formatRupiah(avgCpr) : '-';
+      }
       await Promise.all([
         loadStats(currentDashProfile),
         loadActionLog(currentDashProfile),
@@ -289,7 +302,17 @@
     if (profile.role !== 'admin') aq = aq.eq('user_id', profile.id);
     const { count: actionCount } = await aq;
     document.getElementById('stat-actions').textContent = actionCount || 0;
-    document.getElementById('stat-spend').textContent = 'Rp -';
+
+    // Spend & avg CPR dari DB (cache dari cron)
+    let sq = sb.from('campaigns').select('spend_today, cpr');
+    if (profile.role !== 'admin') sq = sq.eq('user_id', profile.id);
+    const { data: campMetrics } = await sq;
+    const totalSpend = (campMetrics || []).reduce((s, c) => s + (c.spend_today || 0), 0);
+    document.getElementById('stat-spend').textContent = formatRupiah(totalSpend);
+    const validCprs = (campMetrics || []).filter(c => c.cpr > 0);
+    const avgCpr = validCprs.length > 0
+      ? validCprs.reduce((s, c) => s + c.cpr, 0) / validCprs.length : 0;
+    document.getElementById('stat-avg-cpr').textContent = avgCpr > 0 ? formatRupiah(avgCpr) : '-';
   }
 
   async function loadCampaigns(profile) {
