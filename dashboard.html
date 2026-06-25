@@ -339,11 +339,11 @@
         if (seen2b.has(c.meta_campaign_id)) continue;
         seen2b.add(c.meta_campaign_id);
         const group = data.filter(x => x.phase_type === '2b' && x.meta_campaign_id === c.meta_campaign_id);
-        const totalSpend = group.reduce((s, x) => s + (x.spend_today || 0), 0);
+        const totalSpend = group.reduce((s, x) => s + (x.spend ?? x.spend_today ?? 0), 0);
         const parentName = c.name.replace(/ — Phase 2b.*$/, '') + ' — Phase 2b';
         rows.push({ ...c, _name: parentName, _spend: totalSpend, _cpr: null });
       } else {
-        rows.push({ ...c, _name: c.name, _spend: c.spend_today || 0, _cpr: c.cpr });
+        rows.push({ ...c, _name: c.name, _spend: c.spend ?? c.spend_today ?? 0, _cpr: c.cpr });
       }
     }
 
