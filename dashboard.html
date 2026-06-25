@@ -222,7 +222,7 @@
         document.getElementById('stat-avg-cpr').textContent = avgCpr > 0 ? formatRupiah(avgCpr) : '-';
       }
       await Promise.all([
-        loadStats(currentDashProfile),
+        loadStats(currentDashProfile, true), // skip spend/CPR — sudah di-set dari Meta API di atas
         loadActionLog(currentDashProfile),
       ]);
       setLastUpdated();
@@ -286,7 +286,7 @@
     checkTokenExpiry(profile);
   }
 
-  async function loadStats(profile) {
+  async function loadStats(profile, skipMetrics = false) {
     let q = sb.from('campaigns').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE');
     if (profile.role !== 'admin') q = q.eq('user_id', profile.id);
     const { count: campCount } = await q;
@@ -303,16 +303,18 @@
     const { count: actionCount } = await aq;
     document.getElementById('stat-actions').textContent = actionCount || 0;
 
-    // Spend & avg CPR dari DB (cache dari cron)
-    let sq = sb.from('campaigns').select('spend_today, cpr');
-    if (profile.role !== 'admin') sq = sq.eq('user_id', profile.id);
-    const { data: campMetrics } = await sq;
-    const totalSpend = (campMetrics || []).reduce((s, c) => s + (c.spend_today || 0), 0);
-    document.getElementById('stat-spend').textContent = formatRupiah(totalSpend);
-    const validCprs = (campMetrics || []).filter(c => c.cpr > 0);
-    const avgCpr = validCprs.length > 0
-      ? validCprs.reduce((s, c) => s + c.cpr, 0) / validCprs.length : 0;
-    document.getElementById('stat-avg-cpr').textContent = avgCpr > 0 ? formatRupiah(avgCpr) : '-';
+    if (!skipMetrics) {
+      // Spend & avg CPR dari DB (cache dari cron) — hanya saat load awal
+      let sq = sb.from('campaigns').select('spend_today, cpr');
+      if (profile.role !== 'admin') sq = sq.eq('user_id', profile.id);
+      const { data: campMetrics } = await sq;
+      const totalSpend = (campMetrics || []).reduce((s, c) => s + (c.spend_today || 0), 0);
+      document.getElementById('stat-spend').textContent = formatRupiah(totalSpend);
+      const validCprs = (campMetrics || []).filter(c => c.cpr > 0);
+      const avgCpr = validCprs.length > 0
+        ? validCprs.reduce((s, c) => s + c.cpr, 0) / validCprs.length : 0;
+      document.getElementById('stat-avg-cpr').textContent = avgCpr > 0 ? formatRupiah(avgCpr) : '-';
+    }
   }
 
   async function loadCampaigns(profile) {
