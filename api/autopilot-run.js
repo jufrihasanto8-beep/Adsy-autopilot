@@ -19,6 +19,11 @@ export default async function handler(req, res) {
     return await manualAdvancePhase(req, res);
   }
 
+  // ── Retry sub-phase yang belum terbuat (Phase 2b, 2c, dst) ──
+  if (req.method === 'POST' && req.body?.action === 'retry_subphase') {
+    return await retryMissingSubPhase(req, res);
+  }
+
   // Security: cek secret key (dari cron-job.org header atau query param)
   const CRON_SECRET = process.env.CRON_SECRET;
   if (CRON_SECRET) {
@@ -833,8 +838,10 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
     );
     const campInfo = await campInfoRes.json();
     if (campInfo.error) throw new Error('Gagal ambil info kampanye: ' + campInfo.error.message);
-    const accountId = campInfo.account_id;
-    if (!accountId) throw new Error('Tidak bisa ambil account_id');
+    // Normalize accountId: strip 'act_' prefix karena semua fetch di fungsi ini pakai /act_${accountId}/
+    const rawAccId = campInfo.account_id;
+    if (!rawAccId) throw new Error('Tidak bisa ambil account_id');
+    const accountId = rawAccId.startsWith('act_') ? rawAccId.slice(4) : rawAccId;
     const objectiveMapB = {
       'LINK_CLICKS': 'OUTCOME_TRAFFIC', 'CONVERSIONS': 'OUTCOME_SALES',
       'LEAD_GENERATION': 'OUTCOME_LEADS', 'POST_ENGAGEMENT': 'OUTCOME_ENGAGEMENT',
@@ -1399,12 +1406,115 @@ async function createPhase2FromBlueprint(camp, token, product, blueprintConfig, 
   for (let idx = 0; idx < subPhases.length; idx++) {
     const sp = subPhases[idx];
     const label = String.fromCharCode(97 + idx); // a, b, c...
-    if (sp.strategy === 'cost_cap') {
-      await createPhase2Campaign(camp, token, logs, sp, label);
-    } else if (sp.strategy === 'abo_interest' || sp.strategy === 'cbo_interest') {
-      await createPhase2bCampaign(camp, token, product, logs, sp, label);
+    try {
+      if (sp.strategy === 'cost_cap') {
+        await createPhase2Campaign(camp, token, logs, sp, label);
+      } else if (sp.strategy === 'abo_interest' || sp.strategy === 'cbo_interest') {
+        await createPhase2bCampaign(camp, token, product, logs, sp, label);
+      }
+      // lookalike / broad → placeholder, will be implemented later
+    } catch (subErr) {
+      console.error(`Phase 2${label.toUpperCase()} creation failed:`, subErr.message);
+      try { await sb.from('action_logs').insert({
+        user_id: camp.user_id, campaign_name: camp.name, action_type: 'create',
+        description: `Sub-phase 2${label.toUpperCase()} gagal: ${subErr.message} — klik Retry 2b di campaigns untuk coba lagi`,
+        status: 'error'
+      }); } catch(e) {}
+      // Lanjut ke sub-phase berikutnya meski satu gagal
     }
-    // lookalike / broad → placeholder, will be implemented later
+  }
+}
+
+// ── Retry sub-phase yang belum terbuat (Phase 2b, 2c, dst) ──
+async function retryMissingSubPhase(req, res) {
+  const { campaign_id, user_id } = req.body;
+  if (!campaign_id || !user_id) return res.status(400).json({ error: 'campaign_id dan user_id wajib' });
+
+  try {
+    const { data: camp } = await sb.from('campaigns')
+      .select('*, products(target_cpr, target_cpr_ctwa, name, tagline, benefits)')
+      .eq('id', campaign_id)
+      .eq('user_id', user_id)
+      .single();
+
+    if (!camp) return res.status(404).json({ error: 'Kampanye tidak ditemukan' });
+    if (!camp.initial_budget) return res.status(400).json({ error: 'Phase 2 belum pernah dimulai untuk kampanye ini' });
+
+    const { data: config } = await sb.from('app_config')
+      .select('meta_token').eq('user_id', user_id).single();
+    const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
+    if (!token) return res.status(400).json({ error: 'Token Meta belum dikonfigurasi' });
+
+    // Cek sub-phase mana yang sudah ada di DB
+    const { data: existingPhase2 } = await sb.from('campaigns')
+      .select('name')
+      .ilike('name', camp.name + ' — Phase 2%');
+
+    const existingLabels = new Set();
+    (existingPhase2 || []).forEach(c => {
+      // Extract label: "...— Phase 2a" → 'a', "...— Phase 2B Manfaat" → 'b'
+      const match = c.name.replace(camp.name, '').match(/— Phase 2([a-zA-Z])/);
+      if (match) existingLabels.add(match[1].toLowerCase());
+    });
+
+    // Normalize sub-phases dari blueprint
+    const blueprintConfig = await fetchBlueprintConfig(camp.blueprint_id);
+    let subPhases = [];
+    const p2 = blueprintConfig?.phase2;
+    if (Array.isArray(p2) && p2.length) {
+      subPhases = p2;
+    } else if (blueprintConfig?.phase2a || blueprintConfig?.phase2b) {
+      if (blueprintConfig.phase2a?.enabled !== false) subPhases.push({ strategy: 'cost_cap' });
+      if (blueprintConfig.phase2b?.enabled !== false) subPhases.push({ strategy: 'abo_interest' });
+    } else {
+      subPhases = [{ strategy: 'cost_cap' }, { strategy: 'abo_interest' }];
+    }
+
+    const product = camp.products || null;
+    const logs = [];
+    let created = 0;
+    let errors = [];
+
+    for (let idx = 0; idx < subPhases.length; idx++) {
+      const label = String.fromCharCode(97 + idx);
+      if (existingLabels.has(label)) continue; // sudah ada, skip
+
+      const sp = subPhases[idx];
+      try {
+        if (sp.strategy === 'cost_cap') {
+          await createPhase2Campaign(camp, token, logs, sp, label);
+        } else if (sp.strategy === 'abo_interest' || sp.strategy === 'cbo_interest') {
+          await createPhase2bCampaign(camp, token, product, logs, sp, label);
+        }
+        created++;
+      } catch (subErr) {
+        errors.push(`Phase 2${label.toUpperCase()}: ${subErr.message}`);
+        try { await sb.from('action_logs').insert({
+          user_id, campaign_name: camp.name, action_type: 'create',
+          description: `Retry sub-phase 2${label.toUpperCase()} gagal: ${subErr.message}`,
+          status: 'error'
+        }); } catch(e) {}
+      }
+    }
+
+    if (created > 0) {
+      await sb.from('action_logs').insert({
+        user_id, campaign_name: camp.name, action_type: 'phase_advance',
+        description: `Retry: ${created} sub-phase Phase 2 berhasil dibuat`,
+        status: 'success'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      created,
+      skipped: existingLabels.size,
+      errors: errors.length > 0 ? errors : undefined,
+      logs
+    });
+  } catch (err) {
+    console.error('retryMissingSubPhase error:', err.message);
+    return res.status(500).json({ error: err.message });
   }
 }
 
