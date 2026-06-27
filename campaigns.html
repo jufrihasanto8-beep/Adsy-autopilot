@@ -609,6 +609,7 @@ function drpRender(){const y=drpViewYear,m=drpViewMonth,firstDay=new Date(y,m,1)
             <button class="btn btn-outline btn-sm" onclick="viewDetail('${c.id}')">Detail</button>
             ${c.current_phase === 1 && !c.initial_budget ? `<button class="btn btn-outline btn-sm" style="color:var(--primary);" onclick="advancePhase('${c.id}', '${c.name}')">→ Phase 2</button>` : ''}
             ${c.current_phase === 1 && c.initial_budget && !allCampaigns.some(x => x.name.startsWith(c.name + ' — Phase 2')) ? `<button class="btn btn-outline btn-sm" style="color:var(--warning);" onclick="retryPhase2('${c.id}', '${c.name.replace(/'/g, "\\'")}')">⟳ Retry Phase 2</button>` : ''}
+            ${(() => { const p2list = allCampaigns.filter(x => x.name.startsWith(c.name + ' — Phase 2')); const hasOnlyPhase2A = p2list.length > 0 && p2list.every(x => /— Phase 2a$/.test(x.name)); return c.current_phase === 1 && c.initial_budget && hasOnlyPhase2A; })() ? `<button class="btn btn-outline btn-sm" style="color:#0891B2;border-color:#0891B2;" onclick="retrySubPhase('${c.id}', '${c.name.replace(/'/g, "\\'")}')">⟳ Retry Phase 2b</button>` : ''}
             ${c.is_winner ? `<button class="btn btn-outline btn-sm" style="color:#7C3AED;border-color:#7C3AED;" onclick="openDuplicate('${c.id}', \`${c.name.replace(/`/g, "'")}\`)">⧉ Duplikat</button>` : ''}
             <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteCampaign('${c.id}', '${c.meta_campaign_id}', '${c.name}')">Hapus</button>
           </div>
@@ -797,6 +798,28 @@ function drpRender(){const y=drpViewYear,m=drpViewMonth,firstDay=new Date(y,m,1)
     const sb = getSupabase();
     await sb.from('campaigns').update({ initial_budget: null }).eq('id', id);
     await advancePhase(id, name);
+  };
+
+  // ── Retry sub-phase yang belum terbuat (Phase 2b, 2c, dst) ──
+  window.retrySubPhase = async function(id, name) {
+    if (!confirm(`Phase 2a sudah ada, tapi sub-phase berikutnya (2b, dst) belum terbuat untuk "${name}".\n\nCoba buat sekarang?`)) return;
+    showPhase2Loading();
+    try {
+      const res = await fetch('/api/autopilot-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'retry_subphase', campaign_id: id, user_id: currentProfile.id })
+      });
+      const data = await res.json();
+      hidePhase2Loading();
+      if (!res.ok) throw new Error(data.error || 'Gagal');
+      const msg = `${data.created} sub-phase berhasil dibuat${data.errors?.length ? '\n\nError: ' + data.errors.join('\n') : ''}`;
+      showToast(msg, data.errors?.length ? 'warning' : 'success');
+      await syncMeta();
+    } catch (err) {
+      hidePhase2Loading();
+      showToast('Gagal: ' + err.message, 'error');
+    }
   };
 
   // ── Loading modal Phase 2 ──
