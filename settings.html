@@ -461,11 +461,16 @@
         <div class="form-group">
           <label class="form-label">Page ID <span>*</span></label>
           <input type="text" class="form-input" id="page-id-input" placeholder="Contoh: 100069357626909" />
-          <div class="form-hint">Ambil dari URL Facebook Page — facebook.com/<strong>PAGE_ID</strong></div>
+          <div class="form-hint">FB Page → <strong>About</strong> → scroll bawah → Page ID</div>
         </div>
         <div class="form-group">
           <label class="form-label">Nama Page</label>
           <input type="text" class="form-input" id="page-name-input" placeholder="Contoh: Adsy Official" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Instagram Actor ID <span style="font-weight:400; color:var(--text-sub);">(opsional)</span></label>
+          <input type="text" class="form-input" id="page-ig-actor-input" placeholder="Contoh: 17841400008460056" />
+          <div class="form-hint">Business Manager → <strong>Instagram Accounts</strong> → klik akun → lihat numeric ID di URL atau detail. Wajib diisi kalau iklan mau tayang di Instagram.</div>
         </div>
       </div>
       <div class="form-group">
@@ -1064,7 +1069,7 @@
                 <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--gray-1); border-radius:8px;">
                   <div style="flex:1; min-width:0;">
                     <div style="font-size:13px; font-weight:600;">${p.page_name || 'Page'} ${p.is_default ? '<span class="badge badge-primary" style="font-size:10px; margin-left:4px;">Default</span>' : ''}</div>
-                    <div style="font-size:11px; color:var(--text-sub);">ID: ${p.page_id}</div>
+                    <div style="font-size:11px; color:var(--text-sub);">Page ID: ${p.page_id}${p.ig_actor_id ? ` · IG Actor: ${p.ig_actor_id}` : ' · <span style="color:var(--warning);">IG belum diset</span>'}</div>
                   </div>
                   ${!p.is_default ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="setDefaultPage('${p.id}','${acc.id}')">Set Default</button>` : ''}
                   <button class="btn btn-ghost btn-sm" style="color:var(--danger); font-size:18px; padding:0 6px;" onclick="deletePage('${p.id}')">×</button>
@@ -1214,24 +1219,44 @@
     document.getElementById('page-ss-select').value = '';
     openModal('modal-page');
 
-    // Coba fetch pages dari Meta token
+    // Coba fetch pages dari Meta token — dari 2 sumber:
+    // 1. /me/accounts → pages yang di-manage via akun personal FB
+    // 2. /me/businesses → pages yang di-manage via Business Manager
     const token = await getToken();
     if (!token) return;
     document.getElementById('page-loading').style.display = '';
     document.getElementById('page-manual-wrap').style.display = 'none';
     try {
-      const res  = await fetch(`${META}/me/accounts?fields=id,name&limit=50&access_token=${token}`);
-      const data = await res.json();
+      const [personalRes, bizRes] = await Promise.all([
+        fetch(`${META}/me/accounts?fields=id,name&limit=200&access_token=${encodeURIComponent(token)}`).then(r => r.json()),
+        fetch(`${META}/me/businesses?fields=owned_pages{id,name}&limit=50&access_token=${encodeURIComponent(token)}`).then(r => r.json()).catch(() => ({ data: [] }))
+      ]);
       document.getElementById('page-loading').style.display = 'none';
-      const pages = data.data || [];
+
+      // Gabung + deduplicate by page ID
+      const seen  = new Set();
+      const pages = [];
+      for (const p of (personalRes.data || [])) {
+        if (!seen.has(p.id)) { seen.add(p.id); pages.push(p); }
+      }
+      for (const biz of (bizRes.data || [])) {
+        for (const p of (biz.owned_pages?.data || [])) {
+          if (!seen.has(p.id)) { seen.add(p.id); pages.push(p); }
+        }
+      }
+
       if (pages.length) {
         const options = [...pages.map(p => ({ id: p.id, name: p.name })), { id: '__manual__', name: '✏️ Masukkan ID manual...' }];
         document.getElementById('page-select-wrap').style.display = '';
         document.getElementById('page-manual-wrap').style.display = 'none';
         initPageSearchableSelect(options);
+      } else {
+        // Tidak ada pages → langsung tampilkan manual input
+        document.getElementById('page-manual-wrap').style.display = '';
       }
     } catch (e) {
       document.getElementById('page-loading').style.display = 'none';
+      document.getElementById('page-manual-wrap').style.display = '';
     }
   };
 
@@ -1258,9 +1283,11 @@
             document.getElementById('page-manual-wrap').style.display = '';
             document.getElementById('page-id-input').focus();
           } else {
-            document.getElementById('page-manual-wrap').style.display = 'none';
+            document.getElementById('page-manual-wrap').style.display = '';
             document.getElementById('page-id-input').value   = el.dataset.id;
             document.getElementById('page-name-input').value = el.dataset.name;
+            // Auto-fetch IG account yang terhubung ke page ini
+            autoFetchIGActor(el.dataset.id);
           }
         };
       });
@@ -1285,6 +1312,28 @@
     renderList();
   }
 
+  async function autoFetchIGActor(pageId) {
+    const igInput = document.getElementById('page-ig-actor-input');
+    if (!igInput) return;
+    igInput.value = '';
+    igInput.placeholder = 'Mengambil dari Meta...';
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res  = await fetch(`${META}/${pageId}?fields=instagram_accounts&access_token=${encodeURIComponent(token)}`);
+      const data = await res.json();
+      const igAccounts = data.instagram_accounts?.data || [];
+      if (igAccounts.length) {
+        igInput.value = igAccounts[0].id;
+        igInput.placeholder = 'Contoh: 17841400008460056';
+      } else {
+        igInput.placeholder = 'Tidak ada IG terhubung — isi manual jika ada';
+      }
+    } catch (e) {
+      igInput.placeholder = 'Gagal fetch — isi manual jika ada';
+    }
+  }
+
   function escHtml(str) {
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
@@ -1298,9 +1347,10 @@
   };
 
   async function savePage() {
-    const pageId   = document.getElementById('page-id-input').value.trim();
-    const pageName = document.getElementById('page-name-input').value.trim();
-    const isDefault = document.getElementById('page-default').checked;
+    const pageId     = document.getElementById('page-id-input').value.trim();
+    const pageName   = document.getElementById('page-name-input').value.trim();
+    const igActorId  = document.getElementById('page-ig-actor-input').value.trim();
+    const isDefault  = document.getElementById('page-default').checked;
     if (!pageId) return showToast('Page ID wajib diisi', 'warning');
 
     const btn = document.getElementById('btn-save-page');
@@ -1314,7 +1364,8 @@
       ad_account_id: activePageAccountId,
       page_id: pageId,
       page_name: pageName || null,
-      is_default: isDefault
+      is_default: isDefault,
+      ig_actor_id: igActorId || null
     });
 
     btn.disabled = false; btn.textContent = 'Simpan';
