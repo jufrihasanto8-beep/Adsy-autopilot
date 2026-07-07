@@ -894,11 +894,9 @@
     const metaAccountId = acc?.account_id;
 
     let successCount = 0;
-    // Restore draft IDs dari localStorage (kalau ada campaign/adset yang sudah terbuat sebelumnya tapi creative gagal)
-    let metaCampaignId = localStorage.getItem('adsy_draft_campaign_id') || null;
-    let metaAdsetId    = localStorage.getItem('adsy_draft_adset_id')    || null;
-    let sbCampaignId   = localStorage.getItem('adsy_draft_sb_campaign_id') || null;
-    if (metaCampaignId) console.log('Reuse draft campaign:', metaCampaignId);
+    let metaCampaignId = null;
+    let metaAdsetId    = null;
+    let sbCampaignId   = null;
 
     for (const item of readyItems) {
       try {
@@ -992,22 +990,12 @@
           throw new Error(`Response tidak valid (${res.status})`);
         }
 
-        // Capture IDs bahkan dari error response (campaign/adset mungkin sudah terbuat)
+        // Capture IDs dari response (sukses maupun error) untuk reuse di item berikutnya dalam sesi yang sama
         if (!metaCampaignId && data.meta_campaign_id) metaCampaignId = data.meta_campaign_id;
         if (!metaAdsetId && data.meta_adset_id) metaAdsetId = data.meta_adset_id;
         if (!sbCampaignId && data.campaign_id) sbCampaignId = data.campaign_id;
 
-        // Simpan ke localStorage supaya retry setelah hard refresh tetap reuse campaign yg sama
-        if (metaCampaignId) localStorage.setItem('adsy_draft_campaign_id', metaCampaignId);
-        if (metaAdsetId) localStorage.setItem('adsy_draft_adset_id', metaAdsetId);
-        if (sbCampaignId) localStorage.setItem('adsy_draft_sb_campaign_id', sbCampaignId);
-
         if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
-
-        // Berhasil — bersihkan draft
-        localStorage.removeItem('adsy_draft_campaign_id');
-        localStorage.removeItem('adsy_draft_adset_id');
-        localStorage.removeItem('adsy_draft_sb_campaign_id');
 
         successCount++;
         item.status = 'published';
@@ -1020,9 +1008,6 @@
     btn.innerHTML = '🚀 Publish ke Meta';
 
     if (successCount > 0) {
-      localStorage.removeItem('adsy_draft_campaign_id');
-      localStorage.removeItem('adsy_draft_adset_id');
-      localStorage.removeItem('adsy_draft_sb_campaign_id');
       showToast(`${successCount} iklan berhasil dipublish ke Meta!`, 'success');
       setTimeout(() => window.location.href = 'campaigns.html', 2000);
     }
