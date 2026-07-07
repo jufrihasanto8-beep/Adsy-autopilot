@@ -899,9 +899,11 @@
     }
 
     let successCount = 0;
-    let metaCampaignId = null;
-    let metaAdsetId = null;
-    let sbCampaignId = null;
+    // Restore draft IDs dari localStorage (kalau ada campaign/adset yang sudah terbuat sebelumnya tapi creative gagal)
+    let metaCampaignId = localStorage.getItem('adsy_draft_campaign_id') || null;
+    let metaAdsetId    = localStorage.getItem('adsy_draft_adset_id')    || null;
+    let sbCampaignId   = localStorage.getItem('adsy_draft_sb_campaign_id') || null;
+    if (metaCampaignId) console.log('Reuse draft campaign:', metaCampaignId);
 
     for (const item of readyItems) {
       try {
@@ -969,12 +971,23 @@
 
         const res = await fetch('/api/create-ad', { method: 'POST', body: formData });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
 
-        // Simpan ID dari item pertama untuk dipakai item berikutnya
+        // Capture IDs bahkan dari error response (campaign/adset mungkin sudah terbuat)
         if (!metaCampaignId && data.meta_campaign_id) metaCampaignId = data.meta_campaign_id;
         if (!metaAdsetId && data.meta_adset_id) metaAdsetId = data.meta_adset_id;
         if (!sbCampaignId && data.campaign_id) sbCampaignId = data.campaign_id;
+
+        // Simpan ke localStorage supaya retry setelah hard refresh tetap reuse campaign yg sama
+        if (metaCampaignId) localStorage.setItem('adsy_draft_campaign_id', metaCampaignId);
+        if (metaAdsetId) localStorage.setItem('adsy_draft_adset_id', metaAdsetId);
+        if (sbCampaignId) localStorage.setItem('adsy_draft_sb_campaign_id', sbCampaignId);
+
+        if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+
+        // Berhasil — bersihkan draft
+        localStorage.removeItem('adsy_draft_campaign_id');
+        localStorage.removeItem('adsy_draft_adset_id');
+        localStorage.removeItem('adsy_draft_sb_campaign_id');
 
         successCount++;
         item.status = 'published';
@@ -987,6 +1000,9 @@
     btn.innerHTML = '🚀 Publish ke Meta';
 
     if (successCount > 0) {
+      localStorage.removeItem('adsy_draft_campaign_id');
+      localStorage.removeItem('adsy_draft_adset_id');
+      localStorage.removeItem('adsy_draft_sb_campaign_id');
       showToast(`${successCount} iklan berhasil dipublish ke Meta!`, 'success');
       setTimeout(() => window.location.href = 'campaigns.html', 2000);
     }
@@ -1056,21 +1072,25 @@
   // Extract frame dari video pakai Canvas, upload sebagai adimage ke Meta → dapat image_hash
   async function extractAndUploadThumbnail(videoFile, accountId, token) {
     try {
-      const blob = await new Promise((resolve) => {
-        const video = document.createElement('video');
-        const canvas = document.createElement('canvas');
-        const url = URL.createObjectURL(videoFile);
-        video.onloadedmetadata = () => { video.currentTime = Math.min(1, video.duration * 0.1); };
-        video.onseeked = () => {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          canvas.getContext('2d').drawImage(video, 0, 0);
-          canvas.toBlob(b => { URL.revokeObjectURL(url); resolve(b); }, 'image/jpeg', 0.85);
-        };
-        video.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
-        video.src = url;
-        video.load();
-      });
+      const blob = await Promise.race([
+        new Promise((resolve) => {
+          const video = document.createElement('video');
+          const canvas = document.createElement('canvas');
+          const url = URL.createObjectURL(videoFile);
+          video.onloadedmetadata = () => { video.currentTime = Math.min(1, video.duration * 0.1); };
+          video.onseeked = () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            canvas.toBlob(b => { URL.revokeObjectURL(url); resolve(b); }, 'image/jpeg', 0.85);
+          };
+          video.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+          video.src = url;
+          video.load();
+        }),
+        // Timeout 8 detik — kalau video tidak bisa di-seek, lanjut tanpa thumbnail
+        new Promise(resolve => setTimeout(() => resolve(null), 8000))
+      ]);
       if (!blob) return null;
 
       const thumbForm = new FormData();
