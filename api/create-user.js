@@ -12,12 +12,12 @@ export default async function handler(req, res) {
   if (action === 'delete') {
     if (!userId) return res.status(400).json({ error: 'userId wajib diisi' });
     try {
-      // Hapus auth user dulu — kalau profiles ada ON DELETE CASCADE, otomatis ikut terhapus
+      // Hapus profiles dulu (FK ke auth.users), baru hapus auth user
+      const { error: profileErr } = await sb.from('profiles').delete().eq('id', userId);
+      if (profileErr) return res.status(500).json({ error: 'Gagal hapus profile: ' + profileErr.message });
+
       const { error: authErr } = await sb.auth.admin.deleteUser(userId);
       if (authErr) return res.status(500).json({ error: 'Gagal hapus auth user: ' + authErr.message });
-
-      // Fallback: hapus profiles manual kalau belum terhapus by cascade
-      await sb.from('profiles').delete().eq('id', userId);
 
       return res.status(200).json({ success: true });
     } catch (err) {
