@@ -342,6 +342,8 @@ export default async function handler(req, res) {
           ...(igActorId ? { instagram_actor_id: igActorId } : {}),
           video_data: videoDataPayload
         },
+        // Kalau tidak ada ig_actor_id: paksa Meta pakai FB Page sebagai actor, bukan IG
+        ...(!igActorId ? { use_page_actor_override: true } : {}),
         access_token: token
       };
       const creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
@@ -389,6 +391,8 @@ export default async function handler(req, res) {
           ...(igActorId ? { instagram_actor_id: igActorId } : {}),
           link_data: linkData
         },
+        // Kalau tidak ada ig_actor_id: paksa Meta pakai FB Page sebagai actor, bukan IG
+        ...(!igActorId ? { use_page_actor_override: true } : {}),
         access_token: token
       };
       const creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
