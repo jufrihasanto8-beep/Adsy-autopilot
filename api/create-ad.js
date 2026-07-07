@@ -83,6 +83,14 @@ export default async function handler(req, res) {
     // page_id & pixel_id: pakai dari frontend (multi) atau fallback ke kolom lama
     const pageId    = pageIdOverride  || accData.page_id;
     const pixelId   = pixelIdOverride || accData.pixel_id || null;
+
+    // Ambil ig_actor_id dari ad_pages (kalau user sudah isi di Settings)
+    let igActorId = null;
+    if (pageId) {
+      const { data: pageRow } = await sb.from('ad_pages')
+        .select('ig_actor_id').eq('ad_account_id', adAccountDbId).eq('page_id', pageId).maybeSingle();
+      igActorId = pageRow?.ig_actor_id || null;
+    }
     const destUrl   = adType === 'ctwa'
       ? 'https://wa.me/' + (waNumber || '')
       : (urlData?.url || 'https://wa.me/');
@@ -293,10 +301,12 @@ export default async function handler(req, res) {
       if (thumbnailImageHash) {
         videoDataPayload.image_hash = thumbnailImageHash;
       } else {
+        // Thumbnail tidak dikirim dari browser — coba ambil dari Meta, max 2× dengan delay 1s
+        // Kalau tidak dapat, lanjut saja tanpa thumbnail (Meta generate otomatis)
         let thumbnailUrl = null;
-        for (let attempt = 0; attempt < 6; attempt++) {
+        for (let attempt = 0; attempt < 2; attempt++) {
           try {
-            if (attempt > 0) await new Promise(r => setTimeout(r, 5000));
+            if (attempt > 0) await new Promise(r => setTimeout(r, 1000));
             const thumbRes  = await fetch(`${META_API}/${metaVideoId}?fields=picture,thumbnails&access_token=${encodeURIComponent(token)}`);
             const thumbData = await thumbRes.json();
             thumbnailUrl = thumbData?.picture || null;
@@ -310,15 +320,17 @@ export default async function handler(req, res) {
             console.warn(`Thumbnail attempt ${attempt + 1} gagal:`, e.message);
           }
         }
-        if (!thumbnailUrl) {
-          throw new Error('Thumbnail video belum siap di Meta. Coba beberapa detik lagi lalu publish ulang.');
-        }
-        videoDataPayload.image_url = thumbnailUrl;
+        if (thumbnailUrl) videoDataPayload.image_url = thumbnailUrl;
+        // Kalau masih tidak ada thumbnail, lanjut tanpa — Meta akan generate otomatis
       }
 
       let videoCreativePayload = {
         name: `Creative - ${headline}`,
-        object_story_spec: { page_id: pageId, video_data: videoDataPayload },
+        object_story_spec: {
+          page_id: pageId,
+          ...(igActorId ? { instagram_actor_id: igActorId } : {}),
+          video_data: videoDataPayload
+        },
         access_token: token
       };
       let creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
@@ -336,10 +348,10 @@ export default async function handler(req, res) {
         });
         creativeData = await creativeRes.json();
       }
-      // Retry 2: update adset ke FB-only (hapus IG dari placement), lalu coba creative lagi
+      // Retry 2: FB-only placement + tetap pakai use_page_actor_override
       if (creativeData.error && isInstagramError(creativeData.error)) {
-        console.warn('Creative video: IG error masih, fallback ke FB-only placement');
-        delete videoCreativePayload.use_page_actor_override;
+        console.warn('Creative video: IG error masih, fallback ke FB-only placement + use_page_actor_override');
+        videoCreativePayload.use_page_actor_override = true; // jangan dihapus
         await updateAdsetToFBOnly(metaAdsetId, adsetTargeting, token);
         creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -379,7 +391,11 @@ export default async function handler(req, res) {
 
       let imgCreativePayload = {
         name: `Creative - ${headline}`,
-        object_story_spec: { page_id: pageId, link_data: linkData },
+        object_story_spec: {
+          page_id: pageId,
+          ...(igActorId ? { instagram_actor_id: igActorId } : {}),
+          link_data: linkData
+        },
         access_token: token
       };
       let creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
@@ -397,10 +413,10 @@ export default async function handler(req, res) {
         });
         creativeData = await creativeRes.json();
       }
-      // Retry 2: update adset ke FB-only (hapus IG dari placement), lalu coba creative lagi
+      // Retry 2: FB-only placement + tetap pakai use_page_actor_override
       if (creativeData.error && isInstagramError(creativeData.error)) {
-        console.warn('Creative image: IG error masih, fallback ke FB-only placement');
-        delete imgCreativePayload.use_page_actor_override;
+        console.warn('Creative image: IG error masih, fallback ke FB-only placement + use_page_actor_override');
+        imgCreativePayload.use_page_actor_override = true; // jangan dihapus
         await updateAdsetToFBOnly(metaAdsetId, adsetTargeting, token);
         creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -518,7 +534,14 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('create-ad error:', err);
-    return res.status(500).json({ error: err.message });
+    // Kembalikan partial IDs kalau campaign/adset sudah terbuat tapi creative gagal
+    // Supaya retry berikutnya bisa reuse, tidak buat campaign baru lagi
+    return res.status(500).json({
+      error: err.message,
+      meta_campaign_id: metaCampaignId || undefined,
+      meta_adset_id: metaAdsetId || undefined,
+      campaign_id: sbCampaignId || undefined
+    });
   }
 }
 
