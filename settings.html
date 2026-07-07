@@ -1793,9 +1793,9 @@
   window.rejectUser = async function(id) {
     if (!confirm('Tolak & hapus akun user ini?')) return;
     try {
-      const res = await fetch('/api/update-user-status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: id, status: 'rejected' }) });
-      await sb.auth.admin?.deleteUser?.(id).catch(() => {});
-      await sb.from('profiles').delete().eq('id', id);
+      const res = await fetch('/api/update-user-status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: id, action: 'delete' }) });
+      const data = await res.json();
+      if (!res.ok) return showToast('Gagal hapus: ' + (data.error || res.status), 'error');
       showToast('Akun ditolak & dihapus', 'success');
       await loadUsers();
     } catch (err) { showToast('Error: ' + err.message, 'error'); }
@@ -1830,9 +1830,13 @@
 
   window.removeUser = async function(id) {
     if (!confirm('Hapus user ini?')) return;
-    await sb.from('profiles').delete().eq('id', id);
-    showToast('User dihapus', 'success');
-    await loadUsers();
+    try {
+      const res = await fetch('/api/update-user-status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: id, action: 'delete' }) });
+      const data = await res.json();
+      if (!res.ok) return showToast('Gagal hapus: ' + (data.error || res.status), 'error');
+      showToast('User dihapus', 'success');
+      await loadUsers();
+    } catch (err) { showToast('Error: ' + err.message, 'error'); }
   };
 
   init();
