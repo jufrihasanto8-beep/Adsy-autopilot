@@ -8,8 +8,21 @@ export default async function handler(req, res) {
 
   const { action, name, email, password, role, userId, status } = req.body;
 
+  // ── HAPUS USER ──
+  if (action === 'delete') {
+    if (!userId) return res.status(400).json({ error: 'userId wajib diisi' });
+    try {
+      await sb.from('profiles').delete().eq('id', userId);
+      const { error: authErr } = await sb.auth.admin.deleteUser(userId);
+      if (authErr) console.error('auth.deleteUser error:', authErr.message);
+      return res.status(200).json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
   // ── UPDATE STATUS / ROLE ──
-  if (action === 'update') {
+  if (action === 'update' || action === 'update-status') {
     if (!userId) return res.status(400).json({ error: 'userId wajib diisi' });
     const updates = {};
     if (status !== undefined) updates.status = status;
