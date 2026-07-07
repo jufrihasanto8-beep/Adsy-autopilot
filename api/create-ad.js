@@ -152,18 +152,26 @@ export default async function handler(req, res) {
         videoDataPayload.image_url = thumbnailUrl;
       }
 
-      const creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
+      let videoCreativePayload = {
+        name: `Creative - ${headline}`,
+        object_story_spec: { page_id: pageId, video_data: videoDataPayload },
+        access_token: token
+      };
+      let creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: `Creative - ${headline}`,
-          object_story_spec: {
-            page_id: pageId,
-            video_data: videoDataPayload
-          },
-          access_token: token
-        })
+        body: JSON.stringify(videoCreativePayload)
       });
-      const creativeData = await creativeRes.json();
+      let creativeData = await creativeRes.json();
+      // Retry tanpa Instagram actor kalau Meta complain soal IG permission
+      if (creativeData.error && isInstagramError(creativeData.error)) {
+        console.warn('Creative video: IG error, retry with use_page_actor_override');
+        videoCreativePayload.use_page_actor_override = true;
+        creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(videoCreativePayload)
+        });
+        creativeData = await creativeRes.json();
+      }
       if (creativeData.error) {
         const e = creativeData.error;
         throw new Error(`Meta creative: ${e.error_user_msg || e.message} (code: ${e.code})`);
@@ -194,15 +202,26 @@ export default async function handler(req, res) {
       };
       if (description) linkData.description = description;
 
-      const creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
+      let imgCreativePayload = {
+        name: `Creative - ${headline}`,
+        object_story_spec: { page_id: pageId, link_data: linkData },
+        access_token: token
+      };
+      let creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: `Creative - ${headline}`,
-          object_story_spec: { page_id: pageId, link_data: linkData },
-          access_token: token
-        })
+        body: JSON.stringify(imgCreativePayload)
       });
-      const creativeData = await creativeRes.json();
+      let creativeData = await creativeRes.json();
+      // Retry tanpa Instagram actor kalau Meta complain soal IG permission
+      if (creativeData.error && isInstagramError(creativeData.error)) {
+        console.warn('Creative image: IG error, retry with use_page_actor_override');
+        imgCreativePayload.use_page_actor_override = true;
+        creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(imgCreativePayload)
+        });
+        creativeData = await creativeRes.json();
+      }
       if (creativeData.error) {
         const e = creativeData.error;
         throw new Error(`Meta creative: ${e.error_user_msg || e.message} (code: ${e.code})`);
@@ -856,6 +875,12 @@ async function readJsonBody(req) {
     });
     req.on('error', reject);
   });
+}
+
+// Deteksi error Meta yang berkaitan dengan Instagram actor permission
+function isInstagramError(e) {
+  const msg = (e.error_user_msg || e.message || '').toLowerCase();
+  return e.code === 200 || msg.includes('instagram');
 }
 
 function ctaMap(cta) {
