@@ -1793,7 +1793,7 @@
   window.rejectUser = async function(id) {
     if (!confirm('Tolak & hapus akun user ini?')) return;
     try {
-      const res = await fetch('/api/update-user-status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: id, action: 'delete' }) });
+      const res = await fetch('/api/create-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: id, action: 'delete' }) });
       const data = await res.json();
       if (!res.ok) return showToast('Gagal hapus: ' + (data.error || res.status), 'error');
       showToast('Akun ditolak & dihapus', 'success');
@@ -1831,7 +1831,7 @@
   window.removeUser = async function(id) {
     if (!confirm('Hapus user ini?')) return;
     try {
-      const res = await fetch('/api/update-user-status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: id, action: 'delete' }) });
+      const res = await fetch('/api/create-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: id, action: 'delete' }) });
       const data = await res.json();
       if (!res.ok) return showToast('Gagal hapus: ' + (data.error || res.status), 'error');
       showToast('User dihapus', 'success');
