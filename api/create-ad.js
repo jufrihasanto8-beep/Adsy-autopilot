@@ -83,21 +83,134 @@ export default async function handler(req, res) {
     // page_id & pixel_id: pakai dari frontend (multi) atau fallback ke kolom lama
     const pageId    = pageIdOverride  || accData.page_id;
     const pixelId   = pixelIdOverride || accData.pixel_id || null;
-
-    // Ambil ig_actor_id dari ad_pages (kalau user sudah isi di Settings)
-    let igActorId = null;
-    if (pageId) {
-      const { data: pageRow } = await sb.from('ad_pages')
-        .select('ig_actor_id').eq('ad_account_id', adAccountDbId).eq('page_id', pageId).maybeSingle();
-      igActorId = pageRow?.ig_actor_id || null;
-    }
     const destUrl   = adType === 'ctwa'
       ? 'https://wa.me/' + (waNumber || '')
       : (urlData?.url || 'https://wa.me/');
 
     if (!token) throw new Error('Meta access token belum dikonfigurasi di Pengaturan');
 
-    // ── 1. Buat Campaign di Meta (hanya jika belum ada) ──
+    // ── 1. Upload creative (gambar/video) ──
+    let creativeId;
+
+    if (fileType === 'video') {
+      let metaVideoId;
+
+      if (preUploadedVideoId) {
+        // Video sudah diupload langsung dari browser ke Meta — skip upload
+        metaVideoId = preUploadedVideoId;
+      } else {
+        // Upload melalui server (fallback untuk file kecil)
+        const videoBuffer = fs.readFileSync(file.filepath);
+        const videoBlob   = new Blob([videoBuffer], { type: file.mimetype });
+        const videoForm   = new FormData();
+        videoForm.append('file', videoBlob, file.originalFilename);
+
+        const videoRes  = await fetch(`${META_API}/${accountId}/advideos?access_token=${encodeURIComponent(token)}`, { method: 'POST', body: videoForm });
+        const videoData = await videoRes.json();
+        if (videoData.error) {
+          const e = videoData.error;
+          throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code}${e.error_subcode ? '/' + e.error_subcode : ''})`);
+        }
+        metaVideoId = videoData.id;
+      }
+
+      // Deklarasi payload dulu
+      const videoDataPayload = {
+        video_id: metaVideoId,
+        title: headline,
+        message: primaryText,
+        call_to_action: adType === 'ctwa'
+          ? { type: 'WHATSAPP_MESSAGE', value: { app_destination: 'WHATSAPP' } }
+          : { type: ctaMap(cta), value: { link: destUrl } }
+      };
+
+      // Thumbnail: pakai image_hash dari browser (paling cepat, no-wait)
+      // Fallback: fetch dari Meta dengan retry kalau hash tidak tersedia
+      if (thumbnailImageHash) {
+        videoDataPayload.image_hash = thumbnailImageHash;
+      } else {
+        let thumbnailUrl = null;
+        for (let attempt = 0; attempt < 6; attempt++) {
+          try {
+            if (attempt > 0) await new Promise(r => setTimeout(r, 5000));
+            const thumbRes  = await fetch(`${META_API}/${metaVideoId}?fields=picture,thumbnails&access_token=${encodeURIComponent(token)}`);
+            const thumbData = await thumbRes.json();
+            thumbnailUrl = thumbData?.picture || null;
+            if (!thumbnailUrl) {
+              const thumbs = thumbData?.thumbnails?.data || [];
+              const midIdx = Math.floor(thumbs.length / 2);
+              thumbnailUrl = thumbs[midIdx]?.uri || thumbs[0]?.uri || null;
+            }
+            if (thumbnailUrl) break;
+          } catch (e) {
+            console.warn(`Thumbnail attempt ${attempt + 1} gagal:`, e.message);
+          }
+        }
+        if (!thumbnailUrl) {
+          throw new Error('Thumbnail video belum siap di Meta. Coba beberapa detik lagi lalu publish ulang.');
+        }
+        videoDataPayload.image_url = thumbnailUrl;
+      }
+
+      const creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Creative - ${headline}`,
+          object_story_spec: {
+            page_id: pageId,
+            video_data: videoDataPayload
+          },
+          access_token: token
+        })
+      });
+      const creativeData = await creativeRes.json();
+      if (creativeData.error) {
+        const e = creativeData.error;
+        throw new Error(`Meta creative: ${e.error_user_msg || e.message} (code: ${e.code})`);
+      }
+      creativeId = creativeData.id;
+
+    } else {
+      const imgBuffer = fs.readFileSync(file.filepath);
+      const imgBlob   = new Blob([imgBuffer], { type: file.mimetype });
+      const imgForm   = new FormData();
+      imgForm.append(file.originalFilename, imgBlob, file.originalFilename);
+
+      const imgRes  = await fetch(`${META_API}/${accountId}/adimages?access_token=${encodeURIComponent(token)}`, { method: 'POST', body: imgForm });
+      const imgData = await imgRes.json();
+      if (imgData.error) {
+        const e = imgData.error;
+        throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code}${e.error_subcode ? '/' + e.error_subcode : ''})`);
+      }
+
+      const imageHash = Object.values(imgData.images || {})[0]?.hash;
+      if (!imageHash) throw new Error('Gagal upload gambar ke Meta');
+
+      const linkData = {
+        image_hash: imageHash, link: destUrl, message: primaryText, name: headline,
+        call_to_action: adType === 'ctwa'
+          ? { type: 'WHATSAPP_MESSAGE', value: { app_destination: 'WHATSAPP' } }
+          : { type: ctaMap(cta), value: { link: destUrl } }
+      };
+      if (description) linkData.description = description;
+
+      const creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Creative - ${headline}`,
+          object_story_spec: { page_id: pageId, link_data: linkData },
+          access_token: token
+        })
+      });
+      const creativeData = await creativeRes.json();
+      if (creativeData.error) {
+        const e = creativeData.error;
+        throw new Error(`Meta creative: ${e.error_user_msg || e.message} (code: ${e.code})`);
+      }
+      creativeId = creativeData.id;
+    }
+
+    // ── 2. Buat Campaign di Meta (hanya jika belum ada) ──
     let metaCampaignId = existingMetaCampaignId;
     let metaAdsetId    = existingMetaAdsetId;
     let sbCampaignId   = existingSbCampaignId || null;
@@ -139,10 +252,7 @@ export default async function handler(req, res) {
       metaCampaignId = campData.id;
     }
 
-    // ── 2. Buat Ad Set (hanya jika belum ada) ──
-    // adsetTargeting disimpan untuk fallback FB-only jika creative ditolak Meta karena IG
-    let adsetTargeting = null;
-
+    // ── 3. Buat Ad Set (hanya jika belum ada) ──
     if (!metaAdsetId) {
       // Baca global settings (lokasi & penempatan dari admin)
       const SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
@@ -169,21 +279,17 @@ export default async function handler(req, res) {
       const { optimizationGoal, billingEvent } = adType === 'ctwa'
         ? { optimizationGoal: 'CONVERSATIONS', billingEvent: 'IMPRESSIONS' }
         : objectiveConfig(objective);
-
-      // Bangun targeting object dan simpan untuk fallback
-      adsetTargeting = {
-        geo_locations: geoLocations,
-        ...(excludedGeoLocations ? { excluded_geo_locations: excludedGeoLocations } : {}),
-        age_min: 21,
-        age_max: 65
-      };
-
       const adsetPayload = {
         name: `${finalCampaignName} - Ad Set`,
         campaign_id: metaCampaignId,
         billing_event: billingEvent,
         optimization_goal: optimizationGoal,
-        targeting: adsetTargeting,
+        targeting: {
+          geo_locations: geoLocations,
+          ...(excludedGeoLocations ? { excluded_geo_locations: excludedGeoLocations } : {}),
+          age_min: 21,
+          age_max: 65
+        },
         status: adStatus,
         access_token: token
       };
@@ -221,12 +327,12 @@ export default async function handler(req, res) {
 
         // Hanya tambah platform kalau ada posisi yang dipilih
         const finalPlatforms = [];
-        if (fbPositions.length)  { finalPlatforms.push('facebook');  adsetTargeting.facebook_positions = fbPositions; }
-        if (igPositions.length)  { finalPlatforms.push('instagram'); adsetTargeting.instagram_positions = igPositions; }
-        if (msgPositions.length) { finalPlatforms.push('messenger'); adsetTargeting.messenger_positions = msgPositions; }
-        if (anPositions.length)  { finalPlatforms.push('audience_network'); adsetTargeting.audience_network_positions = anPositions; }
+        if (fbPositions.length)  { finalPlatforms.push('facebook');  adsetPayload.targeting.facebook_positions = fbPositions; }
+        if (igPositions.length)  { finalPlatforms.push('instagram'); adsetPayload.targeting.instagram_positions = igPositions; }
+        if (msgPositions.length) { finalPlatforms.push('messenger'); adsetPayload.targeting.messenger_positions = msgPositions; }
+        if (anPositions.length)  { finalPlatforms.push('audience_network'); adsetPayload.targeting.audience_network_positions = anPositions; }
         if (pl.includes('plt_threads') && finalPlatforms.length) finalPlatforms.push('threads');
-        if (finalPlatforms.length) adsetTargeting.publisher_platforms = finalPlatforms;
+        if (finalPlatforms.length) adsetPayload.targeting.publisher_platforms = finalPlatforms;
       }
       // Jika AUTO: tidak set publisher_platforms → Meta pakai Advantage+ Placement
       // ABO: budget + bid di ad set level
@@ -259,176 +365,6 @@ export default async function handler(req, res) {
         throw new Error(`Meta ad set: ${e.error_user_msg || e.message} (code: ${e.code})`);
       }
       metaAdsetId = adsetData.id;
-    }
-
-    // ── 3. Upload creative (gambar/video) ──
-    let creativeId;
-
-    if (fileType === 'video') {
-      let metaVideoId;
-
-      if (preUploadedVideoId) {
-        // Video sudah diupload langsung dari browser ke Meta — skip upload
-        metaVideoId = preUploadedVideoId;
-      } else {
-        // Upload melalui server (fallback untuk file kecil)
-        const videoBuffer = fs.readFileSync(file.filepath);
-        const videoBlob   = new Blob([videoBuffer], { type: file.mimetype });
-        const videoForm   = new FormData();
-        videoForm.append('file', videoBlob, file.originalFilename);
-
-        const videoRes  = await fetch(`${META_API}/${accountId}/advideos?access_token=${encodeURIComponent(token)}`, { method: 'POST', body: videoForm });
-        const videoData = await videoRes.json();
-        if (videoData.error) {
-          const e = videoData.error;
-          throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code}${e.error_subcode ? '/' + e.error_subcode : ''})`);
-        }
-        metaVideoId = videoData.id;
-      }
-
-      // Deklarasi payload dulu
-      const videoDataPayload = {
-        video_id: metaVideoId,
-        title: headline,
-        message: primaryText,
-        call_to_action: adType === 'ctwa'
-          ? { type: 'WHATSAPP_MESSAGE', value: { app_destination: 'WHATSAPP' } }
-          : { type: ctaMap(cta), value: { link: destUrl } }
-      };
-
-      // Thumbnail: pakai image_hash dari browser (paling cepat, no-wait)
-      // Fallback: fetch dari Meta dengan retry kalau hash tidak tersedia
-      if (thumbnailImageHash) {
-        videoDataPayload.image_hash = thumbnailImageHash;
-      } else {
-        // Thumbnail tidak dikirim dari browser — coba ambil dari Meta, max 2× dengan delay 1s
-        // Kalau tidak dapat, lanjut saja tanpa thumbnail (Meta generate otomatis)
-        let thumbnailUrl = null;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            if (attempt > 0) await new Promise(r => setTimeout(r, 1000));
-            const thumbRes  = await fetch(`${META_API}/${metaVideoId}?fields=picture,thumbnails&access_token=${encodeURIComponent(token)}`);
-            const thumbData = await thumbRes.json();
-            thumbnailUrl = thumbData?.picture || null;
-            if (!thumbnailUrl) {
-              const thumbs = thumbData?.thumbnails?.data || [];
-              const midIdx = Math.floor(thumbs.length / 2);
-              thumbnailUrl = thumbs[midIdx]?.uri || thumbs[0]?.uri || null;
-            }
-            if (thumbnailUrl) break;
-          } catch (e) {
-            console.warn(`Thumbnail attempt ${attempt + 1} gagal:`, e.message);
-          }
-        }
-        if (thumbnailUrl) videoDataPayload.image_url = thumbnailUrl;
-        // Kalau masih tidak ada thumbnail, lanjut tanpa — Meta akan generate otomatis
-      }
-
-      let videoCreativePayload = {
-        name: `Creative - ${headline}`,
-        object_story_spec: {
-          page_id: pageId,
-          ...(igActorId ? { instagram_actor_id: igActorId } : {}),
-          video_data: videoDataPayload
-        },
-        access_token: token
-      };
-      let creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(videoCreativePayload)
-      });
-      let creativeData = await creativeRes.json();
-      // Retry 1: pakai use_page_actor_override
-      if (creativeData.error && isInstagramError(creativeData.error)) {
-        console.warn('Creative video: IG error, retry with use_page_actor_override');
-        videoCreativePayload.use_page_actor_override = true;
-        creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(videoCreativePayload)
-        });
-        creativeData = await creativeRes.json();
-      }
-      // Retry 2: FB-only placement + tetap pakai use_page_actor_override
-      if (creativeData.error && isInstagramError(creativeData.error)) {
-        console.warn('Creative video: IG error masih, fallback ke FB-only placement + use_page_actor_override');
-        videoCreativePayload.use_page_actor_override = true; // jangan dihapus
-        await updateAdsetToFBOnly(metaAdsetId, adsetTargeting, token);
-        creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(videoCreativePayload)
-        });
-        creativeData = await creativeRes.json();
-      }
-      if (creativeData.error) {
-        const e = creativeData.error;
-        throw new Error(`Meta creative: ${e.error_user_msg || e.message} (code: ${e.code})`);
-      }
-      creativeId = creativeData.id;
-
-    } else {
-      const imgBuffer = fs.readFileSync(file.filepath);
-      const imgBlob   = new Blob([imgBuffer], { type: file.mimetype });
-      const imgForm   = new FormData();
-      imgForm.append(file.originalFilename, imgBlob, file.originalFilename);
-
-      const imgRes  = await fetch(`${META_API}/${accountId}/adimages?access_token=${encodeURIComponent(token)}`, { method: 'POST', body: imgForm });
-      const imgData = await imgRes.json();
-      if (imgData.error) {
-        const e = imgData.error;
-        throw new Error(`Meta: ${e.error_user_msg || e.message} (code: ${e.code}${e.error_subcode ? '/' + e.error_subcode : ''})`);
-      }
-
-      const imageHash = Object.values(imgData.images || {})[0]?.hash;
-      if (!imageHash) throw new Error('Gagal upload gambar ke Meta');
-
-      const linkData = {
-        image_hash: imageHash, link: destUrl, message: primaryText, name: headline,
-        call_to_action: adType === 'ctwa'
-          ? { type: 'WHATSAPP_MESSAGE', value: { app_destination: 'WHATSAPP' } }
-          : { type: ctaMap(cta), value: { link: destUrl } }
-      };
-      if (description) linkData.description = description;
-
-      let imgCreativePayload = {
-        name: `Creative - ${headline}`,
-        object_story_spec: {
-          page_id: pageId,
-          ...(igActorId ? { instagram_actor_id: igActorId } : {}),
-          link_data: linkData
-        },
-        access_token: token
-      };
-      let creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(imgCreativePayload)
-      });
-      let creativeData = await creativeRes.json();
-      // Retry 1: pakai use_page_actor_override
-      if (creativeData.error && isInstagramError(creativeData.error)) {
-        console.warn('Creative image: IG error, retry with use_page_actor_override');
-        imgCreativePayload.use_page_actor_override = true;
-        creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(imgCreativePayload)
-        });
-        creativeData = await creativeRes.json();
-      }
-      // Retry 2: FB-only placement + tetap pakai use_page_actor_override
-      if (creativeData.error && isInstagramError(creativeData.error)) {
-        console.warn('Creative image: IG error masih, fallback ke FB-only placement + use_page_actor_override');
-        imgCreativePayload.use_page_actor_override = true; // jangan dihapus
-        await updateAdsetToFBOnly(metaAdsetId, adsetTargeting, token);
-        creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(imgCreativePayload)
-        });
-        creativeData = await creativeRes.json();
-      }
-      if (creativeData.error) {
-        const e = creativeData.error;
-        throw new Error(`Meta creative: ${e.error_user_msg || e.message} (code: ${e.code})`);
-      }
-      creativeId = creativeData.id;
     }
 
     // ── 4. Buat Ad (hubungkan creative ke ad set) ──
@@ -534,14 +470,7 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('create-ad error:', err);
-    // Kembalikan partial IDs kalau campaign/adset sudah terbuat tapi creative gagal
-    // Supaya retry berikutnya bisa reuse, tidak buat campaign baru lagi
-    return res.status(500).json({
-      error: err.message,
-      meta_campaign_id: metaCampaignId || undefined,
-      meta_adset_id: metaAdsetId || undefined,
-      campaign_id: sbCampaignId || undefined
-    });
+    return res.status(500).json({ error: err.message });
   }
 }
 
@@ -927,34 +856,6 @@ async function readJsonBody(req) {
     });
     req.on('error', reject);
   });
-}
-
-// Update adset ke Facebook-only placement sebagai fallback jika IG actor error persisten
-async function updateAdsetToFBOnly(adsetId, currentTargeting, token) {
-  if (!adsetId) return;
-  try {
-    // Bangun targeting baru: pertahankan geo + age, hapus IG, set FB-only publisher_platforms
-    const fbTargeting = currentTargeting
-      ? JSON.parse(JSON.stringify(currentTargeting))
-      : { geo_locations: { countries: ['ID'] }, age_min: 21, age_max: 65 };
-    fbTargeting.publisher_platforms = ['facebook', 'messenger', 'audience_network'];
-    delete fbTargeting.instagram_positions;
-    const r = await fetch(`${META_API}/${adsetId}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targeting: fbTargeting, access_token: token })
-    });
-    const d = await r.json();
-    if (d.error) console.warn('updateAdsetToFBOnly error (non-fatal):', d.error.message);
-    else console.log('Adset updated to FB-only placement, IG excluded.');
-  } catch (e) {
-    console.warn('updateAdsetToFBOnly exception (non-fatal):', e.message);
-  }
-}
-
-// Deteksi error Meta yang berkaitan dengan Instagram actor permission
-function isInstagramError(e) {
-  const msg = (e.error_user_msg || e.message || '').toLowerCase();
-  return e.code === 200 || msg.includes('instagram');
 }
 
 function ctaMap(cta) {
