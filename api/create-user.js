@@ -12,7 +12,19 @@ export default async function handler(req, res) {
   if (action === 'delete') {
     if (!userId) return res.status(400).json({ error: 'userId wajib diisi' });
     try {
-      // Hapus profiles dulu (FK ke auth.users), baru hapus auth user
+      // Hapus semua data user secara berurutan (child tables dulu sebelum parent)
+      const tables = [
+        'ad_pages', 'ad_pixels', 'ad_urls',
+        'ad_copies', 'action_logs', 'notif_settings',
+        'content_library', 'campaigns', 'ad_accounts',
+        'autopilot_rules', 'autopilot_scheme', 'autopilot_blueprints',
+        'products', 'app_config', 'global_settings',
+      ];
+      for (const table of tables) {
+        const col = table === 'autopilot_blueprints' ? 'created_by' : 'user_id';
+        await sb.from(table).delete().eq(col, userId);
+      }
+
       const { error: profileErr } = await sb.from('profiles').delete().eq('id', userId);
       if (profileErr) return res.status(500).json({ error: 'Gagal hapus profile: ' + profileErr.message });
 
