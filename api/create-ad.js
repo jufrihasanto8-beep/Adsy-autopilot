@@ -89,7 +89,171 @@ export default async function handler(req, res) {
 
     if (!token) throw new Error('Meta access token belum dikonfigurasi di Pengaturan');
 
-    // ── 1. Upload creative (gambar/video) ──
+    // ── 1. Buat Campaign di Meta (hanya jika belum ada) ──
+    let metaCampaignId = existingMetaCampaignId;
+    let metaAdsetId    = existingMetaAdsetId;
+    let sbCampaignId   = existingSbCampaignId || null;
+
+    const { data: product } = await sb.from('products').select('name, target_cpr').eq('id', productId).single();
+    const finalCampaignName = campaignNameInput || `${product?.name || 'Iklan'} - ${new Date().toLocaleDateString('id-ID')}`;
+
+    if (!metaCampaignId) {
+      const campPayloadMeta = {
+        name: finalCampaignName,
+        objective,
+        status: adStatus,
+        special_ad_categories: [],
+        access_token: token
+      };
+      // CBO: budget di campaign level + sharing enabled
+      // ABO: budget di ad set level, is_adset_budget_sharing_enabled wajib = false
+      if (budgetType === 'CBO') {
+        campPayloadMeta.daily_budget = dailyBudget;
+        campPayloadMeta.bid_strategy = bidStrategy;
+        if (bidValue && bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
+          if (bidStrategy === 'MINIMUM_ROAS') campPayloadMeta.roas_average_floor = parseFloat(bidValue) * 100;
+          else campPayloadMeta.bid_amount = parseInt(bidValue);
+        }
+      } else {
+        // ABO — Meta wajib tahu bahwa budget tidak di-share di campaign level
+        campPayloadMeta.is_adset_budget_sharing_enabled = false;
+      }
+
+      const campRes  = await fetch(`${META_API}/${accountId}/campaigns`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(campPayloadMeta)
+      });
+      const campData = await campRes.json();
+      if (campData.error) {
+        const e = campData.error;
+        throw new Error(`Meta campaign: ${e.error_user_msg || e.message} (code: ${e.code})`);
+      }
+      metaCampaignId = campData.id;
+    }
+
+    // ── 2. Buat Ad Set (hanya jika belum ada) ──
+    // adsetTargeting disimpan untuk fallback FB-only jika creative ditolak Meta karena IG
+    let adsetTargeting = null;
+
+    if (!metaAdsetId) {
+      // Baca global settings (lokasi & penempatan dari admin)
+      const SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
+      const { data: globalCfg } = await sb.from('global_settings').select('*').eq('id', SETTINGS_ID).single();
+
+      // Bangun geo targeting dari pilihan provinsi admin
+      const locMode = globalCfg?.ad_location_mode || 'include';
+      const selectedProvinces = globalCfg?.ad_selected_provinces || [];
+      let geoLocations = { countries: ['ID'] };
+      let excludedGeoLocations = null;
+
+      if (selectedProvinces.length > 0) {
+        // Fetch region key dari Meta untuk setiap provinsi
+        const regionKeys = await resolveProvinceKeys(selectedProvinces, token);
+        if (regionKeys.length > 0) {
+          if (locMode === 'exclude') {
+            excludedGeoLocations = { regions: regionKeys };
+          } else {
+            geoLocations = { regions: regionKeys };
+          }
+        }
+      }
+
+      const { optimizationGoal, billingEvent } = adType === 'ctwa'
+        ? { optimizationGoal: 'CONVERSATIONS', billingEvent: 'IMPRESSIONS' }
+        : objectiveConfig(objective);
+
+      // Bangun targeting object dan simpan untuk fallback
+      adsetTargeting = {
+        geo_locations: geoLocations,
+        ...(excludedGeoLocations ? { excluded_geo_locations: excludedGeoLocations } : {}),
+        age_min: 21,
+        age_max: 65
+      };
+
+      const adsetPayload = {
+        name: `${finalCampaignName} - Ad Set`,
+        campaign_id: metaCampaignId,
+        billing_event: billingEvent,
+        optimization_goal: optimizationGoal,
+        targeting: adsetTargeting,
+        status: adStatus,
+        access_token: token
+      };
+
+      // Terapkan placement jika admin set manual
+      const plMode = globalCfg?.ad_placement_mode || 'AUTO';
+      if (plMode === 'MANUAL' && globalCfg?.ad_manual_placements?.length) {
+        const pl = globalCfg.ad_manual_placements;
+        const publisherPlatforms = [];
+        const fbPositions = [];
+        const igPositions = [];
+        const msgPositions = [];
+        const anPositions = [];
+
+        // Platform dari plt_* checkboxes (prioritas), fallback ke deteksi dari posisi
+        if (pl.includes('plt_facebook') || pl.some(p => p.startsWith('fb_'))) publisherPlatforms.push('facebook');
+        if (pl.includes('plt_instagram') || pl.some(p => p.startsWith('ig_'))) publisherPlatforms.push('instagram');
+        if (pl.includes('plt_messenger') || pl.some(p => p.startsWith('msg_'))) publisherPlatforms.push('messenger');
+        if (pl.includes('plt_audience_network') || pl.some(p => p.startsWith('an_'))) publisherPlatforms.push('audience_network');
+        if (pl.includes('plt_threads')) publisherPlatforms.push('threads');
+
+        if (pl.includes('fb_feed'))        fbPositions.push('feed');
+        if (pl.includes('fb_story'))       fbPositions.push('story');
+        if (pl.includes('fb_marketplace')) fbPositions.push('marketplace');
+        if (pl.includes('fb_search'))      fbPositions.push('search');
+        // fb_video_feeds dihapus — sudah tidak didukung Meta API v18+
+        if (pl.includes('ig_stream'))      igPositions.push('stream');
+        if (pl.includes('ig_story'))       igPositions.push('story');
+        if (pl.includes('ig_reels'))       igPositions.push('reels');
+        if (pl.includes('ig_explore'))     igPositions.push('explore');
+        if (pl.includes('msg_home'))       msgPositions.push('messenger_home');
+        if (pl.includes('msg_story'))      msgPositions.push('story');
+        if (pl.includes('an_classic'))     anPositions.push('classic');
+        if (pl.includes('an_video'))       anPositions.push('instream_video');
+
+        // Hanya tambah platform kalau ada posisi yang dipilih
+        const finalPlatforms = [];
+        if (fbPositions.length)  { finalPlatforms.push('facebook');  adsetTargeting.facebook_positions = fbPositions; }
+        if (igPositions.length)  { finalPlatforms.push('instagram'); adsetTargeting.instagram_positions = igPositions; }
+        if (msgPositions.length) { finalPlatforms.push('messenger'); adsetTargeting.messenger_positions = msgPositions; }
+        if (anPositions.length)  { finalPlatforms.push('audience_network'); adsetTargeting.audience_network_positions = anPositions; }
+        if (pl.includes('plt_threads') && finalPlatforms.length) finalPlatforms.push('threads');
+        if (finalPlatforms.length) adsetTargeting.publisher_platforms = finalPlatforms;
+      }
+      // Jika AUTO: tidak set publisher_platforms → Meta pakai Advantage+ Placement
+      // ABO: budget + bid di ad set level
+      if (budgetType === 'ABO') {
+        adsetPayload.daily_budget = dailyBudget;
+        adsetPayload.bid_strategy = bidStrategy;
+        if (bidValue && bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
+          if (bidStrategy === 'MINIMUM_ROAS') adsetPayload.roas_average_floor = parseFloat(bidValue) * 100;
+          else adsetPayload.bid_amount = parseInt(bidValue);
+        }
+      }
+
+      // promoted_object — wajib untuk beberapa objective
+      const promotedObject = adType === 'ctwa'
+        ? (pageId ? { page_id: pageId } : null)
+        : getPromotedObject(objective, pageId, pixelId);
+      if (promotedObject) adsetPayload.promoted_object = promotedObject;
+      if (adType === 'ctwa') adsetPayload.destination_type = 'WHATSAPP';
+
+      if (startTime) adsetPayload.start_time = startTime;
+      if (endTime) adsetPayload.end_time = endTime;
+
+      const adsetRes  = await fetch(`${META_API}/${accountId}/adsets`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(adsetPayload)
+      });
+      const adsetData = await adsetRes.json();
+      if (adsetData.error) {
+        const e = adsetData.error;
+        throw new Error(`Meta ad set: ${e.error_user_msg || e.message} (code: ${e.code})`);
+      }
+      metaAdsetId = adsetData.id;
+    }
+
+    // ── 3. Upload creative (gambar/video) ──
     let creativeId;
 
     if (fileType === 'video') {
@@ -162,10 +326,21 @@ export default async function handler(req, res) {
         body: JSON.stringify(videoCreativePayload)
       });
       let creativeData = await creativeRes.json();
-      // Retry tanpa Instagram actor kalau Meta complain soal IG permission
+      // Retry 1: pakai use_page_actor_override
       if (creativeData.error && isInstagramError(creativeData.error)) {
         console.warn('Creative video: IG error, retry with use_page_actor_override');
         videoCreativePayload.use_page_actor_override = true;
+        creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(videoCreativePayload)
+        });
+        creativeData = await creativeRes.json();
+      }
+      // Retry 2: update adset ke FB-only (hapus IG dari placement), lalu coba creative lagi
+      if (creativeData.error && isInstagramError(creativeData.error)) {
+        console.warn('Creative video: IG error masih, fallback ke FB-only placement');
+        delete videoCreativePayload.use_page_actor_override;
+        await updateAdsetToFBOnly(metaAdsetId, adsetTargeting, token);
         creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(videoCreativePayload)
@@ -212,10 +387,21 @@ export default async function handler(req, res) {
         body: JSON.stringify(imgCreativePayload)
       });
       let creativeData = await creativeRes.json();
-      // Retry tanpa Instagram actor kalau Meta complain soal IG permission
+      // Retry 1: pakai use_page_actor_override
       if (creativeData.error && isInstagramError(creativeData.error)) {
         console.warn('Creative image: IG error, retry with use_page_actor_override');
         imgCreativePayload.use_page_actor_override = true;
+        creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(imgCreativePayload)
+        });
+        creativeData = await creativeRes.json();
+      }
+      // Retry 2: update adset ke FB-only (hapus IG dari placement), lalu coba creative lagi
+      if (creativeData.error && isInstagramError(creativeData.error)) {
+        console.warn('Creative image: IG error masih, fallback ke FB-only placement');
+        delete imgCreativePayload.use_page_actor_override;
+        await updateAdsetToFBOnly(metaAdsetId, adsetTargeting, token);
         creativeRes  = await fetch(`${META_API}/${accountId}/adcreatives`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(imgCreativePayload)
@@ -227,163 +413,6 @@ export default async function handler(req, res) {
         throw new Error(`Meta creative: ${e.error_user_msg || e.message} (code: ${e.code})`);
       }
       creativeId = creativeData.id;
-    }
-
-    // ── 2. Buat Campaign di Meta (hanya jika belum ada) ──
-    let metaCampaignId = existingMetaCampaignId;
-    let metaAdsetId    = existingMetaAdsetId;
-    let sbCampaignId   = existingSbCampaignId || null;
-
-    const { data: product } = await sb.from('products').select('name, target_cpr').eq('id', productId).single();
-    const finalCampaignName = campaignNameInput || `${product?.name || 'Iklan'} - ${new Date().toLocaleDateString('id-ID')}`;
-
-    if (!metaCampaignId) {
-      const campPayloadMeta = {
-        name: finalCampaignName,
-        objective,
-        status: adStatus,
-        special_ad_categories: [],
-        access_token: token
-      };
-      // CBO: budget di campaign level + sharing enabled
-      // ABO: budget di ad set level, is_adset_budget_sharing_enabled wajib = false
-      if (budgetType === 'CBO') {
-        campPayloadMeta.daily_budget = dailyBudget;
-        campPayloadMeta.bid_strategy = bidStrategy;
-        if (bidValue && bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
-          if (bidStrategy === 'MINIMUM_ROAS') campPayloadMeta.roas_average_floor = parseFloat(bidValue) * 100;
-          else campPayloadMeta.bid_amount = parseInt(bidValue);
-        }
-      } else {
-        // ABO — Meta wajib tahu bahwa budget tidak di-share di campaign level
-        campPayloadMeta.is_adset_budget_sharing_enabled = false;
-      }
-
-      const campRes  = await fetch(`${META_API}/${accountId}/campaigns`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(campPayloadMeta)
-      });
-      const campData = await campRes.json();
-      if (campData.error) {
-        const e = campData.error;
-        throw new Error(`Meta campaign: ${e.error_user_msg || e.message} (code: ${e.code})`);
-      }
-      metaCampaignId = campData.id;
-    }
-
-    // ── 3. Buat Ad Set (hanya jika belum ada) ──
-    if (!metaAdsetId) {
-      // Baca global settings (lokasi & penempatan dari admin)
-      const SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
-      const { data: globalCfg } = await sb.from('global_settings').select('*').eq('id', SETTINGS_ID).single();
-
-      // Bangun geo targeting dari pilihan provinsi admin
-      const locMode = globalCfg?.ad_location_mode || 'include';
-      const selectedProvinces = globalCfg?.ad_selected_provinces || [];
-      let geoLocations = { countries: ['ID'] };
-      let excludedGeoLocations = null;
-
-      if (selectedProvinces.length > 0) {
-        // Fetch region key dari Meta untuk setiap provinsi
-        const regionKeys = await resolveProvinceKeys(selectedProvinces, token);
-        if (regionKeys.length > 0) {
-          if (locMode === 'exclude') {
-            excludedGeoLocations = { regions: regionKeys };
-          } else {
-            geoLocations = { regions: regionKeys };
-          }
-        }
-      }
-
-      const { optimizationGoal, billingEvent } = adType === 'ctwa'
-        ? { optimizationGoal: 'CONVERSATIONS', billingEvent: 'IMPRESSIONS' }
-        : objectiveConfig(objective);
-      const adsetPayload = {
-        name: `${finalCampaignName} - Ad Set`,
-        campaign_id: metaCampaignId,
-        billing_event: billingEvent,
-        optimization_goal: optimizationGoal,
-        targeting: {
-          geo_locations: geoLocations,
-          ...(excludedGeoLocations ? { excluded_geo_locations: excludedGeoLocations } : {}),
-          age_min: 21,
-          age_max: 65
-        },
-        status: adStatus,
-        access_token: token
-      };
-
-      // Terapkan placement jika admin set manual
-      const plMode = globalCfg?.ad_placement_mode || 'AUTO';
-      if (plMode === 'MANUAL' && globalCfg?.ad_manual_placements?.length) {
-        const pl = globalCfg.ad_manual_placements;
-        const publisherPlatforms = [];
-        const fbPositions = [];
-        const igPositions = [];
-        const msgPositions = [];
-        const anPositions = [];
-
-        // Platform dari plt_* checkboxes (prioritas), fallback ke deteksi dari posisi
-        if (pl.includes('plt_facebook') || pl.some(p => p.startsWith('fb_'))) publisherPlatforms.push('facebook');
-        if (pl.includes('plt_instagram') || pl.some(p => p.startsWith('ig_'))) publisherPlatforms.push('instagram');
-        if (pl.includes('plt_messenger') || pl.some(p => p.startsWith('msg_'))) publisherPlatforms.push('messenger');
-        if (pl.includes('plt_audience_network') || pl.some(p => p.startsWith('an_'))) publisherPlatforms.push('audience_network');
-        if (pl.includes('plt_threads')) publisherPlatforms.push('threads');
-
-        if (pl.includes('fb_feed'))        fbPositions.push('feed');
-        if (pl.includes('fb_story'))       fbPositions.push('story');
-        if (pl.includes('fb_marketplace')) fbPositions.push('marketplace');
-        if (pl.includes('fb_search'))      fbPositions.push('search');
-        // fb_video_feeds dihapus — sudah tidak didukung Meta API v18+
-        if (pl.includes('ig_stream'))      igPositions.push('stream');
-        if (pl.includes('ig_story'))       igPositions.push('story');
-        if (pl.includes('ig_reels'))       igPositions.push('reels');
-        if (pl.includes('ig_explore'))     igPositions.push('explore');
-        if (pl.includes('msg_home'))       msgPositions.push('messenger_home');
-        if (pl.includes('msg_story'))      msgPositions.push('story');
-        if (pl.includes('an_classic'))     anPositions.push('classic');
-        if (pl.includes('an_video'))       anPositions.push('instream_video');
-
-        // Hanya tambah platform kalau ada posisi yang dipilih
-        const finalPlatforms = [];
-        if (fbPositions.length)  { finalPlatforms.push('facebook');  adsetPayload.targeting.facebook_positions = fbPositions; }
-        if (igPositions.length)  { finalPlatforms.push('instagram'); adsetPayload.targeting.instagram_positions = igPositions; }
-        if (msgPositions.length) { finalPlatforms.push('messenger'); adsetPayload.targeting.messenger_positions = msgPositions; }
-        if (anPositions.length)  { finalPlatforms.push('audience_network'); adsetPayload.targeting.audience_network_positions = anPositions; }
-        if (pl.includes('plt_threads') && finalPlatforms.length) finalPlatforms.push('threads');
-        if (finalPlatforms.length) adsetPayload.targeting.publisher_platforms = finalPlatforms;
-      }
-      // Jika AUTO: tidak set publisher_platforms → Meta pakai Advantage+ Placement
-      // ABO: budget + bid di ad set level
-      if (budgetType === 'ABO') {
-        adsetPayload.daily_budget = dailyBudget;
-        adsetPayload.bid_strategy = bidStrategy;
-        if (bidValue && bidStrategy !== 'LOWEST_COST_WITHOUT_CAP') {
-          if (bidStrategy === 'MINIMUM_ROAS') adsetPayload.roas_average_floor = parseFloat(bidValue) * 100;
-          else adsetPayload.bid_amount = parseInt(bidValue);
-        }
-      }
-
-      // promoted_object — wajib untuk beberapa objective
-      const promotedObject = adType === 'ctwa'
-        ? (pageId ? { page_id: pageId } : null)
-        : getPromotedObject(objective, pageId, pixelId);
-      if (promotedObject) adsetPayload.promoted_object = promotedObject;
-      if (adType === 'ctwa') adsetPayload.destination_type = 'WHATSAPP';
-
-      if (startTime) adsetPayload.start_time = startTime;
-      if (endTime) adsetPayload.end_time = endTime;
-
-      const adsetRes  = await fetch(`${META_API}/${accountId}/adsets`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(adsetPayload)
-      });
-      const adsetData = await adsetRes.json();
-      if (adsetData.error) {
-        const e = adsetData.error;
-        throw new Error(`Meta ad set: ${e.error_user_msg || e.message} (code: ${e.code})`);
-      }
-      metaAdsetId = adsetData.id;
     }
 
     // ── 4. Buat Ad (hubungkan creative ke ad set) ──
@@ -875,6 +904,28 @@ async function readJsonBody(req) {
     });
     req.on('error', reject);
   });
+}
+
+// Update adset ke Facebook-only placement sebagai fallback jika IG actor error persisten
+async function updateAdsetToFBOnly(adsetId, currentTargeting, token) {
+  if (!adsetId) return;
+  try {
+    // Bangun targeting baru: pertahankan geo + age, hapus IG, set FB-only publisher_platforms
+    const fbTargeting = currentTargeting
+      ? JSON.parse(JSON.stringify(currentTargeting))
+      : { geo_locations: { countries: ['ID'] }, age_min: 21, age_max: 65 };
+    fbTargeting.publisher_platforms = ['facebook', 'messenger', 'audience_network'];
+    delete fbTargeting.instagram_positions;
+    const r = await fetch(`${META_API}/${adsetId}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targeting: fbTargeting, access_token: token })
+    });
+    const d = await r.json();
+    if (d.error) console.warn('updateAdsetToFBOnly error (non-fatal):', d.error.message);
+    else console.log('Adset updated to FB-only placement, IG excluded.');
+  } catch (e) {
+    console.warn('updateAdsetToFBOnly exception (non-fatal):', e.message);
+  }
 }
 
 // Deteksi error Meta yang berkaitan dengan Instagram actor permission
