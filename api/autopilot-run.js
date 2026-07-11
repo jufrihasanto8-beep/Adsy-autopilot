@@ -880,20 +880,55 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
 
     // 2. Ambil creative dari ads Phase 1
     const adsRes = await fetch(
-      `${META_API}/${camp.meta_campaign_id}/ads?fields=creative{id}&access_token=${encodeURIComponent(token)}`
+      `${META_API}/${camp.meta_campaign_id}/ads?fields=creative{id}&limit=50&access_token=${encodeURIComponent(token)}`
     );
     const adsData = await adsRes.json();
-    const creativeId = adsData.data?.[0]?.creative?.id;
+    const phase1AdsB = adsData.data || [];
+    const creativeId = phase1AdsB[0]?.creative?.id;
+    const allCreativeIds = phase1AdsB
+      .map(a => a.creative?.id)
+      .filter(Boolean)
+      .filter((v, i, arr) => arr.indexOf(v) === i);
 
-    // 3. Ambil pixel_id + page_id dari ad_accounts untuk promoted_object
-    const { data: adAcc } = await sb.from('ad_accounts')
-      .select('pixel_id, page_id')
-      .eq('user_id', camp.user_id)
-      .maybeSingle();
-    const pixelId = adAcc?.pixel_id;
-    const pageId  = adAcc?.page_id;
+    // 3. Ambil promoted_object + optimization_goal langsung dari adset Phase 1 (paling akurat)
+    let promotedObject = null;
+    let optimizationGoal = 'OFFSITE_CONVERSIONS';
+    let billingEventB = 'IMPRESSIONS';
+    if (camp.meta_adset_id) {
+      const adsetInfoRes = await fetch(
+        `${META_API}/${camp.meta_adset_id}?fields=promoted_object,optimization_goal,billing_event&access_token=${encodeURIComponent(token)}`
+      );
+      const adsetInfo = await adsetInfoRes.json();
+      if (!adsetInfo.error) {
+        promotedObject = adsetInfo.promoted_object || null;
+        optimizationGoal = adsetInfo.optimization_goal || 'OFFSITE_CONVERSIONS';
+        billingEventB = adsetInfo.billing_event || 'IMPRESSIONS';
+      }
+    }
 
-    // optimization_goal & promoted_object sesuai objective
+    // Fallback: bangun promotedObject dari ad_pixels/ad_pages jika tidak dapat dari Meta
+    if (!promotedObject) {
+      const { data: defaultPixel } = await sb.from('ad_pixels')
+        .select('pixel_id')
+        .eq('ad_account_id', camp.ad_account_id)
+        .eq('is_default', true)
+        .maybeSingle();
+      const { data: defaultPage } = await sb.from('ad_pages')
+        .select('page_id')
+        .eq('ad_account_id', camp.ad_account_id)
+        .eq('is_default', true)
+        .maybeSingle();
+      const pixelId = defaultPixel?.pixel_id;
+      const pageId  = defaultPage?.page_id;
+      if (objective === 'OUTCOME_SALES' && pixelId) {
+        promotedObject = { pixel_id: pixelId, custom_event_type: 'PURCHASE' };
+      } else if (objective === 'OUTCOME_LEADS' && pixelId) {
+        promotedObject = { pixel_id: pixelId, custom_event_type: 'LEAD' };
+      } else if (pageId) {
+        promotedObject = { page_id: pageId };
+      }
+    }
+
     const optimizationGoalMap = {
       'OUTCOME_SALES':      'OFFSITE_CONVERSIONS',
       'OUTCOME_LEADS':      'LEAD_GENERATION',
@@ -901,13 +936,9 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
       'OUTCOME_AWARENESS':  'REACH',
       'OUTCOME_TRAFFIC':    'LINK_CLICKS'
     };
-    const optimizationGoal = optimizationGoalMap[objective] || 'OFFSITE_CONVERSIONS';
-
-    let promotedObject = null;
-    if (objective === 'OUTCOME_SALES' && pixelId) {
-      promotedObject = { pixel_id: pixelId, custom_event_type: 'PURCHASE' };
-    } else if (pageId) {
-      promotedObject = { page_id: pageId };
+    // Gunakan optimization_goal dari Meta, fallback ke mapping kalau kosong
+    if (!optimizationGoal || optimizationGoal === 'OFFSITE_CONVERSIONS') {
+      optimizationGoal = optimizationGoalMap[objective] || 'OFFSITE_CONVERSIONS';
     }
 
     // 4. Tentukan adset groups berdasarkan strategy
@@ -1026,15 +1057,19 @@ async function createPhase2bCampaign(camp, token, product, logs, subPhaseConfig 
       if (!newAdsetId) {
         throw new Error(`Adset ${catLabel}: Meta tidak return ID — ${JSON.stringify(adsetData)}`);
       }
-      // Buat ad dengan creative yang sama dari Phase 1
-      if (creativeId) {
+      // Buat ad untuk setiap creative dari Phase 1
+      for (let ci = 0; ci < allCreativeIds.length; ci++) {
+        const cid = allCreativeIds[ci];
+        const adName = allCreativeIds.length > 1
+          ? `${camp.name} — Phase 2${phaseLabel} ${catLabel} ${ci + 1}`
+          : `${camp.name} — Phase 2${phaseLabel} ${catLabel}`;
         await fetch(`${META_API}/act_${accountId}/ads`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: `${camp.name} — Phase 2${phaseLabel} ${catLabel}`,
+            name: adName,
             adset_id: newAdsetId,
-            creative: { creative_id: creativeId },
+            creative: { creative_id: cid },
             status: 'ACTIVE',
             access_token: token
           })
