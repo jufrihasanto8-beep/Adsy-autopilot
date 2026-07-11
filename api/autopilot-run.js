@@ -157,14 +157,16 @@ async function syncAllCampaignsFromMeta() {
         for (const camp of metaData.data) {
           const isDeleted = camp.status === 'DELETED' || camp.status === 'ARCHIVED';
           if (isDeleted) {
-            const { data: existing } = await sb.from('campaigns')
-              .select('id').eq('meta_campaign_id', camp.id).single();
-            if (existing) {
-              await sb.from('ad_copies').delete().eq('campaign_id', existing.id);
-              await sb.from('campaigns').delete().eq('id', existing.id);
+            // Hapus semua rows (cover Phase 2b groups yang share meta_campaign_id)
+            const { data: siblings } = await sb.from('campaigns')
+              .select('id').eq('meta_campaign_id', camp.id);
+            for (const s of (siblings || [])) {
+              await sb.from('ad_copies').delete().eq('campaign_id', s.id);
             }
+            await sb.from('campaigns').delete().eq('meta_campaign_id', camp.id);
           } else {
-            await sb.from('campaigns').update({ status: camp.status, name: camp.name })
+            // Update status saja — jangan overwrite nama (Phase 2b punya nama adset unik)
+            await sb.from('campaigns').update({ status: camp.status })
               .eq('meta_campaign_id', camp.id);
           }
         }
@@ -199,34 +201,53 @@ async function syncCampaignInsights(camp, token) {
     const fields = 'impressions,spend,clicks,ctr,actions';
     // Pakai adset-level kalau ada (lebih akurat, khususnya untuk Phase 2b multi-adset)
     const targetId = camp.meta_adset_id || camp.meta_campaign_id;
-    const res = await fetch(
+
+    // Fetch data hari ini (untuk display: spend_today, results_today, ctr, impressions)
+    const todayRes = await fetch(
       `${META_API}/${targetId}/insights?fields=${fields}&date_preset=today&access_token=${encodeURIComponent(token)}`
     );
-    const data = await res.json();
-    const insight = data?.data?.[0];
+    const todayData = await todayRes.json();
+    const insight = todayData?.data?.[0];
     if (!insight) return;
 
-    const impressions = parseInt(insight.impressions || 0);
-    const spend       = parseFloat(insight.spend || 0); // Meta return IDR langsung untuk akun IDR
-    const ctr         = parseFloat(insight.ctr || 0);
+    const impressions   = parseInt(insight.impressions || 0);
+    const spend         = parseFloat(insight.spend || 0); // Meta return IDR langsung untuk akun IDR
+    const ctr           = parseFloat(insight.ctr || 0);
+    const todayActions  = insight.actions || [];
+    const todayResult   = camp.campaign_type === 'ctwa'
+      ? todayActions.find(x => x.action_type === 'onsite_conversion.messaging_conversation_started_7d')
+      : todayActions.find(x => x.action_type === 'offsite_conversion.fb_pixel_purchase' || x.action_type === 'lead');
+    const results_today = parseInt(todayResult?.value || 0);
 
-    // CPR = spend / results — deteksi berdasarkan campaign_type
-    const actions = insight.actions || [];
-    const resultAction = camp.campaign_type === 'ctwa'
-      ? actions.find(x => x.action_type === 'onsite_conversion.messaging_conversation_started_7d')
-      : actions.find(x => x.action_type === 'offsite_conversion.fb_pixel_purchase' || x.action_type === 'lead');
-    const results = parseInt(resultAction?.value || 0);
-    // cpr = null kalau spend ada tapi konversi 0 (bukan sekadar belum ada data)
-    // undefined = jangan update DB (spend 0 = belum ada data hari ini)
-    const cpr = results > 0
-      ? Math.round(spend / results)
-      : (spend > 0 ? null : undefined);
+    // Fetch lifetime data untuk CPR — lebih akurat untuk keputusan autopilot
+    // Menghindari false-positive early morning (spend ada tapi konversi belum masuk)
+    let cpr;
+    try {
+      const lifetimeRes = await fetch(
+        `${META_API}/${targetId}/insights?fields=spend,actions&date_preset=lifetime&access_token=${encodeURIComponent(token)}`
+      );
+      const lifetimeData = await lifetimeRes.json();
+      const lt = lifetimeData?.data?.[0];
+      if (lt) {
+        const ltActions = lt.actions || [];
+        const ltResult  = camp.campaign_type === 'ctwa'
+          ? ltActions.find(x => x.action_type === 'onsite_conversion.messaging_conversation_started_7d')
+          : ltActions.find(x => x.action_type === 'offsite_conversion.fb_pixel_purchase' || x.action_type === 'lead');
+        const ltResults = parseInt(ltResult?.value || 0);
+        const ltSpend   = parseFloat(lt.spend || 0);
+        // null = ada spend tapi 0 konversi (indikasi jelek), undefined = belum ada data sama sekali
+        cpr = ltResults > 0 ? Math.round(ltSpend / ltResults) : (ltSpend > 0 ? null : undefined);
+      }
+    } catch (e) {
+      // Fallback ke today kalau lifetime gagal
+      cpr = results_today > 0 ? Math.round(spend / results_today) : (spend > 0 ? null : undefined);
+    }
 
     await sb.from('campaigns').update({
       impressions,
       spend_today: spend,
       ctr,
-      results_today: results,
+      results_today,
       ...(cpr !== undefined ? { cpr } : {})
     }).eq('id', camp.id);
 
@@ -430,12 +451,16 @@ async function createPhase2Campaign(camp, token, logs, subPhaseConfig = {}, labe
       }
     }
 
-    // 3. Ambil creative dari ads Phase 1
+    // 3. Ambil semua creative dari ads Phase 1
     const adsRes = await fetch(
-      `${META_API}/${camp.meta_campaign_id}/ads?fields=creative{id}&access_token=${encodeURIComponent(token)}`
+      `${META_API}/${camp.meta_campaign_id}/ads?fields=creative{id},name&limit=50&access_token=${encodeURIComponent(token)}`
     );
     const adsData = await adsRes.json();
-    const creativeId = adsData.data?.[0]?.creative?.id;
+    const phase1Ads = adsData.data || [];
+    const creativeIds = phase1Ads
+      .map(a => a.creative?.id)
+      .filter(Boolean)
+      .filter((v, i, arr) => arr.indexOf(v) === i); // dedupe
 
     // 4. Hitung bid amount COST_CAP dari blueprint config
     //    bid_pct = % naik/turun dari CPR Phase 1 (default +10%)
@@ -495,25 +520,29 @@ async function createPhase2Campaign(camp, token, logs, subPhaseConfig = {}, labe
     }
     const newAdsetId = newAdsetData.id;
 
-    // 7. Buat ad dengan creative yang sama dari Phase 1
-    let newAdId = null;
-    if (creativeId) {
+    // 7. Buat ad untuk setiap creative dari Phase 1
+    const newAdIds = [];
+    for (let i = 0; i < creativeIds.length; i++) {
+      const cid = creativeIds[i];
+      const adName = creativeIds.length > 1
+        ? `${camp.name} — Phase 2${label.toUpperCase()} ${i + 1}`
+        : `${camp.name} — Phase 2${label.toUpperCase()}`;
       const adRes = await fetch(`${META_API}/${accountId}/ads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: camp.name + ' — Phase 2a',
+          name: adName,
           adset_id: newAdsetId,
-          creative: { creative_id: creativeId },
+          creative: { creative_id: cid },
           status: 'PAUSED',
           access_token: token
         })
       });
       const adData = await adRes.json();
-      newAdId = adData.id || null;
+      if (adData.id) newAdIds.push(adData.id);
     }
 
-    // 8. Aktifkan campaign + adset + ad sekaligus
+    // 8. Aktifkan campaign + adset + semua ads sekaligus
     await Promise.all([
       fetch(`${META_API}/${newCampaignId}`, {
         method: 'POST',
@@ -525,11 +554,11 @@ async function createPhase2Campaign(camp, token, logs, subPhaseConfig = {}, labe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'ACTIVE', access_token: token })
       }),
-      ...(newAdId ? [fetch(`${META_API}/${newAdId}`, {
+      ...newAdIds.map(adId => fetch(`${META_API}/${adId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'ACTIVE', access_token: token })
-      })] : [])
+      }))
     ]);
 
     // 9. Simpan ke Supabase
@@ -543,7 +572,7 @@ async function createPhase2Campaign(camp, token, logs, subPhaseConfig = {}, labe
       phase_started_at: new Date().toISOString(),
       autopilot_enabled: true,
       product_id: camp.product_id,
-      daily_budget: 5000000,
+      daily_budget: p2aBudget,
       meta_campaign_id: newCampaignId,
       meta_adset_id: newAdsetId,
       days_running: 0
@@ -622,7 +651,7 @@ async function runBlueprintRules(camp, targetCpr, targetRoas, token, logs) {
   const cpr         = camp.cpr;
   const budget      = camp.daily_budget || 50000;
   const currentPhase = camp.current_phase;
-  const today       = new Date().toISOString().slice(0, 10);
+  const today       = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }); // WIB date YYYY-MM-DD
 
   // Phase 1: Testing
   if (currentPhase === 1 && cpr !== null && cpr !== undefined) {
@@ -1520,27 +1549,41 @@ async function retryMissingSubPhase(req, res) {
 
 // ── Helpers ──
 async function pauseCampaign(camp, token) {
-  if (camp.meta_campaign_id && token) {
-    await fetch(`${META_API}/${camp.meta_campaign_id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'PAUSED', access_token: token })
-    });
+  if (token) {
+    // Phase 2b: pause di adset level (tiap adset punya meta_adset_id sendiri)
+    // Jangan pause campaign level — akan matiin semua adset saudara di grup yang sama
+    const pauseId = (camp.phase_type === '2b' && camp.meta_adset_id)
+      ? camp.meta_adset_id
+      : camp.meta_campaign_id;
+    if (pauseId) {
+      await fetch(`${META_API}/${pauseId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'PAUSED', access_token: token })
+      });
+    }
   }
   await sb.from('campaigns').update({ status: 'PAUSED' }).eq('id', camp.id);
 }
 
 async function updateBudget(camp, newBudget, token) {
-  if (camp.meta_adset_id && token) {
-    await fetch(`${META_API}/${camp.meta_adset_id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ daily_budget: newBudget, access_token: token })
-    });
+  if (token) {
+    // Phase 2a (CBO Cost Cap): budget di campaign level
+    // Phase 1 + Phase 2b (ABO): budget di adset level
+    const budgetTargetId = camp.phase_type === '2a'
+      ? camp.meta_campaign_id
+      : (camp.meta_adset_id || camp.meta_campaign_id);
+    if (budgetTargetId) {
+      await fetch(`${META_API}/${budgetTargetId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ daily_budget: String(Math.round(newBudget)), access_token: token })
+      });
+    }
   }
   await sb.from('campaigns').update({
     daily_budget: newBudget,
-    last_budget_change_date: new Date().toISOString().slice(0, 10)
+    last_budget_change_date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
   }).eq('id', camp.id);
 }
 
