@@ -466,13 +466,24 @@
   // ── Drag & drop setup per slot ──
   function setupDrop(si) {
     const area = document.getElementById(`drop-${si}`);
+    const grid = document.getElementById(`grid-${si}`);
     const inp  = document.getElementById(`finp-${si}`);
-    area.addEventListener('dragover',  e => { e.preventDefault(); area.classList.add('drag-over'); });
-    area.addEventListener('dragleave', () => area.classList.remove('drag-over'));
-    area.addEventListener('drop', e => {
-      e.preventDefault(); area.classList.remove('drag-over');
+
+    const onDragOver  = e => { e.preventDefault(); (slots[si].files.length ? grid : area).classList.add('drag-over'); };
+    const onDragLeave = ()  => { area.classList.remove('drag-over'); grid.classList.remove('drag-over'); };
+    const onDrop      = e  => {
+      e.preventDefault();
+      area.classList.remove('drag-over'); grid.classList.remove('drag-over');
       handleFiles(si, [...e.dataTransfer.files]);
-    });
+    };
+
+    area.addEventListener('dragover',  onDragOver);
+    area.addEventListener('dragleave', onDragLeave);
+    area.addEventListener('drop',      onDrop);
+    grid.addEventListener('dragover',  onDragOver);
+    grid.addEventListener('dragleave', onDragLeave);
+    grid.addEventListener('drop',      onDrop);
+
     inp.addEventListener('change', () => {
       if (inp.files.length) handleFiles(si, [...inp.files]);
       inp.value = '';
@@ -498,7 +509,18 @@
 
   function renderGrid(si) {
     const s = slots[si];
-    const el = document.getElementById(`grid-${si}`);
+    const dropEl = document.getElementById(`drop-${si}`);
+    const el     = document.getElementById(`grid-${si}`);
+
+    if (s.files.length === 0) {
+      // Kembalikan drop zone, kosongkan grid
+      dropEl.style.display = '';
+      el.innerHTML = '';
+      return;
+    }
+
+    // Sembunyikan drop zone, tampilkan file cards
+    dropEl.style.display = 'none';
     el.innerHTML = s.files.map((item, fi) => `
       <div class="ref-file-card">
         <div class="ref-file-header">
@@ -507,7 +529,7 @@
         </div>
         <img class="ref-file-img" src="${item.dataUrl}" alt="File ${fi + 1}" />
       </div>`).join('') +
-      (s.files.length > 0 && s.files.length < 4
+      (s.files.length < 4
         ? `<div class="ref-add-row" onclick="document.getElementById('finp-${si}').click()">＋ Tambah file (${s.files.length}/4)</div>`
         : '');
   }
