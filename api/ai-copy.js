@@ -58,13 +58,12 @@ export default async function handler(req, res) {
 
       const kieData = await kieResp.json();
       if (kieData.code !== 200) {
-        // Hapus file referensi kalau kie.ai gagal
         await sb.storage.from('gen-images').remove([fileName]);
         return res.status(500).json({ error: kieData.msg || 'Gagal membuat task generate' });
       }
 
-      // Hapus file referensi setelah task berhasil dibuat (tidak dibutuhkan lagi)
-      sb.storage.from('gen-images').remove([fileName]); // fire & forget
+      // Hapus file referensi setelah task berhasil dibuat (fire & forget)
+      sb.storage.from('gen-images').remove([fileName]);
 
       return res.json({ ok: true, task_id: kieData.data.taskId });
 
