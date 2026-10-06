@@ -1,12 +1,98 @@
-// api/ai-copy.js — Generate copy iklan dengan Claude AI
+// api/ai-copy.js — Generate copy iklan dengan Claude AI + Generate Image (kie.ai)
 import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { action } = req.body;
+
+  // ── GENERATE IMAGE (kie.ai image-to-image) ──
+  if (action === 'generate_image') {
+    const { image_base64, mime_type, prompt, aspect_ratio, resolution, background } = req.body;
+    if (!image_base64) return res.status(400).json({ error: 'image_base64 wajib diisi' });
+    if (!prompt) return res.status(400).json({ error: 'prompt wajib diisi' });
+
+    const KIE_KEY = process.env.KIE_API_KEY;
+    if (!KIE_KEY) return res.status(500).json({ error: 'KIE_API_KEY belum dikonfigurasi' });
+
+    try {
+      // Upload gambar ke Supabase Storage untuk dapat public URL
+      const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+      const ext = (mime_type || 'image/jpeg').split('/')[1] || 'jpg';
+      const fileName = `ref-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const buffer = Buffer.from(image_base64, 'base64');
+
+      const { error: uploadErr } = await sb.storage
+        .from('gen-images')
+        .upload(fileName, buffer, { contentType: mime_type || 'image/jpeg', upsert: false });
+
+      if (uploadErr) return res.status(500).json({ error: 'Gagal upload gambar referensi: ' + uploadErr.message });
+
+      const { data: { publicUrl } } = sb.storage.from('gen-images').getPublicUrl(fileName);
+
+      // Kirim task ke kie.ai
+      const kieResp = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${KIE_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-image-2-image-to-image',
+          input: {
+            prompt,
+            input_urls: [publicUrl],
+            aspect_ratio: aspect_ratio || 'auto',
+            resolution: resolution || '1K',
+            background: background || 'opaque'
+          }
+        })
+      });
+
+      const kieData = await kieResp.json();
+      if (kieData.code !== 200) return res.status(500).json({ error: kieData.msg || 'Gagal membuat task generate' });
+
+      return res.json({ ok: true, task_id: kieData.data.taskId });
+
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── CHECK IMAGE TASK STATUS ──
+  if (action === 'check_image_task') {
+    const { task_id } = req.body;
+    if (!task_id) return res.status(400).json({ error: 'task_id wajib diisi' });
+
+    const KIE_KEY = process.env.KIE_API_KEY;
+    if (!KIE_KEY) return res.status(500).json({ error: 'KIE_API_KEY belum dikonfigurasi' });
+
+    try {
+      const resp = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${task_id}`, {
+        headers: { 'Authorization': `Bearer ${KIE_KEY}` }
+      });
+      const data = await resp.json();
+      if (data.code !== 200) return res.status(500).json({ error: data.msg || 'Gagal cek status task' });
+
+      const { state, resultJson, failMsg } = data.data;
+      let resultUrls = null;
+      if (state === 'success' && resultJson) {
+        try { resultUrls = JSON.parse(resultJson).resultUrls || []; } catch {}
+      }
+
+      return res.json({ ok: true, state, result_urls: resultUrls, fail_msg: failMsg });
+
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
 
   // ── ANALISA WINNER ──
   if (action === 'analyze-winners') {
