@@ -463,7 +463,8 @@
           })
         });
         const notifData = await notifResp.json();
-        if (!notifData.ok && notifData.warn) waWarn = notifData.warn;
+        if (notifData.warn) waWarn = notifData.warn;
+        else if (!notifData.ok) waWarn = 'Gagal kirim WA (tidak ada detail error)';
       } catch (_) {}
 
       showSuccess(nominal, extractedData, recommendationData, waWarn);
