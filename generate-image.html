@@ -140,7 +140,9 @@
 
     .slot-result-img img {
       width:100%; border-radius:10px; display:block; background:var(--gray-1);
+      cursor:zoom-in; transition:opacity .15s;
     }
+    .slot-result-img img:hover { opacity:.88; }
     .slot-result-btns { display:flex; gap:6px; }
     .slot-result-btns a, .slot-result-btns button {
       flex:1; padding:8px 6px; border-radius:8px; font-size:12px; font-weight:600;
@@ -151,6 +153,35 @@
     .slot-result-btns a { background:var(--primary); color:#fff; border-color:var(--primary); }
     .slot-result-btns a:hover { background:#4f46e5; }
     .slot-result-btns button:hover { border-color:var(--primary); color:var(--primary); }
+
+    /* ── Lightbox ── */
+    #lightbox {
+      display:none; position:fixed; inset:0; z-index:9999;
+      background:rgba(0,0,0,.88); align-items:center; justify-content:center;
+      padding:20px;
+    }
+    #lightbox.open { display:flex; }
+    #lightbox img {
+      max-width:100%; max-height:90vh; border-radius:12px;
+      object-fit:contain; box-shadow:0 8px 40px rgba(0,0,0,.6);
+    }
+    #lightbox-close {
+      position:fixed; top:16px; right:20px; width:38px; height:38px;
+      border-radius:50%; background:rgba(255,255,255,.15); border:none;
+      color:#fff; font-size:20px; cursor:pointer; display:flex;
+      align-items:center; justify-content:center; transition:background .15s;
+    }
+    #lightbox-close:hover { background:rgba(255,255,255,.28); }
+    #lightbox-actions {
+      position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+      display:flex; gap:10px;
+    }
+    #lightbox-actions a {
+      padding:10px 22px; border-radius:10px; font-size:13px; font-weight:700;
+      background:var(--primary); color:#fff; text-decoration:none;
+      border:none; cursor:pointer; font-family:inherit; transition:background .15s;
+    }
+    #lightbox-actions a:hover { background:#4f46e5; }
 
     .slot-err-box {
       text-align:center; padding:16px 10px; background:#fef2f2;
@@ -312,6 +343,15 @@
   </main>
 </div>
 
+<!-- Lightbox -->
+<div id="lightbox" onclick="closeLightbox()">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="Preview" onclick="event.stopPropagation()" />
+  <div id="lightbox-actions" onclick="event.stopPropagation()">
+    <a id="lightbox-dl" href="" target="_blank" download="generated.png">⬇️ Download</a>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
   import { requireAuth, renderUserInfo } from './js/auth.js';
@@ -402,8 +442,10 @@
             </div>
             <!-- Image result -->
             <div class="slot-result-img" id="rimg-${s.idx}" style="display:none">
-              <img id="img-${s.idx}" src="" alt="Result" style="margin-bottom:8px;" />
+              <img id="img-${s.idx}" src="" alt="Result" style="margin-bottom:8px;"
+                onclick="openLightbox(this.src, document.getElementById('dl-${s.idx}').href)" />
               <div class="slot-result-btns">
+                <button onclick="openLightbox(document.getElementById('img-${s.idx}').src, document.getElementById('dl-${s.idx}').href)">🔍 Preview</button>
                 <a id="dl-${s.idx}" target="_blank" download="gen.png">⬇️ Download</a>
                 <button onclick="clearSlotResult(${s.idx})">↺ Ulang</button>
               </div>
@@ -709,6 +751,19 @@
     btn.closest('.history-card').remove();
     showToast('Dihapus dari riwayat', 'success');
   };
+
+  // ── Lightbox ──
+  window.openLightbox = function(src, dlHref) {
+    document.getElementById('lightbox-img').src = src;
+    document.getElementById('lightbox-dl').href = dlHref || src;
+    document.getElementById('lightbox').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  };
+  window.closeLightbox = function() {
+    document.getElementById('lightbox').classList.remove('open');
+    document.body.style.overflow = '';
+  };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
 
   // ── Utility ──
   function fileToBase64(file) {
