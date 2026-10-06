@@ -1,6 +1,5 @@
 // api/ai-copy.js — Generate copy iklan dengan Claude AI + Generate Image (kie.ai)
 import Anthropic from '@anthropic-ai/sdk';
-import { createClient } from '@supabase/supabase-js';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -23,19 +22,23 @@ export default async function handler(req, res) {
     if (!KIE_KEY) return res.status(500).json({ error: 'KIE_API_KEY belum dikonfigurasi' });
 
     try {
-      // Upload gambar ke Supabase Storage untuk dapat public URL
-      const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-      const ext = (mime_type || 'image/jpeg').split('/')[1] || 'jpg';
-      const fileName = `ref-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const buffer = Buffer.from(image_base64, 'base64');
+      const ext = (mime_type || 'image/jpeg').split('/')[1] || 'jpg';
 
-      const { error: uploadErr } = await sb.storage
-        .from('gen-images')
-        .upload(fileName, buffer, { contentType: mime_type || 'image/jpeg', upsert: false });
+      // Upload langsung ke kie.ai (tidak perlu Supabase Storage)
+      const formData = new FormData();
+      formData.append('file', new Blob([buffer], { type: mime_type || 'image/jpeg' }), `ref.${ext}`);
 
-      if (uploadErr) return res.status(500).json({ error: 'Gagal upload gambar referensi: ' + uploadErr.message });
+      const uploadResp = await fetch('https://api.kie.ai/api/v1/files/upload', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${KIE_KEY}` },
+        body: formData
+      });
+      const uploadData = await uploadResp.json();
+      if (uploadData.code !== 200) return res.status(500).json({ error: 'Gagal upload ke kie.ai: ' + (uploadData.msg || '') });
 
-      const { data: { publicUrl } } = sb.storage.from('gen-images').getPublicUrl(fileName);
+      const imageUrl = uploadData.data?.url || uploadData.data?.fileUrl || uploadData.data?.file_url;
+      if (!imageUrl) return res.status(500).json({ error: 'kie.ai tidak mengembalikan URL gambar', raw: uploadData });
 
       // Kirim task ke kie.ai
       const kieResp = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
@@ -48,7 +51,7 @@ export default async function handler(req, res) {
           model: 'gpt-image-2-image-to-image',
           input: {
             prompt,
-            input_urls: [publicUrl],
+            input_urls: [imageUrl],
             aspect_ratio: aspect_ratio || 'auto',
             resolution: resolution || '1K',
             background: background || 'opaque'
@@ -57,13 +60,7 @@ export default async function handler(req, res) {
       });
 
       const kieData = await kieResp.json();
-      if (kieData.code !== 200) {
-        await sb.storage.from('gen-images').remove([fileName]);
-        return res.status(500).json({ error: kieData.msg || 'Gagal membuat task generate' });
-      }
-
-      // Hapus file referensi setelah task berhasil dibuat (fire & forget)
-      sb.storage.from('gen-images').remove([fileName]);
+      if (kieData.code !== 200) return res.status(500).json({ error: kieData.msg || 'Gagal membuat task generate' });
 
       return res.json({ ok: true, task_id: kieData.data.taskId });
 
