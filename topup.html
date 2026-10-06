@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Top Up Budget — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <style>
+    /* ── Tabs ── */
+    .topup-tabs { display:flex; gap:4px; background:var(--gray-1); border-radius:12px; padding:4px; width:fit-content; margin-bottom:24px; }
+    .topup-tab { padding:8px 22px; border-radius:9px; border:none; background:transparent; font-size:13px; font-weight:600; color:var(--text-sub); cursor:pointer; transition:all .18s; font-family:inherit; }
+    .topup-tab.active { background:#fff; color:var(--primary); box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+
+    /* ── Upload area ── */
+    .ss-drop { border:2px dashed #c7d2fe; border-radius:12px; padding:28px 20px; text-align:center; cursor:pointer; transition:all .2s; background:#fafbff; }
+    .ss-drop:hover, .ss-drop.drag-over { border-color:var(--primary); background:#f0f2ff; }
+    .ss-placeholder { display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--text-sub); }
+    .ss-placeholder .upload-icon { font-size:32px; }
+    .ss-placeholder .upload-hint { font-size:13px; }
+    .ss-placeholder .upload-sub { font-size:11px; color:var(--gray-4); }
+    #ss-preview { width:100%; max-height:280px; object-fit:contain; border-radius:8px; margin-top:8px; display:none; }
+    #ss-filename { font-size:11px; color:var(--text-sub); margin-top:5px; }
+
+    /* ── Nominal input ── */
+    .nominal-wrap { position:relative; }
+    .nominal-wrap .prefix { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text-sub); font-weight:600; font-size:14px; }
+    .nominal-wrap input { padding-left:42px; font-size:18px; font-weight:700; }
+
+    /* ── Extract result ── */
+    .extract-result { background:var(--gray-1); border-radius:12px; padding:16px; margin-top:12px; display:none; }
+    .extract-row { display:flex; justify-content:space-between; font-size:13px; padding:5px 0; border-bottom:1px solid var(--gray-2); }
+    .extract-row:last-child { border-bottom:none; }
+    .extract-row .lbl { color:var(--text-sub); }
+    .extract-row .val { font-weight:600; color:var(--text); }
+
+    /* ── AI Recommendation badge ── */
+    .rec-wrap { margin-top:12px; display:none; }
+    .rec-badge { display:inline-flex; align-items:center; gap:8px; padding:8px 16px; border-radius:20px; font-size:13px; font-weight:700; }
+    .rec-badge.good     { background:#d1fae5; color:#065f46; border:1.5px solid #6ee7b7; }
+    .rec-badge.moderate { background:#fef3c7; color:#92400e; border:1.5px solid #fcd34d; }
+    .rec-badge.poor     { background:#fee2e2; color:#991b1b; border:1.5px solid #fca5a5; }
+    .rec-reason { font-size:12px; color:var(--text-sub); margin-top:8px; padding:8px 12px; background:var(--gray-1); border-radius:8px; line-height:1.6; }
+
+    /* ── Status badge ── */
+    .badge-pending  { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+    .badge-approved { background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+    .badge-rejected { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+
+    /* ── Status filter tabs ── */
+    .status-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+    .status-tab { padding:6px 16px; border-radius:20px; border:1.5px solid var(--gray-3); background:#fff; font-size:12px; font-weight:600; color:var(--text-sub); cursor:pointer; transition:all .18s; font-family:inherit; }
+    .status-tab:hover { border-color:var(--primary); color:var(--primary); }
+    .status-tab.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+
+    /* ── Request card in history ── */
+    .req-card { background:#fff; border:1.5px solid var(--gray-2); border-radius:14px; padding:18px 20px; margin-bottom:12px; }
+    .req-card-header { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap; }
+    .req-chips { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
+    .chip { background:var(--gray-1); border-radius:20px; padding:4px 12px; font-size:12px; color:var(--text-sub); font-weight:500; }
+    .chip.rec-good     { background:#d1fae5; color:#065f46; }
+    .chip.rec-moderate { background:#fef3c7; color:#92400e; }
+    .chip.rec-poor     { background:#fee2e2; color:#991b1b; }
+
+    /* ── Admin approve modal ── */
+    .modal-field { margin-bottom:14px; }
+    .modal-field label { display:block; font-size:12px; font-weight:600; color:var(--text-sub); margin-bottom:6px; }
+
+    .loading-state { text-align:center; padding:48px; color:var(--text-sub); }
+    .empty-state { text-align:center; padding:56px 24px; color:var(--text-sub); }
+    .empty-state .icon { font-size:48px; margin-bottom:12px; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="/assets/autopilot.png" style="width:36px;height:36px;object-fit:contain;border-radius:8px;" alt="Adsy" />
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
+      <div class="nav-item" data-page="ctwa.html"><span class="nav-icon">💬</span> Buat Iklan CTWA</div>
+      <div class="nav-item" data-page="boost-post.html"><span class="nav-icon">🚀</span> Boost Post</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-item active" data-page="topup.html"><span class="nav-icon">💳</span> Top Up Budget</div>
+      <div class="nav-item" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
+      <div class="nav-item" data-page="products.html"><span class="nav-icon">📦</span> Produk</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>💳 Top Up Budget</h2>
+        <p>Request top up budget Meta Ads</p>
+      </div>
+      <div class="topbar-right">
+        <div class="user-info">
+          <div class="user-avatar" id="user-avatar">?</div>
+          <div>
+            <strong id="user-name">-</strong>
+            <span id="user-email" style="font-size:11px; color:var(--text-sub); display:block;"></span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- Tabs -->
+      <div class="topup-tabs" id="topup-tabs">
+        <button class="topup-tab active" data-tab="request" onclick="switchTab('request')">Request Top Up</button>
+        <button class="topup-tab" data-tab="riwayat" onclick="switchTab('riwayat')">Riwayat</button>
+      </div>
+
+      <!-- ── Panel: Request ── -->
+      <div id="panel-request" class="topup-panel" style="max-width:540px;">
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Request Top Up Budget</div>
+              <div class="card-sub">Upload screenshot Meta Ads untuk analisis performa otomatis</div>
+            </div>
+          </div>
+
+          <!-- Pilih Produk -->
+          <div class="form-group">
+            <label class="form-label">Produk <span>*</span></label>
+            <select class="form-input form-select" id="tp-product" onchange="onProductChange()">
+              <option value="">— Pilih Produk —</option>
+            </select>
+            <div class="form-hint" id="tp-product-kpi" style="display:none;"></div>
+          </div>
+
+          <!-- Screenshot -->
+          <div class="form-group">
+            <label class="form-label">Screenshot Meta Ads Manager <span>*</span></label>
+            <div class="ss-drop" id="ss-drop">
+              <div class="ss-placeholder" id="ss-placeholder">
+                <div class="upload-icon">📸</div>
+                <div class="upload-hint">Klik atau drag & drop screenshot di sini</div>
+                <div class="upload-sub">PNG / JPG / WEBP · Maks 4MB</div>
+              </div>
+              <img id="ss-preview" src="" alt="Preview" />
+            </div>
+            <div id="ss-filename"></div>
+          </div>
+          <input type="file" id="ss-input" accept="image/*" style="display:none;" />
+
+          <!-- Extract result -->
+          <div class="extract-result" id="extract-result">
+            <div style="font-size:12px; font-weight:700; color:var(--text-sub); margin-bottom:8px;">📊 Data dari Screenshot</div>
+            <div id="extract-rows"></div>
+          </div>
+
+          <!-- AI Recommendation -->
+          <div class="rec-wrap" id="rec-wrap">
+            <div id="rec-badge-el"></div>
+            <div class="rec-reason" id="rec-reason-el" style="display:none;"></div>
+          </div>
+
+          <!-- Nominal -->
+          <div class="form-group" style="margin-top:16px;">
+            <label class="form-label">Nominal yang Diminta <span>*</span></label>
+            <div class="nominal-wrap">
+              <span class="prefix">Rp</span>
+              <input type="text" id="tp-nominal" placeholder="0" inputmode="numeric"
+                oninput="formatNominalInput(this)" class="form-input" />
+            </div>
+          </div>
+
+          <div class="form-hint" id="tp-err" style="color:var(--danger); display:none;"></div>
+
+          <button class="btn btn-primary" id="tp-submit" onclick="submitTopup()" style="width:100%;margin-top:4px;" disabled>
+            Submit Request
+          </button>
+        </div>
+
+        <div id="tp-success"></div>
+      </div>
+
+      <!-- ── Panel: Riwayat / Manajemen ── -->
+      <div id="panel-riwayat" class="topup-panel" style="display:none; max-width:680px;">
+
+        <!-- Status filter (admin only) -->
+        <div id="status-filter" style="display:none;">
+          <div class="status-tabs">
+            <button class="status-tab active" data-status="pending" onclick="switchStatus('pending')">⏳ Pending</button>
+            <button class="status-tab" data-status="approved" onclick="switchStatus('approved')">✅ Disetujui</button>
+            <button class="status-tab" data-status="rejected" onclick="switchStatus('rejected')">❌ Ditolak</button>
+            <button class="status-tab" data-status="" onclick="switchStatus('')">📋 Semua</button>
+          </div>
+        </div>
+
+        <div id="history-list">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+    </div><!-- end page-content -->
+  </main>
+</div><!-- end app-layout -->
+
+<!-- ── Modal: Approve (admin) ── -->
+<div class="modal-overlay hidden" id="modal-approve">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 id="modal-approve-title">Approve Top Up</h3>
+      <div class="modal-close" onclick="closeModal('modal-approve')">✕</div>
+    </div>
+    <div class="modal-body" id="modal-approve-body">
+      <!-- filled dynamically -->
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo, getProfile } from './js/auth.js';
+  import { initSidebar, showToast, formatRupiah } from './js/sidebar.js';
+  import { getSupabase } from './js/supabase.js';
+
+  let sb, currentProfile, products = [];
+  let selectedFile = null, extractedData = null, recommendationData = null;
+  let currentStatus = 'pending';
+  let approveTarget = null; // { id, nominalRequest }
+
+  // ── Init ──
+  (async () => {
+    const session = await requireAuth();
+    if (!session) return;
+    sb = await getSupabase();
+    currentProfile = await renderUserInfo();
+    initSidebar();
+
+    // Admin: ubah tab Riwayat jadi Manajemen, langsung buka manajemen panel
+    if (['admin', 'superadmin'].includes(currentProfile?.role)) {
+      const tabRiwayat = document.querySelector('.topup-tab[data-tab="riwayat"]');
+      if (tabRiwayat) tabRiwayat.textContent = 'Manajemen Top Up';
+      document.getElementById('status-filter').style.display = 'block';
+    }
+
+    await loadProducts();
+    setupUploadArea();
+    await loadHistory();
+  })();
+
+  // ── Produk ──
+  async function loadProducts() {
+    const { data } = await sb.from('products').select('id, name, target_cpr').order('name');
+    products = data || [];
+    const sel = document.getElementById('tp-product');
+    products.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      opt.dataset.cpr = p.target_cpr || '';
+      sel.appendChild(opt);
+    });
+  }
+
+  window.onProductChange = function() {
+    const sel = document.getElementById('tp-product');
+    const opt = sel.options[sel.selectedIndex];
+    const cpr = opt?.dataset.cpr;
+    const hintEl = document.getElementById('tp-product-kpi');
+    if (cpr) {
+      hintEl.textContent = `Target CPR produk ini: Rp ${Number(cpr).toLocaleString('id-ID')}`;
+      hintEl.style.display = 'block';
+    } else {
+      hintEl.style.display = 'none';
+    }
+    checkSubmitEnabled();
+  };
+
+  // ── Upload area ──
+  function setupUploadArea() {
+    const area = document.getElementById('ss-drop');
+    const inp  = document.getElementById('ss-input');
+    area.addEventListener('click', () => inp.click());
+    area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('drag-over'); });
+    area.addEventListener('dragleave', () => area.classList.remove('drag-over'));
+    area.addEventListener('drop', e => {
+      e.preventDefault(); area.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) handleFileSelected(e.dataTransfer.files[0]);
+    });
+    inp.addEventListener('change', () => { if (inp.files[0]) handleFileSelected(inp.files[0]); });
+  }
+
+  function handleFileSelected(file) {
+    if (!file.type.startsWith('image/')) { showToast('File harus berupa gambar (PNG/JPG)', 'error'); return; }
+    if (file.size > 4 * 1024 * 1024) { showToast('Screenshot terlalu besar, maks 4MB', 'error'); return; }
+    selectedFile = file;
+    extractedData = null;
+    recommendationData = null;
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      const preview = document.getElementById('ss-preview');
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+      document.getElementById('ss-placeholder').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+    document.getElementById('ss-filename').textContent = file.name;
+
+    document.getElementById('extract-result').style.display = 'none';
+    document.getElementById('rec-wrap').style.display = 'none';
+    checkSubmitEnabled();
+
+    // Auto-analyze
+    analyzeScreenshot();
+  }
+
+  async function analyzeScreenshot() {
+    const btn = document.getElementById('tp-submit');
+    btn.textContent = 'Menganalisis screenshot...';
+    btn.disabled = true;
+
+    try {
+      const base64 = await fileToBase64(selectedFile);
+      const sel = document.getElementById('tp-product');
+      const opt = sel.options[sel.selectedIndex];
+      const targetCpr = opt?.dataset.cpr || '';
+      const productName = opt?.textContent || '';
+
+      const resp = await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'extract_topup',
+          image_base64: base64,
+          mime_type: selectedFile.type,
+          target_cpr: targetCpr,
+          product_name: productName
+        })
+      });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || 'Gagal analisis screenshot');
+
+      extractedData = data.extracted || {};
+      recommendationData = data.recommendation || {};
+
+      renderExtractResult(extractedData);
+      renderRecommendation(recommendationData);
+
+    } catch (e) {
+      showToast('Gagal analisis: ' + e.message, 'error');
+    } finally {
+      checkSubmitEnabled();
+      btn.textContent = 'Submit Request';
+    }
+  }
+
+  function renderExtractResult(ext) {
+    const fmtNum = n => n != null ? 'Rp ' + Number(n).toLocaleString('id-ID') : null;
+    const rows = [
+      ext.date_range ? ['📅 Periode', ext.date_range] : null,
+      ext.spend != null ? ['💸 Spend', fmtNum(ext.spend)] : null,
+      ext.results != null ? ['📊 Results', Number(ext.results).toLocaleString('id-ID')] : null,
+      ext.cpr != null ? ['💰 CPR', fmtNum(ext.cpr)] : null,
+      ext.ctr != null ? ['📈 CTR', Number(ext.ctr).toFixed(2) + '%'] : null,
+    ].filter(Boolean);
+
+    if (!rows.length) return;
+    document.getElementById('extract-rows').innerHTML = rows.map(([lbl, val]) =>
+      `<div class="extract-row"><span class="lbl">${lbl}</span><span class="val">${val}</span></div>`
+    ).join('');
+    document.getElementById('extract-result').style.display = 'block';
+  }
+
+  function renderRecommendation(rec) {
+    if (!rec?.level) return;
+    const pct = rec.recommendation_pct || '-';
+    const levelLabel = { good: 'Performa Baik', moderate: 'Performa Cukup', poor: 'Performa Rendah' }[rec.level] || '-';
+    const badgeEl = document.getElementById('rec-badge-el');
+    badgeEl.innerHTML = `<span class="rec-badge ${rec.level}">⚡ ${levelLabel} — Rekomendasi Top Up ${pct}%</span>`;
+    const reasonEl = document.getElementById('rec-reason-el');
+    if (rec.reason) {
+      reasonEl.textContent = rec.reason;
+      reasonEl.style.display = 'block';
+    }
+    document.getElementById('rec-wrap').style.display = 'block';
+  }
+
+  // ── Submit ──
+  window.submitTopup = async function() {
+    const productId = document.getElementById('tp-product').value;
+    const nominal = parseInt(document.getElementById('tp-nominal').value.replace(/\D/g, '')) || 0;
+    const errEl = document.getElementById('tp-err');
+    errEl.style.display = 'none';
+
+    if (!productId) { errEl.textContent = 'Pilih produk terlebih dahulu.'; errEl.style.display = 'block'; return; }
+    if (!selectedFile) { errEl.textContent = 'Upload screenshot Meta Ads terlebih dahulu.'; errEl.style.display = 'block'; return; }
+    if (!nominal || nominal < 1000) { errEl.textContent = 'Masukkan nominal top up yang valid.'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('tp-submit');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    try {
+      const { data: { user } } = await sb.auth.getUser();
+      const approveToken = crypto.randomUUID();
+      const sel = document.getElementById('tp-product');
+      const productName = sel.options[sel.selectedIndex]?.textContent || '';
+
+      const { data: saved, error: dbErr } = await sb.from('topup_requests').insert({
+        user_id: user.id,
+        user_name: currentProfile?.name || user.email,
+        product_id: productId,
+        nominal_request: nominal,
+        extracted_data: extractedData || {},
+        ai_recommendation: recommendationData || {},
+        status: 'pending',
+        approve_token: approveToken
+      }).select().single();
+
+      if (dbErr) throw new Error(dbErr.message);
+
+      // Notif WA ke admin/finance
+      btn.textContent = 'Mengirim notifikasi...';
+      await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'notify_topup',
+          request_id: saved.id,
+          user_name: currentProfile?.name || user.email,
+          product_name: productName,
+          nominal_request: nominal,
+          extracted: extractedData || {},
+          recommendation: recommendationData || {},
+          approve_token: approveToken
+        })
+      });
+
+      showSuccess(nominal, extractedData, recommendationData);
+      resetForm();
+
+    } catch (e) {
+      errEl.textContent = e.message; errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Submit Request';
+    }
+  };
+
+  function showSuccess(nominal, ext, rec) {
+    const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
+    const recPct = rec?.recommendation_pct;
+    const box = document.getElementById('tp-success');
+    box.innerHTML = `
+      <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:12px;padding:20px;margin-top:16px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <span style="font-size:20px;">✅</span>
+          <strong style="color:#065f46;">Request berhasil dikirim!</strong>
+        </div>
+        <div style="font-size:13px;color:#047857;line-height:2;">
+          <div>Nominal: <strong>Rp ${fmtNum(nominal)}</strong></div>
+          ${ext?.spend != null ? `<div>Spend kemarin: <strong>Rp ${fmtNum(ext.spend)}</strong></div>` : ''}
+          ${ext?.cpr != null ? `<div>CPR: <strong>Rp ${fmtNum(ext.cpr)}</strong></div>` : ''}
+          ${recPct ? `<div>AI Rekomendasi: <strong>Top up ${recPct}%</strong></div>` : ''}
+        </div>
+        <div style="font-size:12px;color:#6ee7b7;margin-top:8px;">Notifikasi sudah dikirim ke admin/finance.</div>
+      </div>`;
+  }
+
+  function resetForm() {
+    document.getElementById('tp-product').value = '';
+    document.getElementById('tp-product-kpi').style.display = 'none';
+    document.getElementById('tp-nominal').value = '';
+    selectedFile = null; extractedData = null; recommendationData = null;
+    document.getElementById('ss-input').value = '';
+    document.getElementById('ss-preview').style.display = 'none';
+    document.getElementById('ss-preview').src = '';
+    document.getElementById('ss-placeholder').style.display = 'flex';
+    document.getElementById('ss-filename').textContent = '';
+    document.getElementById('extract-result').style.display = 'none';
+    document.getElementById('rec-wrap').style.display = 'none';
+    document.getElementById('tp-submit').disabled = true;
+  }
+
+  function checkSubmitEnabled() {
+    const hasProduct = !!document.getElementById('tp-product').value;
+    const hasFile = !!selectedFile;
+    document.getElementById('tp-submit').disabled = !(hasProduct && hasFile);
+  }
+
+  // ── Tabs ──
+  window.switchTab = function(tab) {
+    document.querySelectorAll('.topup-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.topup-panel').forEach(p => p.style.display = 'none');
+    document.getElementById('panel-' + tab).style.display = 'block';
+    if (tab === 'riwayat') loadHistory();
+  };
+
+  window.switchStatus = function(status) {
+    currentStatus = status;
+    document.querySelectorAll('.status-tab').forEach(t => t.classList.toggle('active', t.dataset.status === status));
+    loadHistory();
+  };
+
+  // ── History ──
+  async function loadHistory() {
+    const el = document.getElementById('history-list');
+    el.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+    const { data: { user } } = await sb.auth.getUser();
+    const isAdmin = ['admin', 'superadmin'].includes(currentProfile?.role);
+
+    let q = sb.from('topup_requests')
+      .select('*, products(name)')
+      .order('created_at', { ascending: false });
+    if (!isAdmin) q = q.eq('user_id', user.id);
+    if (isAdmin && currentStatus) q = q.eq('status', currentStatus);
+
+    const { data, error } = await q;
+    if (error) { el.innerHTML = `<div class="empty-state"><p>${error.message}</p></div>`; return; }
+    if (!data?.length) {
+      const msg = isAdmin && currentStatus === 'pending'
+        ? '<h3 style="font-size:15px;margin-bottom:4px;">Tidak ada request pending</h3><p style="font-size:13px;">Semua request sudah ditangani.</p>'
+        : '<h3 style="font-size:15px;margin-bottom:4px;">Belum ada request</h3><p style="font-size:13px;">Request top up akan muncul di sini.</p>';
+      el.innerHTML = `<div class="empty-state"><div class="icon">💳</div>${msg}</div>`;
+      return;
+    }
+    el.innerHTML = data.map(r => renderCard(r, isAdmin)).join('');
+  }
+
+  function renderCard(r, isAdmin) {
+    const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
+    const ext = r.extracted_data || {};
+    const rec = r.ai_recommendation || {};
+    const statusBadge = {
+      pending: '<span class="badge-pending">Menunggu</span>',
+      approved: '<span class="badge-approved">Disetujui</span>',
+      rejected: '<span class="badge-rejected">Ditolak</span>'
+    }[r.status] || '';
+    const tgl = new Date(r.created_at).toLocaleDateString('id-ID', {
+      day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta'
+    });
+    const productName = r.products?.name || '-';
+    const recClass = { good: 'rec-good', moderate: 'rec-moderate', poor: 'rec-poor' }[rec.level] || '';
+    const recLabel = { good: 'Performa Baik', moderate: 'Performa Cukup', poor: 'Performa Rendah' }[rec.level] || '';
+
+    return `<div class="req-card" id="req-${r.id}">
+      <div class="req-card-header">
+        <div>
+          ${isAdmin ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:3px;">👤 ${r.user_name || '-'}</div>` : ''}
+          <div style="font-size:17px;font-weight:700;color:var(--text);">Rp ${fmtNum(r.nominal_request)}</div>
+          ${r.nominal_disetujui && r.status === 'approved' ? `<div style="font-size:12px;color:#065f46;font-weight:600;">✅ Disetujui: Rp ${fmtNum(r.nominal_disetujui)}</div>` : ''}
+          <div style="font-size:11px;color:var(--text-sub);margin-top:2px;">${tgl}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${statusBadge}
+          ${isAdmin && r.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="openApproveModal('${r.id}', ${r.nominal_request}, '${r.user_name}', '${productName}')">Review</button>` : ''}
+        </div>
+      </div>
+      <div class="req-chips">
+        <span class="chip">📦 ${productName}</span>
+        ${ext.date_range ? `<span class="chip">📅 ${ext.date_range}</span>` : ''}
+        ${ext.spend != null ? `<span class="chip">💸 Spend: Rp ${fmtNum(ext.spend)}</span>` : ''}
+        ${ext.results != null ? `<span class="chip">📊 Results: ${fmtNum(ext.results)}</span>` : ''}
+        ${ext.cpr != null ? `<span class="chip">💰 CPR: Rp ${fmtNum(ext.cpr)}</span>` : ''}
+        ${rec.level ? `<span class="chip ${recClass}">⚡ ${recLabel} (${rec.recommendation_pct || '-'}%)</span>` : ''}
+      </div>
+      ${r.catatan ? `<div style="margin-top:10px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">📝 ${r.catatan}</div>` : ''}
+    </div>`;
+  }
+
+  // ── Admin: Open Approve Modal ──
+  window.openApproveModal = function(id, nominalRequest, userName, productName) {
+    approveTarget = { id, nominalRequest };
+    document.getElementById('modal-approve-title').textContent = `Review Top Up — ${userName}`;
+    const fmtNum = n => Number(n).toLocaleString('id-ID');
+    document.getElementById('modal-approve-body').innerHTML = `
+      <div style="background:var(--gray-1);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;line-height:2;">
+        <div><strong>Produk:</strong> ${productName}</div>
+        <div><strong>Nominal Request:</strong> Rp ${fmtNum(nominalRequest)}</div>
+      </div>
+      <div class="modal-field">
+        <label>Nominal yang Disetujui <span style="color:var(--danger)">*</span></label>
+        <div class="nominal-wrap">
+          <span class="prefix">Rp</span>
+          <input type="text" class="form-input" id="modal-nominal" value="${fmtNum(nominalRequest)}"
+            inputmode="numeric" oninput="formatNominalInput(this)" style="padding-left:42px;font-size:16px;font-weight:700;" />
+        </div>
+      </div>
+      <div class="modal-field">
+        <label>Catatan (opsional)</label>
+        <input type="text" class="form-input" id="modal-catatan" placeholder="Catatan untuk advertiser..." />
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button class="btn btn-danger" style="flex:1;" onclick="doReject()">❌ Tolak</button>
+        <button class="btn btn-success" style="flex:2;" onclick="doApprove()">✅ Approve</button>
+      </div>`;
+    openModal('modal-approve');
+  };
+
+  window.doApprove = async function() {
+    const nominal = parseInt(document.getElementById('modal-nominal').value.replace(/\D/g, '')) || 0;
+    const catatan = document.getElementById('modal-catatan').value.trim();
+    if (!nominal) { showToast('Masukkan nominal yang disetujui', 'warning'); return; }
+
+    try {
+      const r = await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve_topup', id: approveTarget.id, token: await getApproveToken(approveTarget.id), nominal_disetujui: nominal, catatan })
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error);
+      showToast('Request disetujui!', 'success');
+      closeModal('modal-approve');
+      loadHistory();
+    } catch (e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  window.doReject = async function() {
+    const catatan = document.getElementById('modal-catatan').value.trim() || prompt('Alasan penolakan (opsional):') || '';
+    try {
+      const r = await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve_topup', id: approveTarget.id, token: await getApproveToken(approveTarget.id), reject: true, catatan })
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error);
+      showToast('Request ditolak.', 'error');
+      closeModal('modal-approve');
+      loadHistory();
+    } catch (e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  async function getApproveToken(id) {
+    const { data } = await sb.from('topup_requests').select('approve_token').eq('id', id).single();
+    return data?.approve_token;
+  }
+
+  // ── Helpers ──
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  window.formatNominalInput = function(el) {
+    const raw = el.value.replace(/\D/g, '');
+    el.value = raw ? Number(raw).toLocaleString('id-ID') : '';
+  };
+
+  // expose helpers ke window for inline onclick
+  window.openModal = (id) => document.getElementById(id)?.classList.remove('hidden');
+  window.closeModal = (id) => document.getElementById(id)?.classList.add('hidden');
+</script>
+</body>
+</html>

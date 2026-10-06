@@ -216,6 +216,25 @@
         </div>
       </div>
 
+      <!-- ADMIN SECTION: TOP UP WA TARGETS -->
+      <div data-admin-only style="margin-top:28px;">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">💳 Penerima Notif Top Up</div>
+              <div class="card-sub">Nomor WA yang menerima notifikasi request top up dari advertiser (Finance / Admin)</div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-save-topup-wa">Simpan</button>
+          </div>
+          <div id="topup-wa-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
+          <div style="display:flex;gap:8px;">
+            <input type="text" class="form-input" id="topup-wa-input" placeholder="Contoh: 08123456789" style="flex:1;" />
+            <button class="btn btn-outline" onclick="addTopupWaNumber()">+ Tambah</button>
+          </div>
+          <div class="form-hint">Format: 08xxx atau 628xxx. Setiap nomor menerima notif + link approve langsung dari WA.</div>
+        </div>
+      </div>
+
       <!-- ADMIN SECTION: AD DEFAULTS -->
       <div data-admin-only style="margin-top:32px;">
         <div class="card">
@@ -668,6 +687,7 @@
       loadAdDefaults();
       setupAdDefaultsEvents();
       loadFonnteToken();
+      loadTopupWaTargets();
     }
   }
 
@@ -754,6 +774,60 @@
     btn.disabled = false; btn.textContent = 'Simpan';
     if (error) return showToast('Gagal simpan: ' + error.message, 'error');
     showToast('Fonnte token disimpan!', 'success');
+  }
+
+  // ── TOP UP WA TARGETS (admin only) ──
+  let topupWaNumbers = [];
+
+  async function loadTopupWaTargets() {
+    const { data } = await sb.from('global_settings')
+      .select('topup_wa_targets')
+      .eq('id', '00000000-0000-0000-0000-000000000001')
+      .single();
+    topupWaNumbers = data?.topup_wa_targets || [];
+    renderTopupWaList();
+  }
+
+  function renderTopupWaList() {
+    const el = document.getElementById('topup-wa-list');
+    if (!topupWaNumbers.length) {
+      el.innerHTML = '<div style="font-size:13px;color:var(--text-sub);padding:8px 0;">Belum ada nomor penerima.</div>';
+      return;
+    }
+    el.innerHTML = topupWaNumbers.map((no, i) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--gray-1);border-radius:8px;">
+        <span style="font-size:13px;font-weight:600;">📱 ${no}</span>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger);padding:4px 8px;" onclick="removeTopupWaNumber(${i})">✕</button>
+      </div>`).join('');
+  }
+
+  window.addTopupWaNumber = function() {
+    const inp = document.getElementById('topup-wa-input');
+    const raw = inp.value.trim().replace(/\D/g, '');
+    if (!raw) return showToast('Masukkan nomor WA', 'warning');
+    const normalized = raw.startsWith('0') ? '62' + raw.slice(1) : raw.startsWith('62') ? raw : '62' + raw;
+    if (topupWaNumbers.includes(normalized)) { showToast('Nomor sudah ada', 'warning'); return; }
+    topupWaNumbers.push(normalized);
+    renderTopupWaList();
+    inp.value = '';
+  };
+
+  window.removeTopupWaNumber = function(idx) {
+    topupWaNumbers.splice(idx, 1);
+    renderTopupWaList();
+  };
+
+  async function saveTopupWaTargets() {
+    const btn = document.getElementById('btn-save-topup-wa');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    const { error } = await sb.from('global_settings').upsert({
+      id: '00000000-0000-0000-0000-000000000001',
+      topup_wa_targets: topupWaNumbers,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+    btn.disabled = false; btn.textContent = 'Simpan';
+    if (error) return showToast('Gagal simpan: ' + error.message, 'error');
+    showToast('Penerima notif top up disimpan!', 'success');
   }
 
   // ── TOKEN ──
@@ -1155,6 +1229,7 @@
     document.getElementById('btn-create-user')?.addEventListener('click', createUser);
     document.getElementById('btn-save-notif').addEventListener('click', saveNotifSettings);
     document.getElementById('btn-save-fonnte')?.addEventListener('click', saveFonnteToken);
+    document.getElementById('btn-save-topup-wa')?.addEventListener('click', saveTopupWaTargets);
   }
 
   async function saveAccount() {
