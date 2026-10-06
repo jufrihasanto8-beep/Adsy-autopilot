@@ -375,7 +375,8 @@ Field tidak ditemukan = null.`
     if (!waTargets.length) return res.json({ ok: false, warn: 'Belum ada nomor penerima notif top up di Settings' });
 
     const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
-    const approveLink = `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://adsy-autopilot.vercel.app'}/api/notify-wa?action=approve&id=${request_id}&token=${approve_token}`;
+    const baseUrl = process.env.APP_URL || 'https://adsy-autopilot.vercel.app';
+    const approveLink = `${baseUrl}/api/notify-wa?action=approve&id=${request_id}&token=${approve_token}`;
 
     const rec = recommendation || {};
     const levelLabel = { good: 'Performa Baik ✅', moderate: 'Performa Cukup ⚠️', poor: 'Performa Rendah ❌' }[rec.level] || '-';
