@@ -352,15 +352,25 @@ Field tidak ditemukan = null.`
   if (action === 'notify_topup') {
     const { request_id, user_name, product_name, nominal_request, extracted, recommendation, approve_token } = body;
 
-    // Ambil fonnte token dari admin
-    const { data: adminCfg } = await sb.from('app_config')
-      .select('fonnte_token')
-      .not('fonnte_token', 'is', null)
-      .limit(1)
-      .maybeSingle();
+    // Ambil fonnte token dari admin (role admin/superadmin yang punya token)
+    const { data: adminProfiles } = await sb.from('profiles')
+      .select('id')
+      .in('role', ['admin', 'superadmin']);
 
-    const fonnteToken = adminCfg?.fonnte_token || process.env.FONNTE_TOKEN;
-    if (!fonnteToken) return res.json({ ok: false, warn: 'fonnte_token belum dikonfigurasi di Settings' });
+    const adminIds = (adminProfiles || []).map(p => p.id);
+    let fonnteToken = process.env.FONNTE_TOKEN;
+
+    if (adminIds.length) {
+      const { data: adminCfg } = await sb.from('app_config')
+        .select('fonnte_token')
+        .in('user_id', adminIds)
+        .not('fonnte_token', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      if (adminCfg?.fonnte_token) fonnteToken = adminCfg.fonnte_token;
+    }
+
+    if (!fonnteToken) return res.json({ ok: false, warn: 'Fonnte token belum dikonfigurasi di Settings → Fonnte' });
 
     // Ambil WA targets dari global_settings
     const { data: gs, error: gsErr } = await sb.from('global_settings')
@@ -404,22 +414,30 @@ Field tidak ditemukan = null.`
 
     const results = await Promise.all(
       waTargets.map(async no => {
-        let target = String(no).replace(/\D/g, '');
-        if (target.startsWith('0')) target = '62' + target.slice(1);
+        // Nomor sudah dalam format 62xxx dari Settings, strip non-digit saja
+        const target = String(no).replace(/\D/g, '');
         try {
           const r2 = await fetch('https://api.fonnte.com/send', {
             method: 'POST',
             headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ target, message: pesan, countryCode: '62' })
+            body: JSON.stringify({ target, message: pesan })
           });
-          return { no, result: await r2.json() };
+          const d = await r2.json();
+          return { no: target, ok: d.status !== false, result: d };
         } catch (e) {
-          return { no, error: e.message };
+          return { no: target, ok: false, error: e.message };
         }
       })
     );
 
-    return res.json({ ok: true, results });
+    const allFailed = results.every(r => !r.ok);
+    const anyFailed = results.some(r => !r.ok);
+    const failReasons = results.filter(r => !r.ok).map(r => r.result?.reason || r.error || 'unknown').join(', ');
+
+    if (allFailed) {
+      return res.json({ ok: false, warn: 'Fonnte gagal kirim WA: ' + failReasons, results });
+    }
+    return res.json({ ok: true, partial: anyFailed, warn: anyFailed ? 'Sebagian gagal: ' + failReasons : null, results });
   }
 
   // ── approve_topup: eksekusi approve / reject ──
