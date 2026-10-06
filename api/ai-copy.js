@@ -56,7 +56,7 @@ export default async function handler(req, res) {
       const kieData = await kieResp.json();
       if (kieData.code !== 200) return res.status(500).json({ error: kieData.msg || 'Gagal membuat task generate' });
 
-      return res.json({ ok: true, task_id: kieData.data.taskId });
+      return res.json({ ok: true, task_id: kieData.data.taskId, ref_file: fileName });
 
     } catch (e) {
       return res.status(500).json({ error: e.message });
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
 
   // ── CHECK IMAGE TASK STATUS ──
   if (action === 'check_image_task') {
-    const { task_id } = req.body;
+    const { task_id, ref_file } = req.body;
     if (!task_id) return res.status(400).json({ error: 'task_id wajib diisi' });
 
     const KIE_KEY = process.env.KIE_API_KEY;
@@ -82,6 +82,12 @@ export default async function handler(req, res) {
       let resultUrls = null;
       if (state === 'success' && resultJson) {
         try { resultUrls = JSON.parse(resultJson).resultUrls || []; } catch {}
+      }
+
+      // Hapus gambar referensi dari Storage saat task selesai (success/fail)
+      if ((state === 'success' || state === 'fail') && ref_file) {
+        const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+        sb.storage.from('gen-images').remove([ref_file]); // fire & forget
       }
 
       return res.json({ ok: true, state, result_urls: resultUrls, fail_msg: failMsg });
