@@ -349,6 +349,29 @@
         </select>
       </div>
 
+      <!-- Tipe Iklan -->
+      <div class="modal-field">
+        <label>Tipe Iklan <span style="color:var(--danger)">*</span></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <label style="cursor:pointer;">
+            <input type="radio" name="aa_ad_type" value="form" checked onchange="onAdTypeChange()" style="display:none;" />
+            <div class="topup-time-card active" id="aa-card-form">
+              <div style="font-size:16px;">📋</div>
+              <div style="font-weight:700;font-size:13px;margin-top:4px;">Form</div>
+              <div style="font-size:11px;color:var(--text-sub);margin-top:2px;">KPI: CPR</div>
+            </div>
+          </label>
+          <label style="cursor:pointer;">
+            <input type="radio" name="aa_ad_type" value="ctwa" onchange="onAdTypeChange()" style="display:none;" />
+            <div class="topup-time-card" id="aa-card-ctwa">
+              <div style="font-size:16px;">💬</div>
+              <div style="font-weight:700;font-size:13px;margin-top:4px;">CTWA</div>
+              <div style="font-size:11px;color:var(--text-sub);margin-top:2px;">KPI: CPC</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <!-- Nama Akun -->
       <div class="modal-field">
         <label>Nama Akun Iklan <span style="color:var(--danger)">*</span></label>
@@ -431,6 +454,7 @@
   let adAccounts = [];
   let adAccountLogs = [];
   let selectedAccountId = null;
+  let selectedAccount = null;
 
   // billing SS state (in add-account modal)
   let billingFile = null;
@@ -458,7 +482,7 @@
 
   // ── Produk ──
   async function loadProducts() {
-    const { data } = await sb.from('products').select('id, name, target_cpr').order('name');
+    const { data } = await sb.from('products').select('id, name, target_cpr, target_cpc').order('name');
     products = data || [];
     const sel = document.getElementById('tp-product');
     const aaSel = document.getElementById('aa-product');
@@ -468,6 +492,7 @@
         opt.value = p.id;
         opt.textContent = p.name;
         opt.dataset.cpr = p.target_cpr || '';
+        opt.dataset.cpc = p.target_cpc || '';
         s.appendChild(opt);
       });
     });
@@ -501,18 +526,9 @@
 
   window.onProductChange = function() {
     const sel = document.getElementById('tp-product');
-    const opt = sel.options[sel.selectedIndex];
-    const cpr = opt?.dataset.cpr;
-    const hintEl = document.getElementById('tp-product-kpi');
-    if (cpr) {
-      hintEl.textContent = `Target CPR produk ini: Rp ${Number(cpr).toLocaleString('id-ID')}`;
-      hintEl.style.display = 'block';
-    } else {
-      hintEl.style.display = 'none';
-    }
+    const productId = sel.value;
 
     // populate ad account dropdown filtered by product
-    const productId = sel.value;
     const aaGroup = document.getElementById('tp-adaccount-group');
     const aaSel = document.getElementById('tp-adaccount');
     aaSel.innerHTML = '<option value="">— Pilih Akun Iklan (opsional) —</option>';
@@ -522,30 +538,54 @@
       filtered.forEach(a => {
         const o = document.createElement('option');
         o.value = a.id;
-        o.textContent = a.nama_akun;
-        o.dataset.saldo = a.saldo_saat_ini || 0;
-        o.dataset.jangkauan = a.jangkauan_saldo || 0;
-        o.dataset.ccNomor = a.kartu_kredit_nomor || '';
-        o.dataset.ccNama = a.kartu_kredit_nama || '';
+        o.textContent = a.nama_akun + (a.ad_type === 'ctwa' ? ' (CTWA)' : ' (Form)');
         aaSel.appendChild(o);
       });
     }
     aaGroup.style.display = productId ? 'block' : 'none';
     hideBillingBar();
     selectedAccountId = null;
+    selectedAccount = null;
+    updateKpiHint();
     checkSubmitEnabled();
   };
+
+  function updateKpiHint() {
+    const hintEl = document.getElementById('tp-product-kpi');
+    const sel = document.getElementById('tp-product');
+    const opt = sel.options[sel.selectedIndex];
+    const adType = selectedAccount?.ad_type || 'form';
+
+    if (adType === 'ctwa') {
+      const cpc = opt?.dataset.cpc;
+      hintEl.textContent = cpc
+        ? `Target CPC produk ini: Rp ${Number(cpc).toLocaleString('id-ID')} · Tipe: CTWA`
+        : 'Tipe iklan: CTWA (KPI: CPC) — target CPC belum diset di produk';
+      hintEl.style.display = 'block';
+    } else {
+      const cpr = opt?.dataset.cpr;
+      if (cpr) {
+        hintEl.textContent = `Target CPR produk ini: Rp ${Number(cpr).toLocaleString('id-ID')} · Tipe: Form`;
+        hintEl.style.display = 'block';
+      } else {
+        hintEl.style.display = 'none';
+      }
+    }
+  }
 
   window.onAdAccountChange = function() {
     const sel = document.getElementById('tp-adaccount');
     const opt = sel.options[sel.selectedIndex];
-    if (!opt?.value) { hideBillingBar(); selectedAccountId = null; return; }
+    if (!opt?.value) { hideBillingBar(); selectedAccountId = null; selectedAccount = null; updateKpiHint(); return; }
 
     selectedAccountId = opt.value;
-    const saldo = opt.dataset.saldo;
-    const jangkauan = opt.dataset.jangkauan;
-    const ccNomor = opt.dataset.ccNomor;
-    const ccNama = opt.dataset.ccNama;
+    selectedAccount = adAccounts.find(a => a.id === selectedAccountId) || null;
+    updateKpiHint();
+
+    const saldo = selectedAccount?.saldo_saat_ini;
+    const jangkauan = selectedAccount?.jangkauan_saldo;
+    const ccNomor = selectedAccount?.kartu_kredit_nomor;
+    const ccNama = selectedAccount?.kartu_kredit_nama;
 
     const fmtRp = n => 'Rp ' + Number(n).toLocaleString('id-ID');
     document.getElementById('bi-saldo').textContent = saldo ? fmtRp(saldo) : '-';
@@ -646,8 +686,12 @@
         </div>
       </div>` : `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-2);font-size:12px;color:var(--text-sub);text-align:center;">Belum ada riwayat top up</div>`;
 
+    const adTypeBadge = a.ad_type === 'ctwa'
+      ? `<span style="display:inline-block;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:6px;">💬 CTWA</span>`
+      : `<span style="display:inline-block;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:6px;">📋 Form</span>`;
+
     return `<div class="acct-card" id="acct-${a.id}">
-      <div class="acct-card-name">${a.nama_akun}</div>
+      <div class="acct-card-name">${a.nama_akun}${adTypeBadge}</div>
       <div class="acct-card-actions">
         <button onclick="openAddAccountModal('${a.id}')" title="Edit">✏️</button>
         <button onclick="deleteAdAccount('${a.id}')" title="Hapus" style="color:var(--danger)">🗑️</button>
@@ -661,6 +705,12 @@
     </div>`;
   }
 
+  window.onAdTypeChange = function() {
+    const val = document.querySelector('input[name="aa_ad_type"]:checked')?.value || 'form';
+    document.getElementById('aa-card-form').classList.toggle('active', val === 'form');
+    document.getElementById('aa-card-ctwa').classList.toggle('active', val === 'ctwa');
+  };
+
   // ── Add/Edit Account Modal ──
   window.openAddAccountModal = function(editId) {
     document.getElementById('aa-edit-id').value = editId || '';
@@ -672,6 +722,9 @@
     document.getElementById('aa-cc-nomor').value = '';
     document.getElementById('aa-cc-nama').value = '';
     document.getElementById('aa-err').style.display = 'none';
+    // Reset ad_type to form
+    document.querySelectorAll('input[name="aa_ad_type"]').forEach(r => r.checked = r.value === 'form');
+    onAdTypeChange();
     billingFile = null;
     document.getElementById('billing-input').value = '';
     document.getElementById('billing-preview').style.display = 'none';
@@ -688,6 +741,9 @@
         if (existing.jangkauan_saldo) document.getElementById('aa-jangkauan').value = Number(existing.jangkauan_saldo).toLocaleString('id-ID');
         document.getElementById('aa-cc-nomor').value = existing.kartu_kredit_nomor || '';
         document.getElementById('aa-cc-nama').value = existing.kartu_kredit_nama || '';
+        const adType = existing.ad_type || 'form';
+        document.querySelectorAll('input[name="aa_ad_type"]').forEach(r => r.checked = r.value === adType);
+        onAdTypeChange();
       }
     }
 
@@ -731,7 +787,6 @@
     // Auto-extract
     document.getElementById('aa-save-btn').disabled = true;
     document.getElementById('aa-save-btn').textContent = 'Menganalisis billing...';
-    document.getElementById('billing-extract-result').style.display = 'none';
 
     try {
       const base64 = await fileToBase64(file);
@@ -767,6 +822,7 @@
     const editId = document.getElementById('aa-edit-id').value;
     const productId = document.getElementById('aa-product').value;
     const nama = document.getElementById('aa-nama').value.trim();
+    const adType = document.querySelector('input[name="aa_ad_type"]:checked')?.value || 'form';
     const saldo = parseInt(document.getElementById('aa-saldo').value.replace(/\D/g, '')) || null;
     const jangkauan = parseInt(document.getElementById('aa-jangkauan').value.replace(/\D/g, '')) || null;
     const ccNomor = document.getElementById('aa-cc-nomor').value.trim() || null;
@@ -787,6 +843,7 @@
         user_id: user.id,
         product_id: productId,
         nama_akun: nama,
+        ad_type: adType,
         saldo_saat_ini: saldo,
         jangkauan_saldo: jangkauan,
         kartu_kredit_nomor: ccNomor,
@@ -866,7 +923,8 @@
       const base64 = await fileToBase64(selectedFile);
       const sel = document.getElementById('tp-product');
       const opt = sel.options[sel.selectedIndex];
-      const targetCpr = opt?.dataset.cpr || '';
+      const adType = selectedAccount?.ad_type || 'form';
+      const targetKpi = adType === 'ctwa' ? (opt?.dataset.cpc || '') : (opt?.dataset.cpr || '');
       const productName = opt?.textContent || '';
 
       const resp = await fetch('/api/notify-wa', {
@@ -876,7 +934,8 @@
           action: 'extract_topup',
           image_base64: base64,
           mime_type: selectedFile.type,
-          target_cpr: targetCpr,
+          ad_type: adType,
+          target_kpi: targetKpi,
           product_name: productName
         })
       });
@@ -898,11 +957,14 @@
 
   function renderExtractResult(ext) {
     const fmtNum = n => n != null ? 'Rp ' + Number(n).toLocaleString('id-ID') : null;
+    const adType = selectedAccount?.ad_type || 'form';
     const rows = [
       ext.date_range ? ['📅 Periode', ext.date_range] : null,
       ext.spend != null ? ['💸 Spend', fmtNum(ext.spend)] : null,
       ext.results != null ? ['📊 Results', Number(ext.results).toLocaleString('id-ID')] : null,
-      ext.cpr != null ? ['💰 CPR', fmtNum(ext.cpr)] : null,
+      adType === 'ctwa'
+        ? (ext.cpc != null ? ['💬 CPC', fmtNum(ext.cpc)] : null)
+        : (ext.cpr != null ? ['💰 CPR', fmtNum(ext.cpr)] : null),
       ext.ctr != null ? ['📈 CTR', Number(ext.ctr).toFixed(2) + '%'] : null,
     ].filter(Boolean);
 
@@ -1030,7 +1092,7 @@
     document.getElementById('tp-product').value = '';
     document.getElementById('tp-product-kpi').style.display = 'none';
     document.getElementById('tp-nominal').value = '';
-    selectedFile = null; extractedData = null; recommendationData = null; selectedAccountId = null;
+    selectedFile = null; extractedData = null; recommendationData = null; selectedAccountId = null; selectedAccount = null;
     document.getElementById('ss-input').value = '';
     document.getElementById('ss-preview').style.display = 'none';
     document.getElementById('ss-preview').src = '';
@@ -1133,6 +1195,7 @@
         ${ext.spend != null ? `<span class="chip">💸 Spend: Rp ${fmtNum(ext.spend)}</span>` : ''}
         ${ext.results != null ? `<span class="chip">📊 Results: ${fmtNum(ext.results)}</span>` : ''}
         ${ext.cpr != null ? `<span class="chip">💰 CPR: Rp ${fmtNum(ext.cpr)}</span>` : ''}
+        ${ext.cpc != null ? `<span class="chip">💬 CPC: Rp ${fmtNum(ext.cpc)}</span>` : ''}
         ${isAdmin && rec.level ? (() => {
           const recNominal = rec.recommendation_pct ? Math.round(r.nominal_request * rec.recommendation_pct / 100) : null;
           return `<span class="chip ${recClass}">⚡ ${recLabel} · ${rec.recommendation_pct}%${recNominal ? ' = Rp ' + recNominal.toLocaleString('id-ID') : ''}</span>`;
