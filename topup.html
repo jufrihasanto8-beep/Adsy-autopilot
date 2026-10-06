@@ -201,8 +201,9 @@
             </div>
             <!-- Billing info display -->
             <div class="billing-info-bar" id="billing-info-bar">
-              <div class="bi-row"><span class="bi-lbl">💰 Saldo Saat Ini</span><span class="bi-val" id="bi-saldo">-</span></div>
-              <div class="bi-row"><span class="bi-lbl">📊 Jangkauan Saldo</span><span class="bi-val" id="bi-jangkauan">-</span></div>
+              <div class="bi-row"><span class="bi-lbl">💰 Saldo Estimasi</span><span class="bi-val" id="bi-saldo" style="color:var(--primary);">-</span></div>
+              <div class="bi-row"><span class="bi-lbl">📊 Limit (Jangkauan)</span><span class="bi-val" id="bi-jangkauan">-</span></div>
+              <div class="bi-row" id="bi-sisa-row" style="display:none;"><span class="bi-lbl">↪️ Sisa Ruang</span><span class="bi-val" id="bi-sisa">-</span></div>
               <div class="bi-cc" id="bi-cc" style="display:none;"></div>
             </div>
           </div>
@@ -340,10 +341,10 @@
         <div id="billing-filename" style="font-size:11px;color:var(--text-sub);margin-top:4px;"></div>
       </div>
 
-      <!-- Saldo Saat Ini & Jangkauan -->
+      <!-- Saldo Awal & Jangkauan -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="modal-field" style="margin-bottom:0;">
-          <label>Saldo Saat Ini</label>
+          <label>Saldo Awal <span style="font-weight:400;color:var(--text-sub);">(dari billing SS)</span></label>
           <div class="nominal-wrap">
             <span class="prefix" style="font-size:12px;">Rp</span>
             <input type="text" class="form-input" id="aa-saldo" placeholder="0" inputmode="numeric"
@@ -398,7 +399,8 @@
   let selectedFile = null, extractedData = null, recommendationData = null;
   let currentStatus = 'pending';
   let approveTarget = null;
-  let adAccounts = [];   // all accounts for this user
+  let adAccounts = [];
+  let adAccountLogs = [];
   let selectedAccountId = null;
 
   // billing SS state (in add-account modal)
@@ -490,8 +492,20 @@
     const ccNomor = opt.dataset.ccNomor;
     const ccNama = opt.dataset.ccNama;
 
-    document.getElementById('bi-saldo').textContent = saldo ? 'Rp ' + Number(saldo).toLocaleString('id-ID') : '-';
-    document.getElementById('bi-jangkauan').textContent = jangkauan ? 'Rp ' + Number(jangkauan).toLocaleString('id-ID') : '-';
+    const fmtRp = n => 'Rp ' + Number(n).toLocaleString('id-ID');
+    document.getElementById('bi-saldo').textContent = saldo ? fmtRp(saldo) : '-';
+    document.getElementById('bi-jangkauan').textContent = jangkauan ? fmtRp(jangkauan) : '-';
+
+    // Sisa ruang
+    if (saldo && jangkauan) {
+      const sisa = Number(jangkauan) - Number(saldo);
+      const sisaEl = document.getElementById('bi-sisa');
+      sisaEl.textContent = fmtRp(sisa);
+      sisaEl.style.color = sisa < 0 ? '#ef4444' : '#10b981';
+      document.getElementById('bi-sisa-row').style.display = 'flex';
+    } else {
+      document.getElementById('bi-sisa-row').style.display = 'none';
+    }
 
     const ccEl = document.getElementById('bi-cc');
     if (ccNomor) {
@@ -515,6 +529,14 @@
     if (!isAdmin) q = q.eq('user_id', user.id);
     const { data } = await q;
     adAccounts = data || [];
+
+    if (adAccounts.length) {
+      const ids = adAccounts.map(a => a.id);
+      const { data: logs } = await sb.from('topup_ad_account_logs')
+        .select('*').in('ad_account_id', ids)
+        .order('created_at', { ascending: false }).limit(100);
+      adAccountLogs = logs || [];
+    }
   }
 
   function renderAdAccounts() {
@@ -543,13 +565,30 @@
   }
 
   function renderAccountCard(a) {
-    const fmtRp = n => n ? 'Rp ' + Number(n).toLocaleString('id-ID') : '-';
+    const fmtRp = n => n != null && n !== '' ? 'Rp ' + Number(n).toLocaleString('id-ID') : '-';
     const saldo = Number(a.saldo_saat_ini) || 0;
     const jangkauan = Number(a.jangkauan_saldo) || 0;
-    const pct = jangkauan > 0 ? Math.min(100, Math.round((saldo / jangkauan) * 100)) : 0;
+    const sisaRuang = jangkauan > 0 ? jangkauan - saldo : null;
+    const pct = jangkauan > 0 ? Math.min(100, Math.max(0, Math.round((saldo / jangkauan) * 100))) : 0;
     const ccInfo = a.kartu_kredit_nomor
       ? `<div style="font-size:11px;color:var(--text-sub);margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-2);">💳 •••• ${a.kartu_kredit_nomor}${a.kartu_kredit_nama ? '  ·  ' + a.kartu_kredit_nama : ''}</div>`
       : '';
+
+    // Mini log (maks 4 entri)
+    const logs = adAccountLogs.filter(l => l.ad_account_id === a.id).slice(0, 4);
+    const logHtml = logs.length ? `
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-2);">
+        ${logs.map(l => {
+          const tgl = new Date(l.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short' });
+          const icon = l.type === 'topup' ? '📈' : '📉';
+          const color = l.type === 'topup' ? '#10b981' : '#ef4444';
+          const sign = l.type === 'topup' ? '+' : '';
+          return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;">
+            <span style="color:var(--text-sub);">${icon} ${tgl} · ${l.catatan || '-'}</span>
+            <span style="font-weight:700;color:${color};">${sign}Rp ${Math.abs(Number(l.amount)).toLocaleString('id-ID')}</span>
+          </div>`;
+        }).join('')}
+      </div>` : '';
 
     return `<div class="acct-card" id="acct-${a.id}">
       <div class="acct-card-name">${a.nama_akun}</div>
@@ -557,10 +596,12 @@
         <button onclick="openAddAccountModal('${a.id}')" title="Edit">✏️</button>
         <button onclick="deleteAdAccount('${a.id}')" title="Hapus" style="color:var(--danger)">🗑️</button>
       </div>
-      <div class="acct-card-row"><span class="lbl">💰 Saldo</span><span class="val">${fmtRp(a.saldo_saat_ini)}</span></div>
-      <div class="acct-card-row"><span class="lbl">📊 Jangkauan</span><span class="val">${fmtRp(a.jangkauan_saldo)}</span></div>
-      ${jangkauan > 0 ? `<div class="acct-saldo-bar" title="${pct}% saldo tersisa"><div class="acct-saldo-fill" style="width:${pct}%"></div></div>` : ''}
+      <div class="acct-card-row"><span class="lbl">💰 Saldo Estimasi</span><span class="val" style="color:var(--primary);">${fmtRp(a.saldo_saat_ini)}</span></div>
+      ${jangkauan > 0 ? `<div class="acct-card-row"><span class="lbl">📊 Limit (Jangkauan)</span><span class="val">${fmtRp(jangkauan)}</span></div>` : ''}
+      ${sisaRuang != null ? `<div class="acct-card-row"><span class="lbl">↪️ Sisa Ruang</span><span class="val" style="color:${sisaRuang < 0 ? '#ef4444' : '#10b981'};">${fmtRp(sisaRuang)}</span></div>` : ''}
+      ${jangkauan > 0 ? `<div class="acct-saldo-bar" title="${pct}% terpakai"><div class="acct-saldo-fill" style="width:${pct}%"></div></div>` : ''}
       ${ccInfo}
+      ${logHtml}
     </div>`;
   }
 
@@ -581,7 +622,6 @@
     document.getElementById('billing-preview').src = '';
     document.getElementById('billing-placeholder').style.display = 'block';
     document.getElementById('billing-filename').textContent = '';
-    document.getElementById('billing-extract-result').style.display = 'none';
 
     if (editId) {
       const existing = adAccounts.find(a => a.id === editId);
@@ -886,6 +926,7 @@
             extracted: extractedData || {},
             recommendation: recommendationData || {},
             approve_token: approveToken,
+            ad_account_id: adAccountId,
             ad_account_name: adAccountName,
             billing_data: billingData
           })
