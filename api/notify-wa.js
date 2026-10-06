@@ -352,24 +352,15 @@ Field tidak ditemukan = null.`
   if (action === 'notify_topup') {
     const { request_id, user_name, product_name, nominal_request, extracted, recommendation, approve_token } = body;
 
-    // Ambil fonnte token dari admin (role admin/superadmin yang punya token)
-    const { data: adminProfiles } = await sb.from('profiles')
-      .select('id')
-      .in('role', ['admin', 'superadmin']);
+    // Ambil fonnte token — cari dari siapapun yang sudah set, fallback ke env var
+    const { data: cfgWithToken } = await sb.from('app_config')
+      .select('fonnte_token')
+      .not('fonnte_token', 'is', null)
+      .neq('fonnte_token', '')
+      .limit(1)
+      .maybeSingle();
 
-    const adminIds = (adminProfiles || []).map(p => p.id);
-    let fonnteToken = process.env.FONNTE_TOKEN;
-
-    if (adminIds.length) {
-      const { data: adminCfg } = await sb.from('app_config')
-        .select('fonnte_token')
-        .in('user_id', adminIds)
-        .not('fonnte_token', 'is', null)
-        .limit(1)
-        .maybeSingle();
-      if (adminCfg?.fonnte_token) fonnteToken = adminCfg.fonnte_token;
-    }
-
+    const fonnteToken = cfgWithToken?.fonnte_token || process.env.FONNTE_TOKEN;
     if (!fonnteToken) return res.json({ ok: false, warn: 'Fonnte token belum dikonfigurasi di Settings → Fonnte' });
 
     // Ambil WA targets dari global_settings
