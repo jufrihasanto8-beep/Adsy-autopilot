@@ -501,12 +501,12 @@ Field tidak ditemukan = null.` }
     if (adAccountId && spend > 0) {
       try {
         const { data: acct } = await sb.from('topup_ad_accounts').select('saldo_saat_ini').eq('id', adAccountId).single();
-        const newSaldo = (Number(acct?.saldo_saat_ini) || 0) - spend;
+        const newSaldo = (Number(acct?.saldo_saat_ini) || 0) + spend;
         await sb.from('topup_ad_accounts').update({ saldo_saat_ini: newSaldo, updated_at: new Date().toISOString() }).eq('id', adAccountId);
         await sb.from('topup_ad_account_logs').insert({
           ad_account_id: adAccountId,
           type: 'spend',
-          amount: -spend,
+          amount: spend,
           request_id: body.request_id,
           catatan: `Spend ${extracted?.date_range || 'kemarin'}`,
           tanggal: new Date().toISOString().split('T')[0]
@@ -555,12 +555,12 @@ Field tidak ditemukan = null.` }
     if (!reject && nominal_disetujui && req_data.topup_ad_account_id) {
       try {
         const { data: acct } = await sb.from('topup_ad_accounts').select('saldo_saat_ini').eq('id', req_data.topup_ad_account_id).single();
-        const newSaldo = (Number(acct?.saldo_saat_ini) || 0) + Number(nominal_disetujui);
+        const newSaldo = Math.max(0, (Number(acct?.saldo_saat_ini) || 0) - Number(nominal_disetujui));
         await sb.from('topup_ad_accounts').update({ saldo_saat_ini: newSaldo, updated_at: new Date().toISOString() }).eq('id', req_data.topup_ad_account_id);
         await sb.from('topup_ad_account_logs').insert({
           ad_account_id: req_data.topup_ad_account_id,
           type: 'topup',
-          amount: Number(nominal_disetujui),
+          amount: -Number(nominal_disetujui),
           request_id: req_data.id,
           catatan: 'Top up disetujui',
           tanggal: new Date().toISOString().split('T')[0]
