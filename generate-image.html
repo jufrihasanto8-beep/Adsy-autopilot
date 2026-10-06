@@ -10,110 +10,185 @@
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/components.css" />
   <style>
-    .gen-tabs { display:flex; gap:4px; background:var(--gray-1); border-radius:12px; padding:4px; width:fit-content; margin-bottom:24px; }
+    /* ── Tabs ── */
+    .gen-tabs { display:flex; gap:4px; background:var(--gray-1); border-radius:12px; padding:4px; width:fit-content; margin-bottom:20px; }
     .gen-tab { padding:8px 22px; border-radius:9px; border:none; background:transparent; font-size:13px; font-weight:600; color:var(--text-sub); cursor:pointer; transition:all .18s; font-family:inherit; }
     .gen-tab.active { background:#fff; color:var(--primary); box-shadow:0 1px 4px rgba(0,0,0,0.08); }
 
-    .img-drop {
-      border: 2px dashed #c7d2fe; border-radius: 14px; padding: 24px 20px;
-      text-align: center; cursor: pointer; transition: all .2s; background: #fafbff;
+    /* ── Shared bar ── */
+    .shared-bar {
+      background:#fff; border:1.5px solid var(--gray-2); border-radius:14px;
+      padding:14px 16px; display:flex; align-items:center; gap:10px;
+      flex-wrap:wrap; margin-bottom:16px;
     }
-    .img-drop:hover, .img-drop.drag-over { border-color: var(--primary); background: #f0f2ff; }
-    .img-drop .drop-icon { font-size: 32px; margin-bottom: 6px; }
-    .img-drop .drop-hint { font-size: 13px; color: var(--text-sub); font-weight: 500; }
-    .img-drop .drop-sub  { font-size: 11px; color: var(--gray-4); margin-top: 3px; }
+    .shared-bar label { font-size:12px; font-weight:600; color:var(--text-sub); white-space:nowrap; }
+    .shared-bar select {
+      flex:1; min-width:110px; padding:7px 10px; border-radius:8px;
+      border:1.5px solid var(--gray-2); background:#fff; font-size:12px;
+      font-family:inherit; color:var(--text); font-weight:500; cursor:pointer;
+    }
+    .shared-bar select:focus { outline:none; border-color:var(--primary); }
+    .shared-bar .divider { width:1px; height:28px; background:var(--gray-2); flex-shrink:0; }
+    .btn-gen-all {
+      padding:9px 20px; background:var(--primary); color:#fff; border:none;
+      border-radius:9px; font-size:13px; font-weight:700; cursor:pointer;
+      font-family:inherit; white-space:nowrap; transition:background .15s; flex-shrink:0;
+    }
+    .btn-gen-all:hover { background:#4f46e5; }
+    .btn-gen-all:disabled { background:var(--gray-3); cursor:not-allowed; }
 
-    /* ── Multi-image preview grid ── */
-    .ref-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    /* ── Slots grid ── */
+    .slots-grid {
+      display:grid; grid-template-columns:repeat(3,1fr); gap:14px; align-items:start;
+    }
+    @media(max-width:900px) { .slots-grid { grid-template-columns:1fr; } }
+
+    /* ── Slot card ── */
+    .slot-card {
+      background:#fff; border:1.5px solid var(--gray-2); border-radius:14px;
+      overflow:hidden; display:flex; flex-direction:column;
+    }
+    .slot-head {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 14px 0; margin-bottom:10px;
+    }
+    .slot-num { font-size:13px; font-weight:700; color:var(--text); }
+    .slot-badge {
+      font-size:10px; font-weight:700; padding:3px 8px; border-radius:20px;
+    }
+    .slot-badge.idle { background:var(--gray-1); color:var(--gray-4); }
+    .slot-badge.loading { background:#fef3c7; color:#b45309; }
+    .slot-badge.done { background:#dcfce7; color:#15803d; }
+    .slot-badge.error { background:#fee2e2; color:#b91c1c; }
+
+    .slot-body { padding:0 14px 14px; display:flex; flex-direction:column; gap:10px; }
+
+    /* ── Drop zone (compact) ── */
+    .slot-drop {
+      border:2px dashed #c7d2fe; border-radius:10px; padding:16px 10px;
+      text-align:center; cursor:pointer; transition:all .2s; background:#fafbff;
+    }
+    .slot-drop:hover, .slot-drop.drag-over { border-color:var(--primary); background:#f0f2ff; }
+    .slot-drop .di { font-size:22px; margin-bottom:4px; }
+    .slot-drop .dh { font-size:11px; color:var(--text-sub); font-weight:600; }
+    .slot-drop .ds { font-size:10px; color:var(--gray-4); margin-top:2px; }
+
+    /* ── Ref thumbnail grid (below drop zone) ── */
+    .ref-grid { display:flex; flex-wrap:wrap; gap:6px; }
     .ref-thumb {
-      position: relative; width: 80px; height: 80px; border-radius: 10px;
-      overflow: hidden; border: 1.5px solid var(--gray-2); flex-shrink: 0;
+      position:relative; width:60px; height:60px; border-radius:8px;
+      overflow:hidden; border:1.5px solid var(--gray-2); flex-shrink:0;
     }
-    .ref-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ref-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
     .ref-thumb-del {
-      position: absolute; top: 3px; right: 3px; width: 18px; height: 18px;
-      border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; border: none;
-      font-size: 10px; font-weight: 700; cursor: pointer; display: flex;
-      align-items: center; justify-content: center; line-height: 1;
+      position:absolute; top:2px; right:2px; width:16px; height:16px;
+      border-radius:50%; background:rgba(0,0,0,.6); color:#fff; border:none;
+      font-size:9px; font-weight:700; cursor:pointer; display:flex;
+      align-items:center; justify-content:center; line-height:1;
     }
-    .ref-thumb-del:hover { background: rgba(239,68,68,.85); }
+    .ref-thumb-del:hover { background:rgba(239,68,68,.85); }
     .ref-add-btn {
-      width: 80px; height: 80px; border-radius: 10px; border: 2px dashed #c7d2fe;
-      background: #fafbff; cursor: pointer; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 2px; flex-shrink: 0;
-      font-size: 20px; color: var(--primary); transition: all .15s;
+      width:60px; height:60px; border-radius:8px; border:2px dashed #c7d2fe;
+      background:#fafbff; cursor:pointer; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:1px; flex-shrink:0;
+      font-size:18px; color:var(--primary); transition:all .15s;
     }
-    .ref-add-btn:hover { border-color: var(--primary); background: #f0f2ff; }
-    .ref-add-btn span { font-size: 10px; font-weight: 600; color: var(--text-sub); }
+    .ref-add-btn:hover { border-color:var(--primary); background:#f0f2ff; }
+    .ref-add-btn span { font-size:9px; font-weight:600; color:var(--text-sub); }
 
-    .gen-settings { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-    .gen-settings select {
-      flex: 1; min-width: 120px; padding: 8px 12px; border-radius: 10px;
-      border: 1.5px solid var(--gray-2); background: #fff; font-size: 13px;
-      font-family: inherit; color: var(--text); font-weight: 500; cursor: pointer;
+    /* ── Prompt textarea ── */
+    .slot-prompt {
+      width:100%; min-height:80px; padding:10px 12px; border-radius:10px;
+      border:1.5px solid var(--gray-2); font-family:inherit; font-size:13px;
+      resize:vertical; line-height:1.5; transition:border-color .18s;
+      background:#fff; color:var(--text); box-sizing:border-box;
     }
-    .gen-settings select:focus { outline: none; border-color: var(--primary); }
+    .slot-prompt:focus { outline:none; border-color:var(--primary); }
+    .prompt-char-sm { font-size:10px; color:var(--gray-4); text-align:right; margin-top:-6px; }
 
-    .prompt-wrap { position: relative; margin-top: 14px; }
-    .prompt-wrap textarea {
-      width: 100%; min-height: 110px; padding: 14px; border-radius: 12px;
-      border: 1.5px solid var(--gray-2); font-family: inherit; font-size: 14px;
-      resize: vertical; line-height: 1.6; transition: border-color .18s; background: #fff; color: var(--text);
-    }
-    .prompt-wrap textarea:focus { outline: none; border-color: var(--primary); }
-    .prompt-char { font-size: 11px; color: var(--gray-4); text-align: right; margin-top: 4px; }
-
-    .result-area { margin-top: 20px; display: none; }
-    .result-img-wrap {
-      border-radius: 14px; overflow: hidden; background: var(--gray-1);
-      min-height: 200px; display: flex; align-items: center; justify-content: center;
-    }
-    .result-img-wrap img { width: 100%; height: auto; display: block; border-radius: 14px; }
-    .result-actions { display: flex; gap: 10px; margin-top: 12px; }
-
-    .gen-loading { display: none; flex-direction: column; align-items: center; gap: 12px; padding: 40px; text-align: center; }
-    .gen-loading .spinner-big {
-      width: 44px; height: 44px; border: 4px solid var(--gray-2);
-      border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .gen-loading .loading-txt { font-size: 13px; color: var(--text-sub); font-weight: 500; }
-    .gen-loading .loading-sub { font-size: 12px; color: var(--gray-4); }
-
-    .dot-anim { display: inline-flex; gap: 4px; }
-    .dot-anim span { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); animation: dotPulse 1.2s infinite ease-in-out; }
-    .dot-anim span:nth-child(2) { animation-delay: .2s; }
-    .dot-anim span:nth-child(3) { animation-delay: .4s; }
-    @keyframes dotPulse { 0%,100%{opacity:.2;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
-
-    .prompt-tips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    /* ── Tip chips ── */
+    .tip-chips { display:flex; flex-wrap:wrap; gap:4px; }
     .tip-chip {
-      padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
-      cursor: pointer; border: 1.5px solid var(--gray-2); background: #fff;
-      color: var(--text-sub); transition: all .15s;
+      padding:3px 9px; border-radius:20px; font-size:10px; font-weight:600;
+      cursor:pointer; border:1.5px solid var(--gray-2); background:#fff;
+      color:var(--text-sub); transition:all .15s; white-space:nowrap;
     }
-    .tip-chip:hover { border-color: var(--primary); color: var(--primary); background: #f0f2ff; }
+    .tip-chip:hover { border-color:var(--primary); color:var(--primary); background:#f0f2ff; }
+
+    /* ── Slot generate button ── */
+    .slot-gen-btn {
+      width:100%; padding:11px; background:var(--primary); color:#fff;
+      border:none; border-radius:10px; font-size:13px; font-weight:700;
+      cursor:pointer; font-family:inherit; transition:background .15s;
+    }
+    .slot-gen-btn:hover:not(:disabled) { background:#4f46e5; }
+    .slot-gen-btn:disabled { background:var(--gray-3); cursor:not-allowed; }
+
+    /* ── Result area ── */
+    .slot-result { display:none; flex-direction:column; gap:8px; }
+
+    .slot-loading {
+      display:flex; flex-direction:column; align-items:center;
+      gap:8px; padding:20px 10px; text-align:center;
+    }
+    .spinner-sm {
+      width:28px; height:28px; border:3px solid var(--gray-2);
+      border-top-color:var(--primary); border-radius:50%;
+      animation:spin .8s linear infinite; flex-shrink:0;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .slot-loading-txt { font-size:12px; color:var(--text-sub); font-weight:500; }
+    .slot-loading-sub { font-size:11px; color:var(--gray-4); }
+
+    .slot-result-img img {
+      width:100%; border-radius:10px; display:block; background:var(--gray-1);
+    }
+    .slot-result-btns { display:flex; gap:6px; }
+    .slot-result-btns a, .slot-result-btns button {
+      flex:1; padding:8px 6px; border-radius:8px; font-size:12px; font-weight:600;
+      text-align:center; cursor:pointer; font-family:inherit; text-decoration:none;
+      border:1.5px solid var(--gray-2); background:#fff; color:var(--text-sub);
+      transition:all .15s;
+    }
+    .slot-result-btns a { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .slot-result-btns a:hover { background:#4f46e5; }
+    .slot-result-btns button:hover { border-color:var(--primary); color:var(--primary); }
+
+    .slot-err-box {
+      text-align:center; padding:16px 10px; background:#fef2f2;
+      border-radius:10px; border:1.5px solid #fecaca;
+    }
+    .slot-err-title { font-size:13px; font-weight:700; color:var(--danger); margin-bottom:4px; }
+    .slot-err-msg { font-size:11px; color:#b91c1c; }
+    .slot-err-box button {
+      margin-top:10px; padding:7px 16px; border-radius:8px; font-size:12px;
+      font-weight:600; cursor:pointer; font-family:inherit;
+      border:1.5px solid #fca5a5; background:#fff; color:var(--danger);
+      transition:all .15s;
+    }
+
+    .slot-inline-err { font-size:11px; color:var(--danger); margin-top:-6px; display:none; }
 
     /* ── Riwayat grid ── */
-    .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+    .history-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
     .history-card {
-      background: #fff; border: 1.5px solid var(--gray-2); border-radius: 14px;
-      overflow: hidden; transition: box-shadow .2s;
+      background:#fff; border:1.5px solid var(--gray-2); border-radius:14px;
+      overflow:hidden; transition:box-shadow .2s;
     }
-    .history-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-    .history-card img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--gray-1); }
-    .history-card-body { padding: 10px 12px; }
-    .history-card-prompt { font-size: 12px; color: var(--text); font-weight: 500; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .history-card-meta { font-size: 11px; color: var(--gray-4); margin-top: 4px; }
-    .history-card-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .history-card:hover { box-shadow:0 4px 16px rgba(0,0,0,0.08); }
+    .history-card img { width:100%; aspect-ratio:1; object-fit:cover; display:block; background:var(--gray-1); }
+    .history-card-body { padding:10px 12px; }
+    .history-card-prompt { font-size:12px; color:var(--text); font-weight:500; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .history-card-meta { font-size:11px; color:var(--gray-4); margin-top:4px; }
+    .history-card-actions { display:flex; gap:6px; margin-top:8px; }
     .history-card-actions a, .history-card-actions button {
-      flex: 1; padding: 6px; border-radius: 8px; font-size: 11px; font-weight: 600;
-      text-align: center; cursor: pointer; font-family: inherit; text-decoration: none;
-      border: 1.5px solid var(--gray-2); background: #fff; color: var(--text-sub); transition: all .15s;
+      flex:1; padding:6px; border-radius:8px; font-size:11px; font-weight:600;
+      text-align:center; cursor:pointer; font-family:inherit; text-decoration:none;
+      border:1.5px solid var(--gray-2); background:#fff; color:var(--text-sub); transition:all .15s;
     }
-    .history-card-actions a:hover, .history-card-actions button:hover { border-color: var(--primary); color: var(--primary); }
-    .history-card-actions a.dl { background: var(--primary); color: #fff; border-color: var(--primary); }
-    .history-card-actions a.dl:hover { background: #4f46e5; }
+    .history-card-actions a:hover, .history-card-actions button:hover { border-color:var(--primary); color:var(--primary); }
+    .history-card-actions a.dl { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .history-card-actions a.dl:hover { background:#4f46e5; }
     .empty-state { text-align:center; padding:56px 24px; color:var(--text-sub); }
     .empty-state .icon { font-size:48px; margin-bottom:12px; }
   </style>
@@ -165,7 +240,7 @@
     <header class="topbar">
       <div class="topbar-left">
         <h2>🎨 Generate Gambar</h2>
-        <p>Ubah gambar referensi dengan AI menggunakan GPT Image 2</p>
+        <p>Generate 3 variasi sekaligus dengan AI GPT Image 2</p>
       </div>
       <div class="topbar-right">
         <div class="topbar-user">
@@ -176,130 +251,66 @@
     </header>
 
     <div class="page-content">
-      <div style="max-width:680px; margin:0 auto;">
 
-        <!-- Tabs -->
-        <div class="gen-tabs">
-          <button class="gen-tab active" onclick="switchTab('generate')">✨ Generate</button>
-          <button class="gen-tab" onclick="switchTab('riwayat')" id="tab-riwayat">🕘 Riwayat</button>
+      <!-- Tabs -->
+      <div class="gen-tabs">
+        <button class="gen-tab active" onclick="switchTab('generate')">✨ Generate</button>
+        <button class="gen-tab" onclick="switchTab('riwayat')">🕘 Riwayat</button>
+      </div>
+
+      <!-- ── Panel Generate ── -->
+      <div id="panel-generate">
+
+        <!-- Shared settings bar -->
+        <div class="shared-bar">
+          <label>Aspect</label>
+          <select id="sh-aspect">
+            <option value="auto">Otomatis</option>
+            <option value="1:1">1:1 Square</option>
+            <option value="4:3">4:3 Landscape</option>
+            <option value="3:4">3:4 Portrait</option>
+            <option value="16:9">16:9 Wide</option>
+            <option value="9:16">9:16 Story</option>
+          </select>
+          <div class="divider"></div>
+          <label>Resolusi</label>
+          <select id="sh-res">
+            <option value="1K">1K</option>
+            <option value="2K">2K</option>
+          </select>
+          <div class="divider"></div>
+          <label>Background</label>
+          <select id="sh-bg">
+            <option value="opaque">Solid</option>
+            <option value="transparent">Transparan</option>
+            <option value="auto">Otomatis</option>
+          </select>
+          <div class="divider"></div>
+          <button class="btn-gen-all" id="gen-all-btn" onclick="generateAll()">⚡ Generate Semua</button>
         </div>
 
-        <!-- ── Panel Generate ── -->
-        <div id="panel-generate">
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Gambar Referensi</div>
-                <div class="card-sub">Upload gambar yang ingin diubah atau dijadikan referensi gaya</div>
-              </div>
-            </div>
-
-            <div class="img-drop" id="img-drop" onclick="document.getElementById('ref-input').click()">
-              <div class="drop-icon">🖼️</div>
-              <div class="drop-hint">Klik atau drag & drop gambar referensi</div>
-              <div class="drop-sub">PNG / JPG / WEBP · Maks 10MB · Bisa beberapa gambar</div>
-            </div>
-            <input type="file" id="ref-input" accept="image/*" multiple style="display:none;" />
-            <div class="ref-grid" id="ref-grid"></div>
-
-            <div style="margin-top:18px;">
-              <label class="form-label">Prompt <span style="color:var(--danger)">*</span></label>
-              <div class="prompt-wrap">
-                <textarea id="gen-prompt" placeholder="Contoh: ubah background jadi pantai tropis, pertahankan objek utama, gaya fotografi profesional..." oninput="updateCharCount()"></textarea>
-              </div>
-              <div class="prompt-char"><span id="char-count">0</span> / 20000</div>
-              <div class="prompt-tips">
-                <span class="tip-chip" onclick="appendPrompt('pertahankan objek utama')">pertahankan objek utama</span>
-                <span class="tip-chip" onclick="appendPrompt('gaya fotografi profesional')">fotografi profesional</span>
-                <span class="tip-chip" onclick="appendPrompt('background putih bersih')">background putih</span>
-                <span class="tip-chip" onclick="appendPrompt('lighting natural cerah')">lighting natural</span>
-                <span class="tip-chip" onclick="appendPrompt('remove background')">remove background</span>
-                <span class="tip-chip" onclick="appendPrompt('cinematic style')">cinematic</span>
-                <span class="tip-chip" onclick="appendPrompt('product photography style')">product photo</span>
-              </div>
-            </div>
-
-            <div class="gen-settings">
-              <select id="gen-aspect" title="Aspect Ratio">
-                <option value="auto">📐 Otomatis</option>
-                <option value="1:1">1:1 — Square</option>
-                <option value="4:3">4:3 — Landscape</option>
-                <option value="3:4">3:4 — Portrait</option>
-                <option value="16:9">16:9 — Widescreen</option>
-                <option value="9:16">9:16 — Story</option>
-                <option value="3:2">3:2</option>
-                <option value="2:3">2:3</option>
-              </select>
-              <select id="gen-resolution" title="Resolusi">
-                <option value="1K">🔲 Resolusi 1K</option>
-                <option value="2K">🔳 Resolusi 2K</option>
-              </select>
-              <select id="gen-background" title="Background">
-                <option value="opaque">🎨 Background Solid</option>
-                <option value="transparent">⬜ Transparan (PNG)</option>
-                <option value="auto">🔄 Otomatis</option>
-              </select>
-            </div>
-
-            <div id="gen-err" style="font-size:12px;color:var(--danger);margin-top:10px;display:none;"></div>
-
-            <button class="btn btn-primary" id="gen-btn" onclick="generateImage()"
-              style="width:100%;margin-top:16px;font-size:15px;padding:14px;" disabled>
-              ✨ Generate Gambar
-            </button>
-          </div>
-
-          <!-- Result -->
-          <div class="result-area" id="result-area">
-            <div class="card">
-              <div class="gen-loading" id="gen-loading">
-                <div class="spinner-big"></div>
-                <div class="loading-txt" id="loading-txt">Mengirim ke AI...</div>
-                <div class="loading-sub" id="loading-sub">Biasanya butuh 20–60 detik</div>
-              </div>
-              <div id="result-img-container" style="display:none;">
-                <div class="card-header" style="margin-bottom:12px;">
-                  <div>
-                    <div class="card-title">✅ Gambar Selesai!</div>
-                    <div class="card-sub" id="result-meta"></div>
-                  </div>
-                </div>
-                <div class="result-img-wrap">
-                  <img id="result-img" src="" alt="Generated" />
-                </div>
-                <div class="result-actions">
-                  <a id="dl-btn" class="btn btn-primary" style="flex:2;text-align:center;text-decoration:none;" download="generated.png">⬇️ Download</a>
-                  <button class="btn btn-outline" style="flex:1;" onclick="regenerate()">🔄 Ulangi</button>
-                </div>
-              </div>
-              <div id="result-error" style="display:none;padding:24px;text-align:center;">
-                <div style="font-size:32px;margin-bottom:8px;">⚠️</div>
-                <div style="font-weight:700;color:var(--danger);margin-bottom:4px;" id="error-title">Generate gagal</div>
-                <div style="font-size:13px;color:var(--text-sub);" id="error-msg"></div>
-                <button class="btn btn-outline" style="margin-top:16px;" onclick="regenerate()">Coba Lagi</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Panel Riwayat ── -->
-        <div id="panel-riwayat" style="display:none;">
-          <div class="card" style="margin-bottom:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <div>
-                <div class="card-title">🕘 Riwayat Generate</div>
-                <div class="card-sub">URL gambar aktif selama 14 hari sejak di-generate (kebijakan kie.ai)</div>
-              </div>
-              <button class="btn btn-outline btn-sm" onclick="loadHistory()">↺ Refresh</button>
-            </div>
-          </div>
-          <div id="history-list">
-            <div class="loading-state"><div class="spinner"></div></div>
-          </div>
-        </div>
+        <!-- 3 Slots -->
+        <div class="slots-grid" id="slots-grid"></div>
 
       </div>
-    </div>
+
+      <!-- ── Panel Riwayat ── -->
+      <div id="panel-riwayat" style="display:none;">
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div class="card-title">🕘 Riwayat Generate</div>
+              <div class="card-sub">URL gambar aktif selama 14 hari sejak di-generate (kebijakan kie.ai)</div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="loadHistory()">↺ Refresh</button>
+          </div>
+        </div>
+        <div id="history-list">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
   </main>
 </div>
 
@@ -309,10 +320,18 @@
   import { initSidebar, showToast } from './js/sidebar.js';
   import { getSupabase } from './js/supabase.js';
 
+  const SLOT_COUNT = 3;
   let sb, currentUser;
-  let selectedFiles = []; // array of { file, dataUrl }
-  let pollInterval = null;
-  let currentPrompt = '', currentSettings = {}, currentRefFiles = [];
+
+  // Per-slot state
+  const slots = Array.from({ length: SLOT_COUNT }, (_, i) => ({
+    idx: i,
+    files: [],       // { file, dataUrl }
+    refFiles: [],    // filenames to clean up from storage
+    pollId: null,
+    prompt: '',
+    settings: {},
+  }));
 
   // ── Init ──
   (async () => {
@@ -323,100 +342,193 @@
     currentUser = user;
     await renderUserInfo();
     initSidebar();
-    setupUpload();
+    buildSlots();
   })();
 
   // ── Tabs ──
   window.switchTab = function(tab) {
-    document.querySelectorAll('.gen-tab').forEach((t, i) => t.classList.toggle('active', (i === 0 ? 'generate' : 'riwayat') === tab));
+    document.querySelectorAll('.gen-tab').forEach((t, i) =>
+      t.classList.toggle('active', (i === 0 ? 'generate' : 'riwayat') === tab));
     document.getElementById('panel-generate').style.display = tab === 'generate' ? 'block' : 'none';
     document.getElementById('panel-riwayat').style.display  = tab === 'riwayat'  ? 'block' : 'none';
     if (tab === 'riwayat') loadHistory();
   };
 
-  // ── Upload ──
-  function setupUpload() {
-    const area = document.getElementById('img-drop');
-    const inp  = document.getElementById('ref-input');
+  // ── Build slot HTML ──
+  function buildSlots() {
+    const grid = document.getElementById('slots-grid');
+    grid.innerHTML = slots.map(s => `
+      <div class="slot-card" id="slot-${s.idx}">
+        <div class="slot-head">
+          <span class="slot-num">Slot ${s.idx + 1}</span>
+          <span class="slot-badge idle" id="badge-${s.idx}">Siap</span>
+        </div>
+        <div class="slot-body">
+          <div class="slot-drop" id="drop-${s.idx}" onclick="document.getElementById('finp-${s.idx}').click()">
+            <div class="di">🖼️</div>
+            <div class="dh">Klik atau drag & drop</div>
+            <div class="ds">PNG / JPG / WEBP · Maks 10MB</div>
+          </div>
+          <input type="file" id="finp-${s.idx}" accept="image/*" multiple style="display:none" />
+          <div class="ref-grid" id="grid-${s.idx}"></div>
+
+          <div>
+            <textarea class="slot-prompt" id="prompt-${s.idx}"
+              placeholder="Tulis prompt, contoh: ubah background jadi putih bersih, pertahankan produk..."
+              oninput="onPromptInput(${s.idx})"></textarea>
+            <div class="prompt-char-sm"><span id="plen-${s.idx}">0</span>/20000</div>
+          </div>
+
+          <div class="tip-chips">
+            <span class="tip-chip" onclick="addTip(${s.idx},'pertahankan objek utama')">objek utama</span>
+            <span class="tip-chip" onclick="addTip(${s.idx},'background putih bersih')">bg putih</span>
+            <span class="tip-chip" onclick="addTip(${s.idx},'lighting natural cerah')">lighting</span>
+            <span class="tip-chip" onclick="addTip(${s.idx},'product photography style')">product photo</span>
+            <span class="tip-chip" onclick="addTip(${s.idx},'remove background')">remove bg</span>
+            <span class="tip-chip" onclick="addTip(${s.idx},'cinematic style')">cinematic</span>
+          </div>
+
+          <div class="slot-inline-err" id="err-${s.idx}"></div>
+
+          <button class="slot-gen-btn" id="gbtn-${s.idx}" onclick="generateSlot(${s.idx})" disabled>
+            ✨ Generate
+          </button>
+
+          <!-- Result -->
+          <div class="slot-result" id="res-${s.idx}">
+            <!-- Loading -->
+            <div class="slot-loading" id="loading-${s.idx}" style="display:none">
+              <div class="spinner-sm"></div>
+              <div class="slot-loading-txt" id="ltxt-${s.idx}">Memproses...</div>
+              <div class="slot-loading-sub" id="lsub-${s.idx}"></div>
+            </div>
+            <!-- Image result -->
+            <div class="slot-result-img" id="rimg-${s.idx}" style="display:none">
+              <img id="img-${s.idx}" src="" alt="Result" style="margin-bottom:8px;" />
+              <div class="slot-result-btns">
+                <a id="dl-${s.idx}" target="_blank" download="gen.png">⬇️ Download</a>
+                <button onclick="clearSlotResult(${s.idx})">↺ Ulang</button>
+              </div>
+            </div>
+            <!-- Error -->
+            <div class="slot-err-box" id="rerr-${s.idx}" style="display:none">
+              <div class="slot-err-title" id="etitle-${s.idx}">Generate gagal</div>
+              <div class="slot-err-msg" id="emsg-${s.idx}"></div>
+              <button onclick="clearSlotResult(${s.idx})">Coba Lagi</button>
+            </div>
+          </div>
+        </div>
+      </div>`).join('');
+
+    slots.forEach(s => setupDrop(s.idx));
+  }
+
+  // ── Drag & drop setup per slot ──
+  function setupDrop(si) {
+    const area = document.getElementById(`drop-${si}`);
+    const inp  = document.getElementById(`finp-${si}`);
     area.addEventListener('dragover',  e => { e.preventDefault(); area.classList.add('drag-over'); });
     area.addEventListener('dragleave', () => area.classList.remove('drag-over'));
     area.addEventListener('drop', e => {
       e.preventDefault(); area.classList.remove('drag-over');
-      handleFiles([...e.dataTransfer.files]);
+      handleFiles(si, [...e.dataTransfer.files]);
     });
-    inp.addEventListener('change', () => { if (inp.files.length) handleFiles([...inp.files]); inp.value = ''; });
+    inp.addEventListener('change', () => {
+      if (inp.files.length) handleFiles(si, [...inp.files]);
+      inp.value = '';
+    });
   }
 
-  function handleFiles(files) {
+  // ── File handling ──
+  function handleFiles(si, files) {
+    const s = slots[si];
     files.forEach(file => {
       if (!file.type.startsWith('image/')) { showToast(`${file.name}: bukan gambar`, 'error'); return; }
       if (file.size > 10 * 1024 * 1024) { showToast(`${file.name}: maks 10MB`, 'error'); return; }
-      if (selectedFiles.length >= 4) { showToast('Maksimal 4 gambar referensi', 'warning'); return; }
+      if (s.files.length >= 4) { showToast('Maks 4 gambar per slot', 'warning'); return; }
       const reader = new FileReader();
       reader.onload = e => {
-        selectedFiles.push({ file, dataUrl: e.target.result });
-        renderRefGrid();
-        checkReady();
+        s.files.push({ file, dataUrl: e.target.result });
+        renderGrid(si);
+        checkReady(si);
       };
       reader.readAsDataURL(file);
     });
   }
 
-  function renderRefGrid() {
-    const grid = document.getElementById('ref-grid');
-    grid.innerHTML = selectedFiles.map((item, i) => `
-      <div class="ref-thumb" id="thumb-${i}">
-        <img src="${item.dataUrl}" alt="Ref ${i+1}" />
-        <button class="ref-thumb-del" onclick="removeRefImage(${i})">✕</button>
+  function renderGrid(si) {
+    const s = slots[si];
+    const el = document.getElementById(`grid-${si}`);
+    el.innerHTML = s.files.map((item, fi) => `
+      <div class="ref-thumb">
+        <img src="${item.dataUrl}" alt="Ref ${fi+1}" />
+        <button class="ref-thumb-del" onclick="removeFile(${si},${fi})">✕</button>
       </div>`).join('') +
-      (selectedFiles.length < 4
-        ? `<div class="ref-add-btn" onclick="document.getElementById('ref-input').click()">＋<span>Tambah</span></div>`
+      (s.files.length < 4
+        ? `<div class="ref-add-btn" onclick="document.getElementById('finp-${si}').click()">＋<span>Tambah</span></div>`
         : '');
   }
 
-  window.removeRefImage = function(i) {
-    selectedFiles.splice(i, 1);
-    renderRefGrid();
-    checkReady();
+  window.removeFile = function(si, fi) {
+    slots[si].files.splice(fi, 1);
+    renderGrid(si);
+    checkReady(si);
   };
 
-  window.updateCharCount = function() {
-    document.getElementById('char-count').textContent = document.getElementById('gen-prompt').value.length;
-    checkReady();
+  window.onPromptInput = function(si) {
+    const ta = document.getElementById(`prompt-${si}`);
+    slots[si].prompt = ta.value;
+    document.getElementById(`plen-${si}`).textContent = ta.value.length;
+    checkReady(si);
   };
 
-  window.appendPrompt = function(text) {
-    const ta = document.getElementById('gen-prompt');
+  window.addTip = function(si, text) {
+    const ta = document.getElementById(`prompt-${si}`);
     ta.value = ta.value.trim() ? ta.value.trim() + ', ' + text : text;
-    updateCharCount(); ta.focus();
+    slots[si].prompt = ta.value;
+    document.getElementById(`plen-${si}`).textContent = ta.value.length;
+    checkReady(si); ta.focus();
   };
 
-  function checkReady() {
-    const ok = selectedFiles.length > 0 && document.getElementById('gen-prompt').value.trim().length > 0;
-    document.getElementById('gen-btn').disabled = !ok;
+  function checkReady(si) {
+    const s = slots[si];
+    const ok = s.files.length > 0 && document.getElementById(`prompt-${si}`).value.trim().length > 0;
+    document.getElementById(`gbtn-${si}`).disabled = !ok;
+    updateGenAllBtn();
   }
 
-  // ── Generate ──
-  window.generateImage = async function() {
-    const prompt = document.getElementById('gen-prompt').value.trim();
-    const errEl  = document.getElementById('gen-err');
+  function updateGenAllBtn() {
+    const anyReady = slots.some(s =>
+      s.files.length > 0 && document.getElementById(`prompt-${s.idx}`).value.trim().length > 0 && !s.pollId
+    );
+    document.getElementById('gen-all-btn').disabled = !anyReady;
+  }
+
+  // ── Generate single slot ──
+  window.generateSlot = async function(si) {
+    const s = slots[si];
+    const prompt = document.getElementById(`prompt-${si}`).value.trim();
+    const errEl  = document.getElementById(`err-${si}`);
     errEl.style.display = 'none';
-    if (!selectedFiles.length) { errEl.textContent = 'Upload gambar referensi terlebih dahulu.'; errEl.style.display = 'block'; return; }
-    if (!prompt)               { errEl.textContent = 'Isi prompt terlebih dahulu.'; errEl.style.display = 'block'; return; }
 
-    currentPrompt = prompt;
-    currentSettings = {
-      aspect_ratio: document.getElementById('gen-aspect').value,
-      resolution:   document.getElementById('gen-resolution').value,
-      background:   document.getElementById('gen-background').value,
+    if (!s.files.length) { errEl.textContent = 'Upload gambar dulu.'; errEl.style.display = 'block'; return; }
+    if (!prompt)         { errEl.textContent = 'Isi prompt dulu.'; errEl.style.display = 'block'; return; }
+
+    s.settings = {
+      aspect_ratio: document.getElementById('sh-aspect').value,
+      resolution:   document.getElementById('sh-res').value,
+      background:   document.getElementById('sh-bg').value,
     };
+    s.prompt = prompt;
 
-    const btn = document.getElementById('gen-btn');
+    const btn = document.getElementById(`gbtn-${si}`);
     btn.disabled = true; btn.textContent = '⏳ Memproses...';
-    showLoading(`Mengupload ${selectedFiles.length} gambar referensi...`);
+    setBadge(si, 'loading', 'Generating...');
+    showSlotLoading(si, `Mengupload ${s.files.length} gambar...`, '');
+    document.getElementById(`res-${si}`).style.display = 'flex';
 
     try {
-      const images = await Promise.all(selectedFiles.map(async item => ({
+      const images = await Promise.all(s.files.map(async item => ({
         base64:    await fileToBase64(item.file),
         mime_type: item.file.type,
       })));
@@ -424,81 +536,147 @@
       const resp = await fetch('/api/ai-copy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'generate_image', images, prompt, ...currentSettings })
+        body: JSON.stringify({ action: 'generate_image', images, prompt, ...s.settings })
       });
       const data = await resp.json();
       if (!data.ok) throw new Error(data.error || 'Gagal memulai generate');
 
-      currentRefFiles = data.ref_files || [];
-      updateLoadingText('AI sedang generate gambar...', 'Biasanya butuh 20–60 detik');
-      startPolling(data.task_id);
+      s.refFiles = data.ref_files || [];
+      showSlotLoading(si, 'AI sedang generate...', 'Biasanya 20–60 detik');
+      startPoll(si, data.task_id);
 
     } catch (e) {
-      showError('Gagal generate', e.message);
-      resetBtn();
+      showSlotError(si, 'Gagal generate', e.message);
+      resetBtn(si);
     }
   };
 
+  // ── Generate semua ──
+  window.generateAll = function() {
+    slots.forEach(s => {
+      const hasFiles  = s.files.length > 0;
+      const hasPrompt = document.getElementById(`prompt-${s.idx}`).value.trim().length > 0;
+      const notBusy   = !s.pollId;
+      if (hasFiles && hasPrompt && notBusy) generateSlot(s.idx);
+    });
+  };
+
   // ── Polling ──
-  function startPolling(taskId) {
+  function startPoll(si, taskId) {
+    const s = slots[si];
     let attempt = 0;
-    pollInterval = setInterval(async () => {
+    s.pollId = setInterval(async () => {
       attempt++;
       if (attempt > 60) {
-        clearInterval(pollInterval);
-        showError('Timeout', 'Generate terlalu lama. Coba lagi.');
-        resetBtn(); return;
+        clearInterval(s.pollId); s.pollId = null;
+        showSlotError(si, 'Timeout', 'Generate terlalu lama. Coba lagi.');
+        resetBtn(si); return;
       }
-      if (attempt % 5 === 0) updateLoadingText('AI sedang generate gambar...', `${attempt * 3} detik berlalu...`);
+      if (attempt % 5 === 0) showSlotLoading(si, 'AI sedang generate...', `${attempt * 3} detik berlalu...`);
 
       try {
         const resp = await fetch('/api/ai-copy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'check_image_task', task_id: taskId, ref_files: currentRefFiles })
+          body: JSON.stringify({ action: 'check_image_task', task_id: taskId, ref_files: s.refFiles })
         });
         const data = await resp.json();
         if (!data.ok) return;
 
         if (data.state === 'success') {
-          clearInterval(pollInterval);
+          clearInterval(s.pollId); s.pollId = null;
           if (data.result_urls?.length) {
-            await saveToHistory(taskId, data.result_urls[0]);
-            showResult(data.result_urls[0]);
+            await saveToHistory(s, taskId, data.result_urls[0]);
+            showSlotResult(si, data.result_urls[0]);
           } else {
-            showError('Tidak ada hasil', 'AI berhasil tapi tidak menghasilkan gambar. Coba prompt lain.');
+            showSlotError(si, 'Tidak ada hasil', 'AI berhasil tapi tidak ada gambar. Coba prompt lain.');
           }
-          resetBtn();
+          resetBtn(si);
         } else if (data.state === 'fail') {
-          clearInterval(pollInterval);
-          showError('Generate gagal', data.fail_msg || 'Terjadi kesalahan di sisi AI. Coba lagi.');
-          resetBtn();
+          clearInterval(s.pollId); s.pollId = null;
+          showSlotError(si, 'Generate gagal', data.fail_msg || 'Terjadi kesalahan di sisi AI.');
+          resetBtn(si);
         }
       } catch (_) {}
     }, 3000);
   }
 
+  // ── Slot UI helpers ──
+  function setBadge(si, cls, label) {
+    const el = document.getElementById(`badge-${si}`);
+    el.className = `slot-badge ${cls}`;
+    el.textContent = label;
+  }
+
+  function showSlotLoading(si, txt, sub) {
+    document.getElementById(`loading-${si}`).style.display = 'flex';
+    document.getElementById(`rimg-${si}`).style.display = 'none';
+    document.getElementById(`rerr-${si}`).style.display = 'none';
+    document.getElementById(`ltxt-${si}`).textContent = txt;
+    document.getElementById(`lsub-${si}`).textContent = sub || '';
+  }
+
+  function showSlotResult(si, imgUrl) {
+    document.getElementById(`loading-${si}`).style.display = 'none';
+    document.getElementById(`rerr-${si}`).style.display = 'none';
+    const imgEl = document.getElementById(`rimg-${si}`);
+    imgEl.style.display = 'block';
+    document.getElementById(`img-${si}`).src = imgUrl;
+    const dlEl = document.getElementById(`dl-${si}`);
+    dlEl.href = imgUrl;
+    dlEl.download = `gen-slot${si+1}-${Date.now()}.png`;
+    setBadge(si, 'done', '✅ Selesai');
+    showToast(`Slot ${si + 1} selesai!`, 'success');
+  }
+
+  function showSlotError(si, title, msg) {
+    document.getElementById(`loading-${si}`).style.display = 'none';
+    document.getElementById(`rimg-${si}`).style.display = 'none';
+    document.getElementById(`rerr-${si}`).style.display = 'block';
+    document.getElementById(`etitle-${si}`).textContent = title;
+    document.getElementById(`emsg-${si}`).textContent = msg;
+    setBadge(si, 'error', '⚠️ Gagal');
+  }
+
+  function resetBtn(si) {
+    const btn = document.getElementById(`gbtn-${si}`);
+    btn.disabled = false; btn.textContent = '✨ Generate';
+    checkReady(si);
+    updateGenAllBtn();
+  }
+
+  window.clearSlotResult = function(si) {
+    const s = slots[si];
+    if (s.pollId) { clearInterval(s.pollId); s.pollId = null; }
+    document.getElementById(`res-${si}`).style.display = 'none';
+    document.getElementById(`loading-${si}`).style.display = 'none';
+    document.getElementById(`rimg-${si}`).style.display = 'none';
+    document.getElementById(`rerr-${si}`).style.display = 'none';
+    setBadge(si, 'idle', 'Siap');
+    resetBtn(si);
+  };
+
   // ── Save to history ──
-  async function saveToHistory(taskId, resultUrl) {
+  async function saveToHistory(s, taskId, resultUrl) {
     try {
       await sb.from('image_generations').insert({
         user_id:      currentUser.id,
         task_id:      taskId,
-        prompt:       currentPrompt,
+        prompt:       s.prompt,
         result_url:   resultUrl,
-        aspect_ratio: currentSettings.aspect_ratio,
-        resolution:   currentSettings.resolution,
-        background:   currentSettings.background,
+        aspect_ratio: s.settings.aspect_ratio,
+        resolution:   s.settings.resolution,
+        background:   s.settings.background,
       });
-    } catch (_) {} // silent — jangan ganggu user kalau save gagal
+    } catch (_) {}
   }
 
-  // ── Load History ──
+  // ── Load Riwayat ──
   window.loadHistory = async function() {
     const el = document.getElementById('history-list');
     el.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
     const { data, error } = await sb.from('image_generations')
-      .select('*').order('created_at', { ascending: false }).limit(50);
+      .select('*').order('created_at', { ascending: false }).limit(60);
 
     if (error || !data?.length) {
       el.innerHTML = `<div class="empty-state"><div class="icon">🎨</div><h3 style="font-size:15px;margin-bottom:4px;">Belum ada riwayat</h3><p style="font-size:13px;">Gambar yang di-generate akan muncul di sini.</p></div>`;
@@ -531,57 +709,7 @@
     showToast('Dihapus dari riwayat', 'success');
   };
 
-  window.regenerate = function() {
-    clearInterval(pollInterval);
-    document.getElementById('result-area').style.display = 'none';
-    document.getElementById('result-img-container').style.display = 'none';
-    document.getElementById('result-error').style.display = 'none';
-    document.getElementById('gen-loading').style.display = 'none';
-    resetBtn();
-  };
-
-  // ── UI helpers ──
-  function showLoading(txt) {
-    document.getElementById('result-area').style.display = 'block';
-    document.getElementById('gen-loading').style.display = 'flex';
-    document.getElementById('result-img-container').style.display = 'none';
-    document.getElementById('result-error').style.display = 'none';
-    document.getElementById('loading-txt').textContent = txt;
-    document.getElementById('loading-sub').textContent = '';
-    document.getElementById('result-area').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  function updateLoadingText(txt, sub) {
-    document.getElementById('loading-txt').textContent = txt;
-    document.getElementById('loading-sub').textContent = sub || '';
-  }
-
-  function showResult(imgUrl) {
-    document.getElementById('gen-loading').style.display = 'none';
-    document.getElementById('result-img-container').style.display = 'block';
-    document.getElementById('result-error').style.display = 'none';
-    document.getElementById('result-img').src = imgUrl;
-    document.getElementById('dl-btn').href = imgUrl;
-    document.getElementById('dl-btn').download = `gen-${Date.now()}.png`;
-    const meta = [currentSettings.aspect_ratio !== 'auto' ? currentSettings.aspect_ratio : 'Auto', currentSettings.resolution].join(' · ');
-    document.getElementById('result-meta').textContent = meta;
-    showToast('Gambar berhasil di-generate!', 'success');
-  }
-
-  function showError(title, msg) {
-    document.getElementById('gen-loading').style.display = 'none';
-    document.getElementById('result-img-container').style.display = 'none';
-    document.getElementById('result-error').style.display = 'block';
-    document.getElementById('error-title').textContent = title;
-    document.getElementById('error-msg').textContent = msg;
-  }
-
-  function resetBtn() {
-    const btn = document.getElementById('gen-btn');
-    btn.disabled = false; btn.textContent = '✨ Generate Gambar';
-    checkReady();
-  }
-
+  // ── Utility ──
   function fileToBase64(file) {
     return new Promise((resolve, reject) => {
       const r = new FileReader();
