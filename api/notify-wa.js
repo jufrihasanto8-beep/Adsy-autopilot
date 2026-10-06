@@ -396,7 +396,7 @@ Field tidak ditemukan = null.` }
       const text = data.content?.[0]?.text || '{}';
       const match = text.match(/\{[\s\S]*?\}/);
       try {
-        return res.json({ ok: true, data: JSON.parse(match?.[0] || '{}') });
+        return res.json({ ok: true, extracted: JSON.parse(match?.[0] || '{}') });
       } catch {
         return res.json({ ok: false, error: 'Gagal parse response', raw: text });
       }
