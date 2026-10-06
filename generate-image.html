@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generate Gambar — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <style>
+    /* ── Upload area ── */
+    .img-drop {
+      border: 2px dashed #c7d2fe; border-radius: 14px; padding: 32px 20px;
+      text-align: center; cursor: pointer; transition: all .2s; background: #fafbff;
+      position: relative;
+    }
+    .img-drop:hover, .img-drop.drag-over { border-color: var(--primary); background: #f0f2ff; }
+    .img-drop .drop-icon { font-size: 36px; margin-bottom: 8px; }
+    .img-drop .drop-hint { font-size: 13px; color: var(--text-sub); font-weight: 500; }
+    .img-drop .drop-sub  { font-size: 11px; color: var(--gray-4); margin-top: 4px; }
+    #ref-preview {
+      width: 100%; max-height: 300px; object-fit: contain; border-radius: 10px;
+      margin-top: 8px; display: none;
+    }
+    .drop-clear {
+      position: absolute; top: 10px; right: 12px; font-size: 14px; cursor: pointer;
+      background: var(--gray-2); border: none; border-radius: 50%; width: 24px; height: 24px;
+      display: none; align-items: center; justify-content: center; font-weight: 700;
+      color: var(--text-sub); transition: background .15s;
+    }
+    .drop-clear:hover { background: var(--gray-3); }
+
+    /* ── Settings row ── */
+    .gen-settings { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .gen-settings select {
+      flex: 1; min-width: 120px; padding: 8px 12px; border-radius: 10px;
+      border: 1.5px solid var(--gray-2); background: #fff; font-size: 13px;
+      font-family: inherit; color: var(--text); font-weight: 500; cursor: pointer;
+    }
+    .gen-settings select:focus { outline: none; border-color: var(--primary); }
+
+    /* ── Prompt area ── */
+    .prompt-wrap { position: relative; margin-top: 14px; }
+    .prompt-wrap textarea {
+      width: 100%; min-height: 110px; padding: 14px; border-radius: 12px;
+      border: 1.5px solid var(--gray-2); font-family: inherit; font-size: 14px;
+      resize: vertical; line-height: 1.6; transition: border-color .18s;
+      background: #fff; color: var(--text);
+    }
+    .prompt-wrap textarea:focus { outline: none; border-color: var(--primary); }
+    .prompt-char { font-size: 11px; color: var(--gray-4); text-align: right; margin-top: 4px; }
+
+    /* ── Result area ── */
+    .result-area { margin-top: 20px; display: none; }
+    .result-img-wrap {
+      border-radius: 14px; overflow: hidden; background: var(--gray-1);
+      position: relative; min-height: 200px; display: flex; align-items: center; justify-content: center;
+    }
+    .result-img-wrap img { width: 100%; height: auto; display: block; border-radius: 14px; }
+    .result-actions { display: flex; gap: 10px; margin-top: 12px; }
+
+    /* ── Loading state ── */
+    .gen-loading {
+      display: none; flex-direction: column; align-items: center; gap: 12px;
+      padding: 40px; text-align: center;
+    }
+    .gen-loading .spinner-big {
+      width: 44px; height: 44px; border: 4px solid var(--gray-2);
+      border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .gen-loading .loading-txt { font-size: 13px; color: var(--text-sub); font-weight: 500; }
+    .gen-loading .loading-sub { font-size: 12px; color: var(--gray-4); }
+
+    /* ── Progress dots ── */
+    .dot-anim { display: inline-flex; gap: 4px; }
+    .dot-anim span {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--primary);
+      animation: dotPulse 1.2s infinite ease-in-out;
+    }
+    .dot-anim span:nth-child(2) { animation-delay: .2s; }
+    .dot-anim span:nth-child(3) { animation-delay: .4s; }
+    @keyframes dotPulse { 0%,100%{opacity:.2;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
+
+    /* ── Tip chips ── */
+    .prompt-tips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .tip-chip {
+      padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid var(--gray-2); background: #fff;
+      color: var(--text-sub); transition: all .15s;
+    }
+    .tip-chip:hover { border-color: var(--primary); color: var(--primary); background: #f0f2ff; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="/assets/autopilot.png" style="width:36px;height:36px;object-fit:contain;border-radius:8px;" alt="Adsy" />
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
+      <div class="nav-item" data-page="ctwa.html"><span class="nav-icon">💬</span> Buat Iklan CTWA</div>
+      <div class="nav-item" data-page="boost-post.html"><span class="nav-icon">🚀</span> Boost Post</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item active" data-page="generate-image.html"><span class="nav-icon">🎨</span> Generate Gambar</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-item" data-page="topup.html"><span class="nav-icon">💳</span> Top Up Budget</div>
+      <div class="nav-item" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
+      <div class="nav-item" data-page="products.html"><span class="nav-icon">📦</span> Produk</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>🎨 Generate Gambar</h2>
+        <p>Ubah gambar referensi dengan AI menggunakan GPT Image 2</p>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-user">
+          <div class="topbar-avatar" id="user-avatar">?</div>
+          <div class="topbar-user-info">
+            <strong id="user-email">-</strong>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <div style="max-width:640px; margin:0 auto;">
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Gambar Referensi</div>
+              <div class="card-sub">Upload gambar yang ingin diubah atau dijadikan referensi gaya</div>
+            </div>
+          </div>
+
+          <!-- Upload area -->
+          <div class="img-drop" id="img-drop">
+            <button class="drop-clear" id="drop-clear" onclick="clearImage(event)">✕</button>
+            <div id="drop-placeholder">
+              <div class="drop-icon">🖼️</div>
+              <div class="drop-hint">Klik atau drag & drop gambar referensi</div>
+              <div class="drop-sub">PNG / JPG / WEBP · Maks 10MB</div>
+            </div>
+            <img id="ref-preview" src="" alt="Preview" />
+          </div>
+          <input type="file" id="ref-input" accept="image/*" style="display:none;" />
+          <div id="ref-filename" style="font-size:11px;color:var(--text-sub);margin-top:5px;"></div>
+
+          <!-- Prompt -->
+          <div style="margin-top:18px;">
+            <label class="form-label">Prompt <span style="color:var(--danger)">*</span></label>
+            <div class="prompt-wrap">
+              <textarea id="gen-prompt" placeholder="Contoh: ubah background jadi pantai tropis, pertahankan objek utama, gaya fotografi profesional..." oninput="updateCharCount()"></textarea>
+            </div>
+            <div class="prompt-char"><span id="char-count">0</span> / 20000</div>
+
+            <!-- Quick tips -->
+            <div class="prompt-tips">
+              <span class="tip-chip" onclick="appendPrompt('pertahankan objek utama')">pertahankan objek utama</span>
+              <span class="tip-chip" onclick="appendPrompt('gaya fotografi profesional')">fotografi profesional</span>
+              <span class="tip-chip" onclick="appendPrompt('background putih bersih')">background putih</span>
+              <span class="tip-chip" onclick="appendPrompt('lighting natural cerah')">lighting natural</span>
+              <span class="tip-chip" onclick="appendPrompt('remove background')">remove background</span>
+              <span class="tip-chip" onclick="appendPrompt('cinematic style')">cinematic</span>
+              <span class="tip-chip" onclick="appendPrompt('product photography style')">product photo</span>
+            </div>
+          </div>
+
+          <!-- Settings -->
+          <div class="gen-settings">
+            <select id="gen-aspect" title="Aspect Ratio">
+              <option value="auto">📐 Otomatis</option>
+              <option value="1:1">1:1 — Square</option>
+              <option value="4:3">4:3 — Landscape</option>
+              <option value="3:4">3:4 — Portrait</option>
+              <option value="16:9">16:9 — Widescreen</option>
+              <option value="9:16">9:16 — Story</option>
+              <option value="3:2">3:2</option>
+              <option value="2:3">2:3</option>
+            </select>
+            <select id="gen-resolution" title="Resolusi">
+              <option value="1K">🔲 Resolusi 1K</option>
+              <option value="2K">🔳 Resolusi 2K</option>
+            </select>
+            <select id="gen-background" title="Background">
+              <option value="opaque">🎨 Background Solid</option>
+              <option value="transparent">⬜ Transparan (PNG)</option>
+              <option value="auto">🔄 Otomatis</option>
+            </select>
+          </div>
+
+          <div id="gen-err" style="font-size:12px;color:var(--danger);margin-top:10px;display:none;"></div>
+
+          <button class="btn btn-primary" id="gen-btn" onclick="generateImage()"
+            style="width:100%;margin-top:16px;font-size:15px;padding:14px;" disabled>
+            ✨ Generate Gambar
+          </button>
+        </div>
+
+        <!-- ── Result ── -->
+        <div class="result-area" id="result-area">
+          <div class="card" id="result-card">
+
+            <!-- Loading -->
+            <div class="gen-loading" id="gen-loading">
+              <div class="spinner-big"></div>
+              <div class="loading-txt" id="loading-txt">Mengirim ke AI... <div class="dot-anim"><span></span><span></span><span></span></div></div>
+              <div class="loading-sub" id="loading-sub">Biasanya butuh 20–60 detik</div>
+            </div>
+
+            <!-- Result image -->
+            <div id="result-img-container" style="display:none;">
+              <div class="card-header" style="margin-bottom:12px;">
+                <div>
+                  <div class="card-title">✅ Gambar Selesai!</div>
+                  <div class="card-sub" id="result-meta"></div>
+                </div>
+              </div>
+              <div class="result-img-wrap">
+                <img id="result-img" src="" alt="Generated" />
+              </div>
+              <div class="result-actions">
+                <a id="dl-btn" class="btn btn-primary" style="flex:2;text-align:center;text-decoration:none;" download="generated.png">
+                  ⬇️ Download
+                </a>
+                <button class="btn btn-outline" style="flex:1;" onclick="regenerate()">🔄 Ulangi</button>
+              </div>
+            </div>
+
+            <!-- Error -->
+            <div id="result-error" style="display:none;padding:24px;text-align:center;">
+              <div style="font-size:32px;margin-bottom:8px;">⚠️</div>
+              <div style="font-weight:700;color:var(--danger);margin-bottom:4px;" id="error-title">Generate gagal</div>
+              <div style="font-size:13px;color:var(--text-sub);" id="error-msg"></div>
+              <button class="btn btn-outline" style="margin-top:16px;" onclick="regenerate()">Coba Lagi</button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast } from './js/sidebar.js';
+
+  let selectedFile = null;
+  let pollInterval = null;
+  let currentTaskId = null;
+
+  // ── Init ──
+  (async () => {
+    const session = await requireAuth();
+    if (!session) return;
+    await renderUserInfo();
+    initSidebar();
+    setupUpload();
+  })();
+
+  // ── Upload ──
+  function setupUpload() {
+    const area = document.getElementById('img-drop');
+    const inp  = document.getElementById('ref-input');
+    area.addEventListener('click', e => { if (e.target.id !== 'drop-clear') inp.click(); });
+    area.addEventListener('dragover',  e => { e.preventDefault(); area.classList.add('drag-over'); });
+    area.addEventListener('dragleave', () => area.classList.remove('drag-over'));
+    area.addEventListener('drop', e => {
+      e.preventDefault(); area.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    inp.addEventListener('change', () => { if (inp.files[0]) handleFile(inp.files[0]); });
+  }
+
+  function handleFile(file) {
+    if (!file.type.startsWith('image/')) { showToast('File harus berupa gambar', 'error'); return; }
+    if (file.size > 10 * 1024 * 1024) { showToast('Gambar terlalu besar, maks 10MB', 'error'); return; }
+    selectedFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.getElementById('ref-preview');
+      img.src = e.target.result;
+      img.style.display = 'block';
+      document.getElementById('drop-placeholder').style.display = 'none';
+      document.getElementById('drop-clear').style.display = 'flex';
+    };
+    reader.readAsDataURL(file);
+    document.getElementById('ref-filename').textContent = `📎 ${file.name}  (${(file.size/1024/1024).toFixed(1)} MB)`;
+    checkReady();
+  }
+
+  window.clearImage = function(e) {
+    e.stopPropagation();
+    selectedFile = null;
+    document.getElementById('ref-preview').style.display = 'none';
+    document.getElementById('ref-preview').src = '';
+    document.getElementById('drop-placeholder').style.display = 'block';
+    document.getElementById('drop-clear').style.display = 'none';
+    document.getElementById('ref-filename').textContent = '';
+    document.getElementById('ref-input').value = '';
+    checkReady();
+  };
+
+  window.updateCharCount = function() {
+    const len = document.getElementById('gen-prompt').value.length;
+    document.getElementById('char-count').textContent = len;
+    checkReady();
+  };
+
+  window.appendPrompt = function(text) {
+    const ta = document.getElementById('gen-prompt');
+    const cur = ta.value.trim();
+    ta.value = cur ? cur + ', ' + text : text;
+    updateCharCount();
+    ta.focus();
+  };
+
+  function checkReady() {
+    const hasFile   = !!selectedFile;
+    const hasPrompt = document.getElementById('gen-prompt').value.trim().length > 0;
+    document.getElementById('gen-btn').disabled = !(hasFile && hasPrompt);
+  }
+
+  // ── Generate ──
+  window.generateImage = async function() {
+    const prompt = document.getElementById('gen-prompt').value.trim();
+    const errEl  = document.getElementById('gen-err');
+    errEl.style.display = 'none';
+
+    if (!selectedFile) { errEl.textContent = 'Upload gambar referensi terlebih dahulu.'; errEl.style.display = 'block'; return; }
+    if (!prompt)       { errEl.textContent = 'Isi prompt terlebih dahulu.'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('gen-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Memproses...';
+
+    // Show result area / loading
+    showLoading('Mengupload gambar referensi...');
+
+    try {
+      const base64 = await fileToBase64(selectedFile);
+
+      const resp = await fetch('/api/ai-copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate_image',
+          image_base64: base64,
+          mime_type: selectedFile.type,
+          prompt,
+          aspect_ratio: document.getElementById('gen-aspect').value,
+          resolution: document.getElementById('gen-resolution').value,
+          background: document.getElementById('gen-background').value
+        })
+      });
+
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || 'Gagal memulai generate');
+
+      currentTaskId = data.task_id;
+      updateLoadingText('AI sedang generate gambar...', 'Biasanya butuh 20–60 detik');
+      startPolling(currentTaskId);
+
+    } catch (e) {
+      showError('Gagal generate', e.message);
+      btn.disabled = false;
+      btn.textContent = '✨ Generate Gambar';
+    }
+  };
+
+  // ── Polling ──
+  function startPolling(taskId) {
+    let attempt = 0;
+    const MAX = 60; // 60 × 3s = 3 menit max
+
+    pollInterval = setInterval(async () => {
+      attempt++;
+      if (attempt > MAX) {
+        clearInterval(pollInterval);
+        showError('Timeout', 'Generate terlalu lama. Coba lagi.');
+        resetBtn();
+        return;
+      }
+
+      // Update loading sub-text tiap 5 attempt
+      if (attempt % 5 === 0) {
+        const elapsed = attempt * 3;
+        updateLoadingText('AI sedang generate gambar...', `${elapsed} detik berlalu...`);
+      }
+
+      try {
+        const resp = await fetch('/api/ai-copy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'check_image_task', task_id: taskId })
+        });
+        const data = await resp.json();
+        if (!data.ok) return; // biarkan retry
+
+        if (data.state === 'success') {
+          clearInterval(pollInterval);
+          if (data.result_urls?.length) {
+            showResult(data.result_urls[0]);
+          } else {
+            showError('Tidak ada hasil', 'AI berhasil tapi tidak menghasilkan gambar. Coba prompt lain.');
+          }
+          resetBtn();
+
+        } else if (data.state === 'fail') {
+          clearInterval(pollInterval);
+          showError('Generate gagal', data.fail_msg || 'Terjadi kesalahan di sisi AI. Coba lagi.');
+          resetBtn();
+        }
+        // 'waiting' → lanjut polling
+
+      } catch (e) {
+        // network error, biarkan retry
+      }
+    }, 3000);
+  }
+
+  window.regenerate = function() {
+    clearInterval(pollInterval);
+    document.getElementById('result-area').style.display = 'none';
+    document.getElementById('result-img-container').style.display = 'none';
+    document.getElementById('result-error').style.display = 'none';
+    document.getElementById('gen-loading').style.display = 'none';
+    resetBtn();
+  };
+
+  // ── UI helpers ──
+  function showLoading(txt) {
+    document.getElementById('result-area').style.display = 'block';
+    document.getElementById('gen-loading').style.display = 'flex';
+    document.getElementById('result-img-container').style.display = 'none';
+    document.getElementById('result-error').style.display = 'none';
+    document.getElementById('loading-txt').innerHTML = txt + ' <div class="dot-anim"><span></span><span></span><span></span></div>';
+    document.getElementById('loading-sub').textContent = '';
+    document.getElementById('result-area').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function updateLoadingText(txt, sub) {
+    document.getElementById('loading-txt').innerHTML = txt + ' <div class="dot-anim"><span></span><span></span><span></span></div>';
+    document.getElementById('loading-sub').textContent = sub || '';
+  }
+
+  function showResult(imgUrl) {
+    document.getElementById('gen-loading').style.display = 'none';
+    document.getElementById('result-img-container').style.display = 'block';
+    document.getElementById('result-error').style.display = 'none';
+
+    const img = document.getElementById('result-img');
+    img.src = imgUrl;
+
+    const dlBtn = document.getElementById('dl-btn');
+    dlBtn.href = imgUrl;
+    dlBtn.download = `gen-${Date.now()}.png`;
+
+    const aspect = document.getElementById('gen-aspect').value;
+    const res    = document.getElementById('gen-resolution').value;
+    document.getElementById('result-meta').textContent = `${aspect !== 'auto' ? aspect : 'Auto'} · ${res}`;
+
+    showToast('Gambar berhasil di-generate!', 'success');
+  }
+
+  function showError(title, msg) {
+    document.getElementById('gen-loading').style.display = 'none';
+    document.getElementById('result-img-container').style.display = 'none';
+    document.getElementById('result-error').style.display = 'block';
+    document.getElementById('error-title').textContent = title;
+    document.getElementById('error-msg').textContent = msg;
+  }
+
+  function resetBtn() {
+    const btn = document.getElementById('gen-btn');
+    btn.disabled = false;
+    btn.textContent = '✨ Generate Gambar';
+    checkReady();
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+</script>
+</body>
+</html>
