@@ -495,6 +495,25 @@ Field tidak ditemukan = null.` }
     const anyFailed = results.some(r => !r.ok);
     const failReasons = results.filter(r => !r.ok).map(r => r.result?.reason || r.error || 'unknown').join(', ');
 
+    // Deduct spend dari saldo akun iklan (jika request punya ad_account_id dan spend terdeteksi)
+    const adAccountId = body.ad_account_id;
+    const spend = Number(extracted?.spend) || 0;
+    if (adAccountId && spend > 0) {
+      try {
+        const { data: acct } = await sb.from('topup_ad_accounts').select('saldo_saat_ini').eq('id', adAccountId).single();
+        const newSaldo = (Number(acct?.saldo_saat_ini) || 0) - spend;
+        await sb.from('topup_ad_accounts').update({ saldo_saat_ini: newSaldo, updated_at: new Date().toISOString() }).eq('id', adAccountId);
+        await sb.from('topup_ad_account_logs').insert({
+          ad_account_id: adAccountId,
+          type: 'spend',
+          amount: -spend,
+          request_id: body.request_id,
+          catatan: `Spend ${extracted?.date_range || 'kemarin'}`,
+          tanggal: new Date().toISOString().split('T')[0]
+        });
+      } catch (_) {}
+    }
+
     if (allFailed) {
       return res.json({ ok: false, warn: 'Fonnte gagal kirim WA: ' + failReasons, results });
     }
@@ -531,6 +550,23 @@ Field tidak ditemukan = null.` }
       .eq('id', id);
 
     if (updErr) return res.status(500).json({ error: updErr.message });
+
+    // Update saldo akun iklan saat approve (tambah nominal_disetujui)
+    if (!reject && nominal_disetujui && req_data.topup_ad_account_id) {
+      try {
+        const { data: acct } = await sb.from('topup_ad_accounts').select('saldo_saat_ini').eq('id', req_data.topup_ad_account_id).single();
+        const newSaldo = (Number(acct?.saldo_saat_ini) || 0) + Number(nominal_disetujui);
+        await sb.from('topup_ad_accounts').update({ saldo_saat_ini: newSaldo, updated_at: new Date().toISOString() }).eq('id', req_data.topup_ad_account_id);
+        await sb.from('topup_ad_account_logs').insert({
+          ad_account_id: req_data.topup_ad_account_id,
+          type: 'topup',
+          amount: Number(nominal_disetujui),
+          request_id: req_data.id,
+          catatan: 'Top up disetujui',
+          tanggal: new Date().toISOString().split('T')[0]
+        });
+      } catch (_) {}
+    }
 
     // Notif WA balik ke advertiser
     try {
