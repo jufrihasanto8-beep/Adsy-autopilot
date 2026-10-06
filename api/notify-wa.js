@@ -176,6 +176,37 @@ const htmlConfirm = (r, id, token) => {
 </html>`;
 };
 
+// Hitung rekomendasi budget berdasarkan CPR vs target — pure math, tidak pakai AI
+function calcRecommendation(cpr, targetCpr) {
+  const fmtRp = n => 'Rp ' + Math.round(n).toLocaleString('id-ID');
+
+  if (!cpr || !targetCpr) {
+    return { level: 'moderate', recommendation_pct: 75, reason: 'Target CPR belum diset atau CPR tidak terbaca, gunakan penilaian manual.' };
+  }
+
+  const ratio = cpr / targetCpr;
+
+  if (ratio <= 1) {
+    return {
+      level: 'good',
+      recommendation_pct: 100,
+      reason: `CPR ${fmtRp(cpr)} ≤ target ${fmtRp(targetCpr)} (${(ratio * 100).toFixed(0)}% dari target). Performa baik, top up penuh direkomendasikan.`
+    };
+  } else if (ratio <= 1.5) {
+    return {
+      level: 'moderate',
+      recommendation_pct: 75,
+      reason: `CPR ${fmtRp(cpr)} melebihi target ${fmtRp(targetCpr)} sebesar ${((ratio - 1) * 100).toFixed(0)}%. Performa cukup, top up 75% direkomendasikan.`
+    };
+  } else {
+    return {
+      level: 'poor',
+      recommendation_pct: 50,
+      reason: `CPR ${fmtRp(cpr)} jauh melebihi target ${fmtRp(targetCpr)} (${(ratio * 100).toFixed(0)}% dari target). Performa rendah, top up 50% direkomendasikan.`
+    };
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -271,37 +302,26 @@ export default async function handler(req, res) {
                 type: 'text',
                 text: `Kamu adalah data extractor untuk screenshot Meta Ads Manager (versi Bahasa Indonesia).
 
-Screenshot menampilkan tabel kampanye Meta Ads. Fokus pada BARIS TOTAL di paling bawah tabel (biasanya berlabel "Hasil dari X kampanye").
+Screenshot menampilkan tabel kampanye Meta Ads. Fokus pada BARIS TOTAL di paling bawah tabel (berlabel "Hasil dari X kampanye").
 
-Mapping kolom yang HARUS kamu ikuti:
-- "Hasil" → results (total lead/konversi, ambil angka di baris total)
-- "Biaya per hasil" → cpr (biaya per lead, format Rp xxx.xxx → angka saja)
-- "Jumlah yang dibelanjakan" → spend (total spend, format Rp xxx.xxx → angka saja)
-- Tanggal → date_range (cari di pojok kanan atas, format "Hari Ini: 6 Okt 2026" atau range tanggal)
+Mapping kolom yang HARUS kamu ikuti (ambil dari baris total):
+- "Hasil" → results (angka total lead/konversi di baris paling bawah)
+- "Biaya per hasil" → cpr (angka biaya per lead di baris paling bawah, contoh: "Rp 202.214" → 202214)
+- "Jumlah yang dibelanjakan" → spend (total spend di baris paling bawah, contoh: "Rp 1.617.715" → 1617715)
+- Tanggal dari pojok kanan atas → date_range (contoh: "Hari Ini: 6 Okt 2026" → "6 Okt 2026")
 
-Target CPR produk "${product_name || 'ini'}": Rp ${target_cpr ? Number(target_cpr).toLocaleString('id-ID') : 'tidak diketahui'}
+PENTING: Semua angka kembalikan sebagai INTEGER murni. Format Indonesia: titik = pemisah ribuan, koma = desimal.
+Contoh: "Rp 1.617.715" = 1617715, "Rp 202.214" = 202214, "Rp 25.000" = 25000.
 
 Return HANYA valid JSON (tanpa markdown, tanpa komentar):
 {
-  "extracted": {
-    "date_range": "6 Okt 2026",
-    "spend": 1617715,
-    "results": 8,
-    "cpr": 202214
-  },
-  "recommendation": {
-    "recommendation_pct": 100,
-    "level": "good",
-    "reason": "CPR Rp 202.214 di bawah target Rp 250.000, performa baik."
-  }
+  "date_range": "6 Okt 2026",
+  "spend": 1617715,
+  "results": 8,
+  "cpr": 202214
 }
 
-Aturan rekomendasi (bandingkan cpr hasil extract dengan target_cpr):
-- level "good" (pct: 100) → cpr ≤ target_cpr
-- level "moderate" (pct: 75) → cpr antara target_cpr s/d 1.5× target_cpr
-- level "poor" (pct: 50) → cpr > 1.5× target_cpr
-- Jika target_cpr tidak diketahui atau cpr tidak bisa diekstrak → level "moderate", pct: 75
-- Semua angka dalam number murni (tanpa Rp, tanpa titik/koma pemisah ribuan). Field tidak ditemukan = null.`
+Field tidak ditemukan = null.`
               }
             ]
           }]
@@ -314,8 +334,12 @@ Aturan rekomendasi (bandingkan cpr hasil extract dengan target_cpr):
       const text = data.content?.[0]?.text || '{}';
       const match = text.match(/\{[\s\S]*\}/);
       try {
-        const parsed = JSON.parse(match?.[0] || '{}');
-        return res.json({ ok: true, extracted: parsed.extracted || {}, recommendation: parsed.recommendation || {} });
+        const extracted = JSON.parse(match?.[0] || '{}');
+
+        // Hitung rekomendasi di server (bukan AI) — akurat & tidak bisa salah format
+        const recommendation = calcRecommendation(extracted.cpr, target_cpr);
+
+        return res.json({ ok: true, extracted, recommendation });
       } catch {
         return res.json({ ok: false, error: 'Gagal parse AI response', raw: text });
       }
