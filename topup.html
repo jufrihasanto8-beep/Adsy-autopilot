@@ -72,6 +72,40 @@
     .loading-state { text-align:center; padding:48px; color:var(--text-sub); }
     .empty-state { text-align:center; padding:56px 24px; color:var(--text-sub); }
     .empty-state .icon { font-size:48px; margin-bottom:12px; }
+
+    /* ── Ad Account selector in request form ── */
+    .billing-info-bar { background:linear-gradient(135deg,#eff6ff,#f0fdf4); border:1.5px solid #bfdbfe; border-radius:12px; padding:14px 16px; margin-top:8px; display:none; }
+    .billing-info-bar .bi-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:3px 0; }
+    .billing-info-bar .bi-lbl { color:var(--text-sub); }
+    .billing-info-bar .bi-val { font-weight:700; color:var(--text); }
+    .billing-info-bar .bi-cc { font-size:11px; color:var(--text-sub); margin-top:6px; padding-top:6px; border-top:1px solid #bfdbfe; }
+
+    /* ── Akun Iklan panel ── */
+    .akun-section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+    .akun-section-title { font-size:14px; font-weight:700; color:var(--text); }
+    .acct-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; }
+    .acct-card { background:#fff; border:1.5px solid var(--gray-2); border-radius:14px; padding:16px 18px; position:relative; }
+    .acct-card-name { font-size:14px; font-weight:700; color:var(--text); margin-bottom:10px; padding-right:60px; }
+    .acct-card-row { display:flex; justify-content:space-between; font-size:12px; padding:3px 0; }
+    .acct-card-row .lbl { color:var(--text-sub); }
+    .acct-card-row .val { font-weight:600; color:var(--text); }
+    .acct-card-actions { position:absolute; top:14px; right:14px; display:flex; gap:6px; }
+    .acct-card-actions button { border:none; background:var(--gray-1); border-radius:8px; padding:5px 8px; cursor:pointer; font-size:12px; transition:background .15s; }
+    .acct-card-actions button:hover { background:var(--gray-2); }
+    .acct-product-group { margin-bottom:24px; }
+    .acct-product-label { font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px; }
+    .acct-saldo-bar { margin-top:8px; border-radius:6px; overflow:hidden; background:#e5e7eb; height:6px; }
+    .acct-saldo-fill { height:100%; background:linear-gradient(90deg,#3b82f6,#10b981); border-radius:6px; transition:width .4s; }
+
+    /* ── Billing SS upload (inside modal) ── */
+    .billing-drop { border:2px dashed #c7d2fe; border-radius:10px; padding:18px 16px; text-align:center; cursor:pointer; transition:all .2s; background:#fafbff; }
+    .billing-drop:hover, .billing-drop.drag-over { border-color:var(--primary); background:#f0f2ff; }
+    #billing-preview { width:100%; max-height:160px; object-fit:contain; border-radius:6px; margin-top:6px; display:none; }
+    .billing-extract-result { background:var(--gray-1); border-radius:10px; padding:12px; margin-top:8px; display:none; font-size:13px; }
+    .billing-extract-row { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--gray-2); }
+    .billing-extract-row:last-child { border-bottom:none; }
+    .billing-extract-row .lbl { color:var(--text-sub); }
+    .billing-extract-row .val { font-weight:600; }
   </style>
 </head>
 <body>
@@ -138,6 +172,7 @@
       <div class="topup-tabs" id="topup-tabs">
         <button class="topup-tab active" data-tab="request" onclick="switchTab('request')">Request Top Up</button>
         <button class="topup-tab" data-tab="riwayat" onclick="switchTab('riwayat')">Riwayat</button>
+        <button class="topup-tab" data-tab="akun-iklan" onclick="switchTab('akun-iklan')">Akun Iklan</button>
       </div>
 
       <!-- ── Panel: Request ── -->
@@ -158,6 +193,23 @@
               <option value="">— Pilih Produk —</option>
             </select>
             <div class="form-hint" id="tp-product-kpi" style="display:none;"></div>
+          </div>
+
+          <!-- Pilih Akun Iklan -->
+          <div class="form-group" id="tp-adaccount-group" style="display:none;">
+            <label class="form-label">Akun Iklan</label>
+            <select class="form-input form-select" id="tp-adaccount" onchange="onAdAccountChange()">
+              <option value="">— Pilih Akun Iklan (opsional) —</option>
+            </select>
+            <div class="form-hint">
+              Belum ada? <a href="#" style="color:var(--primary);font-weight:600;" onclick="switchTab('akun-iklan');return false;">Tambah di tab Akun Iklan</a>
+            </div>
+            <!-- Billing info display -->
+            <div class="billing-info-bar" id="billing-info-bar">
+              <div class="bi-row"><span class="bi-lbl">💰 Saldo Saat Ini</span><span class="bi-val" id="bi-saldo">-</span></div>
+              <div class="bi-row"><span class="bi-lbl">📊 Jangkauan Saldo</span><span class="bi-val" id="bi-jangkauan">-</span></div>
+              <div class="bi-cc" id="bi-cc" style="display:none;"></div>
+            </div>
           </div>
 
           <!-- Screenshot -->
@@ -181,7 +233,7 @@
             <div id="extract-rows"></div>
           </div>
 
-          <!-- AI Recommendation -->
+          <!-- AI Recommendation (hidden from advertiser, shown to admin via JS) -->
           <div class="rec-wrap" id="rec-wrap">
             <div id="rec-badge-el"></div>
             <div class="rec-reason" id="rec-reason-el" style="display:none;"></div>
@@ -225,6 +277,17 @@
         </div>
       </div>
 
+      <!-- ── Panel: Akun Iklan ── -->
+      <div id="panel-akun-iklan" class="topup-panel" style="display:none; max-width:760px;">
+        <div class="akun-section-header">
+          <div class="akun-section-title">💳 Daftar Akun Iklan</div>
+          <button class="btn btn-primary btn-sm" onclick="openAddAccountModal()">+ Tambah Akun Iklan</button>
+        </div>
+        <div id="akun-list">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
     </div><!-- end page-content -->
   </main>
 </div><!-- end app-layout -->
@@ -242,6 +305,98 @@
   </div>
 </div>
 
+<!-- ── Modal: Add/Edit Akun Iklan ── -->
+<div class="modal-overlay hidden" id="modal-adaccount">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <h3 id="modal-adaccount-title">Tambah Akun Iklan</h3>
+      <div class="modal-close" onclick="closeModal('modal-adaccount')">✕</div>
+    </div>
+    <div class="modal-body">
+
+      <input type="hidden" id="aa-edit-id" />
+
+      <!-- Produk -->
+      <div class="modal-field">
+        <label>Produk <span style="color:var(--danger)">*</span></label>
+        <select class="form-input form-select" id="aa-product">
+          <option value="">— Pilih Produk —</option>
+        </select>
+      </div>
+
+      <!-- Nama Akun -->
+      <div class="modal-field">
+        <label>Nama Akun Iklan <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-input" id="aa-nama" placeholder="Contoh: Akun Utama Meta Ads" />
+      </div>
+
+      <!-- Screenshot Billing -->
+      <div class="modal-field">
+        <label>Screenshot Billing Meta Ads <span style="color:var(--text-sub);font-weight:400;">(opsional — auto-isi saldo)</span></label>
+        <div class="billing-drop" id="billing-drop">
+          <div id="billing-placeholder" style="font-size:13px;color:var(--text-sub);">
+            <div style="font-size:24px;margin-bottom:4px;">🧾</div>
+            <div>Klik atau drag & drop screenshot billing</div>
+            <div style="font-size:11px;color:var(--gray-4);margin-top:2px;">PNG / JPG · Maks 4MB</div>
+          </div>
+          <img id="billing-preview" src="" alt="Preview billing" />
+        </div>
+        <input type="file" id="billing-input" accept="image/*" style="display:none;" />
+        <div id="billing-filename" style="font-size:11px;color:var(--text-sub);margin-top:4px;"></div>
+        <div class="billing-extract-result" id="billing-extract-result">
+          <div style="font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:6px;">📊 Hasil Ekstrak Billing</div>
+          <div id="billing-extract-rows"></div>
+        </div>
+      </div>
+
+      <!-- Saldo Saat Ini & Jangkauan -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="modal-field" style="margin-bottom:0;">
+          <label>Saldo Saat Ini</label>
+          <div class="nominal-wrap">
+            <span class="prefix" style="font-size:12px;">Rp</span>
+            <input type="text" class="form-input" id="aa-saldo" placeholder="0" inputmode="numeric"
+              oninput="formatNominalInput(this)" style="padding-left:38px;font-size:14px;" />
+          </div>
+        </div>
+        <div class="modal-field" style="margin-bottom:0;">
+          <label>Jangkauan Saldo</label>
+          <div class="nominal-wrap">
+            <span class="prefix" style="font-size:12px;">Rp</span>
+            <input type="text" class="form-input" id="aa-jangkauan" placeholder="0" inputmode="numeric"
+              oninput="formatNominalInput(this)" style="padding-left:38px;font-size:14px;" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Kartu Kredit -->
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-2);">
+        <div style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:10px;">💳 Info Kartu Kredit (opsional)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="modal-field" style="margin-bottom:0;">
+            <label>4 Digit Terakhir</label>
+            <input type="text" class="form-input" id="aa-cc-nomor" placeholder="1234"
+              maxlength="4" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')" />
+          </div>
+          <div class="modal-field" style="margin-bottom:0;">
+            <label>Nama di Kartu</label>
+            <input type="text" class="form-input" id="aa-cc-nama" placeholder="JOHN DOE" style="text-transform:uppercase;" />
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-field" style="margin-top:4px;">
+        <div id="aa-err" style="font-size:12px;color:var(--danger);display:none;"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-adaccount')">Batal</button>
+        <button class="btn btn-primary" style="flex:2;" id="aa-save-btn" onclick="saveAdAccount()">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
   import { requireAuth, renderUserInfo, getProfile } from './js/auth.js';
@@ -251,7 +406,12 @@
   let sb, currentProfile, products = [];
   let selectedFile = null, extractedData = null, recommendationData = null;
   let currentStatus = 'pending';
-  let approveTarget = null; // { id, nominalRequest }
+  let approveTarget = null;
+  let adAccounts = [];   // all accounts for this user
+  let selectedAccountId = null;
+
+  // billing SS state (in add-account modal)
+  let billingFile = null;
 
   // ── Init ──
   (async () => {
@@ -261,7 +421,7 @@
     currentProfile = await renderUserInfo();
     initSidebar();
 
-    // Admin: ubah tab Riwayat jadi Manajemen, langsung buka manajemen panel
+    // Admin: rename Riwayat tab
     if (['admin', 'superadmin'].includes(currentProfile?.role)) {
       const tabRiwayat = document.querySelector('.topup-tab[data-tab="riwayat"]');
       if (tabRiwayat) tabRiwayat.textContent = 'Manajemen Top Up';
@@ -269,6 +429,7 @@
     }
 
     await loadProducts();
+    await loadAdAccounts();
     setupUploadArea();
     await loadHistory();
   })();
@@ -278,12 +439,15 @@
     const { data } = await sb.from('products').select('id, name, target_cpr').order('name');
     products = data || [];
     const sel = document.getElementById('tp-product');
+    const aaSel = document.getElementById('aa-product');
     products.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name;
-      opt.dataset.cpr = p.target_cpr || '';
-      sel.appendChild(opt);
+      [sel, aaSel].forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        opt.dataset.cpr = p.target_cpr || '';
+        s.appendChild(opt);
+      });
     });
   }
 
@@ -298,10 +462,284 @@
     } else {
       hintEl.style.display = 'none';
     }
+
+    // populate ad account dropdown filtered by product
+    const productId = sel.value;
+    const aaGroup = document.getElementById('tp-adaccount-group');
+    const aaSel = document.getElementById('tp-adaccount');
+    aaSel.innerHTML = '<option value="">— Pilih Akun Iklan (opsional) —</option>';
+
+    const filtered = adAccounts.filter(a => a.product_id === productId);
+    if (filtered.length) {
+      filtered.forEach(a => {
+        const o = document.createElement('option');
+        o.value = a.id;
+        o.textContent = a.nama_akun;
+        o.dataset.saldo = a.saldo_saat_ini || 0;
+        o.dataset.jangkauan = a.jangkauan_saldo || 0;
+        o.dataset.ccNomor = a.kartu_kredit_nomor || '';
+        o.dataset.ccNama = a.kartu_kredit_nama || '';
+        aaSel.appendChild(o);
+      });
+    }
+    aaGroup.style.display = productId ? 'block' : 'none';
+    hideBillingBar();
+    selectedAccountId = null;
     checkSubmitEnabled();
   };
 
-  // ── Upload area ──
+  window.onAdAccountChange = function() {
+    const sel = document.getElementById('tp-adaccount');
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt?.value) { hideBillingBar(); selectedAccountId = null; return; }
+
+    selectedAccountId = opt.value;
+    const saldo = opt.dataset.saldo;
+    const jangkauan = opt.dataset.jangkauan;
+    const ccNomor = opt.dataset.ccNomor;
+    const ccNama = opt.dataset.ccNama;
+
+    document.getElementById('bi-saldo').textContent = saldo ? 'Rp ' + Number(saldo).toLocaleString('id-ID') : '-';
+    document.getElementById('bi-jangkauan').textContent = jangkauan ? 'Rp ' + Number(jangkauan).toLocaleString('id-ID') : '-';
+
+    const ccEl = document.getElementById('bi-cc');
+    if (ccNomor) {
+      ccEl.textContent = `💳 •••• ${ccNomor}${ccNama ? '  ·  ' + ccNama : ''}`;
+      ccEl.style.display = 'block';
+    } else {
+      ccEl.style.display = 'none';
+    }
+    document.getElementById('billing-info-bar').style.display = 'block';
+  };
+
+  function hideBillingBar() {
+    document.getElementById('billing-info-bar').style.display = 'none';
+  }
+
+  // ── Ad Accounts ──
+  async function loadAdAccounts() {
+    const { data: { user } } = await sb.auth.getUser();
+    const isAdmin = ['admin', 'superadmin'].includes(currentProfile?.role);
+    let q = sb.from('topup_ad_accounts').select('*, products(name)').order('created_at', { ascending: false });
+    if (!isAdmin) q = q.eq('user_id', user.id);
+    const { data } = await q;
+    adAccounts = data || [];
+  }
+
+  function renderAdAccounts() {
+    const el = document.getElementById('akun-list');
+    if (!adAccounts.length) {
+      el.innerHTML = `<div class="empty-state"><div class="icon">💳</div><h3 style="font-size:15px;margin-bottom:4px;">Belum ada akun iklan</h3><p style="font-size:13px;">Tambah akun iklan untuk menyimpan info billing Meta Ads.</p></div>`;
+      return;
+    }
+
+    // Group by product
+    const grouped = {};
+    adAccounts.forEach(a => {
+      const key = a.product_id || 'tanpa-produk';
+      const label = a.products?.name || 'Tanpa Produk';
+      if (!grouped[key]) grouped[key] = { label, items: [] };
+      grouped[key].items.push(a);
+    });
+
+    el.innerHTML = Object.values(grouped).map(g => `
+      <div class="acct-product-group">
+        <div class="acct-product-label">📦 ${g.label}</div>
+        <div class="acct-grid">
+          ${g.items.map(a => renderAccountCard(a)).join('')}
+        </div>
+      </div>`).join('');
+  }
+
+  function renderAccountCard(a) {
+    const fmtRp = n => n ? 'Rp ' + Number(n).toLocaleString('id-ID') : '-';
+    const saldo = Number(a.saldo_saat_ini) || 0;
+    const jangkauan = Number(a.jangkauan_saldo) || 0;
+    const pct = jangkauan > 0 ? Math.min(100, Math.round((saldo / jangkauan) * 100)) : 0;
+    const ccInfo = a.kartu_kredit_nomor
+      ? `<div style="font-size:11px;color:var(--text-sub);margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-2);">💳 •••• ${a.kartu_kredit_nomor}${a.kartu_kredit_nama ? '  ·  ' + a.kartu_kredit_nama : ''}</div>`
+      : '';
+
+    return `<div class="acct-card" id="acct-${a.id}">
+      <div class="acct-card-name">${a.nama_akun}</div>
+      <div class="acct-card-actions">
+        <button onclick="openAddAccountModal('${a.id}')" title="Edit">✏️</button>
+        <button onclick="deleteAdAccount('${a.id}')" title="Hapus" style="color:var(--danger)">🗑️</button>
+      </div>
+      <div class="acct-card-row"><span class="lbl">💰 Saldo</span><span class="val">${fmtRp(a.saldo_saat_ini)}</span></div>
+      <div class="acct-card-row"><span class="lbl">📊 Jangkauan</span><span class="val">${fmtRp(a.jangkauan_saldo)}</span></div>
+      ${jangkauan > 0 ? `<div class="acct-saldo-bar" title="${pct}% saldo tersisa"><div class="acct-saldo-fill" style="width:${pct}%"></div></div>` : ''}
+      ${ccInfo}
+    </div>`;
+  }
+
+  // ── Add/Edit Account Modal ──
+  window.openAddAccountModal = function(editId) {
+    document.getElementById('aa-edit-id').value = editId || '';
+    document.getElementById('modal-adaccount-title').textContent = editId ? 'Edit Akun Iklan' : 'Tambah Akun Iklan';
+    document.getElementById('aa-product').value = '';
+    document.getElementById('aa-nama').value = '';
+    document.getElementById('aa-saldo').value = '';
+    document.getElementById('aa-jangkauan').value = '';
+    document.getElementById('aa-cc-nomor').value = '';
+    document.getElementById('aa-cc-nama').value = '';
+    document.getElementById('aa-err').style.display = 'none';
+    billingFile = null;
+    document.getElementById('billing-input').value = '';
+    document.getElementById('billing-preview').style.display = 'none';
+    document.getElementById('billing-preview').src = '';
+    document.getElementById('billing-placeholder').style.display = 'block';
+    document.getElementById('billing-filename').textContent = '';
+    document.getElementById('billing-extract-result').style.display = 'none';
+
+    if (editId) {
+      const existing = adAccounts.find(a => a.id === editId);
+      if (existing) {
+        document.getElementById('aa-product').value = existing.product_id || '';
+        document.getElementById('aa-nama').value = existing.nama_akun || '';
+        if (existing.saldo_saat_ini) document.getElementById('aa-saldo').value = Number(existing.saldo_saat_ini).toLocaleString('id-ID');
+        if (existing.jangkauan_saldo) document.getElementById('aa-jangkauan').value = Number(existing.jangkauan_saldo).toLocaleString('id-ID');
+        document.getElementById('aa-cc-nomor').value = existing.kartu_kredit_nomor || '';
+        document.getElementById('aa-cc-nama').value = existing.kartu_kredit_nama || '';
+      }
+    }
+
+    openModal('modal-adaccount');
+    setupBillingUpload();
+  };
+
+  function setupBillingUpload() {
+    const area = document.getElementById('billing-drop');
+    const inp  = document.getElementById('billing-input');
+    // remove previous listeners by cloning
+    const clone = area.cloneNode(true);
+    area.parentNode.replaceChild(clone, area);
+    const inp2 = document.getElementById('billing-input');
+
+    clone.addEventListener('click', () => inp2.click());
+    clone.addEventListener('dragover', e => { e.preventDefault(); clone.classList.add('drag-over'); });
+    clone.addEventListener('dragleave', () => clone.classList.remove('drag-over'));
+    clone.addEventListener('drop', e => {
+      e.preventDefault(); clone.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) handleBillingFile(e.dataTransfer.files[0]);
+    });
+    inp2.addEventListener('change', () => { if (inp2.files[0]) handleBillingFile(inp2.files[0]); });
+  }
+
+  async function handleBillingFile(file) {
+    if (!file.type.startsWith('image/')) { showToast('File harus berupa gambar', 'error'); return; }
+    if (file.size > 4 * 1024 * 1024) { showToast('File terlalu besar, maks 4MB', 'error'); return; }
+    billingFile = file;
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      const preview = document.getElementById('billing-preview');
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+      document.getElementById('billing-placeholder').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+    document.getElementById('billing-filename').textContent = file.name;
+
+    // Auto-extract
+    document.getElementById('aa-save-btn').disabled = true;
+    document.getElementById('aa-save-btn').textContent = 'Menganalisis billing...';
+    document.getElementById('billing-extract-result').style.display = 'none';
+
+    try {
+      const base64 = await fileToBase64(file);
+      const resp = await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'extract_billing', image_base64: base64, mime_type: file.type })
+      });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || 'Gagal ekstrak');
+
+      const ext = data.extracted || {};
+      if (ext.saldo_saat_ini != null) {
+        document.getElementById('aa-saldo').value = Number(ext.saldo_saat_ini).toLocaleString('id-ID');
+      }
+      if (ext.jangkauan_saldo != null) {
+        document.getElementById('aa-jangkauan').value = Number(ext.jangkauan_saldo).toLocaleString('id-ID');
+      }
+
+      const rows = [
+        ext.saldo_saat_ini != null ? ['Saldo Saat Ini', 'Rp ' + Number(ext.saldo_saat_ini).toLocaleString('id-ID')] : null,
+        ext.jangkauan_saldo != null ? ['Jangkauan Saldo', 'Rp ' + Number(ext.jangkauan_saldo).toLocaleString('id-ID')] : null,
+      ].filter(Boolean);
+
+      if (rows.length) {
+        document.getElementById('billing-extract-rows').innerHTML = rows.map(([l, v]) =>
+          `<div class="billing-extract-row"><span class="lbl">${l}</span><span class="val">${v}</span></div>`
+        ).join('');
+        document.getElementById('billing-extract-result').style.display = 'block';
+      }
+
+    } catch (e) {
+      showToast('Gagal ekstrak billing: ' + e.message, 'error');
+    } finally {
+      document.getElementById('aa-save-btn').disabled = false;
+      document.getElementById('aa-save-btn').textContent = 'Simpan';
+    }
+  }
+
+  window.saveAdAccount = async function() {
+    const editId = document.getElementById('aa-edit-id').value;
+    const productId = document.getElementById('aa-product').value;
+    const nama = document.getElementById('aa-nama').value.trim();
+    const saldo = parseInt(document.getElementById('aa-saldo').value.replace(/\D/g, '')) || null;
+    const jangkauan = parseInt(document.getElementById('aa-jangkauan').value.replace(/\D/g, '')) || null;
+    const ccNomor = document.getElementById('aa-cc-nomor').value.trim() || null;
+    const ccNama = document.getElementById('aa-cc-nama').value.trim().toUpperCase() || null;
+
+    const errEl = document.getElementById('aa-err');
+    errEl.style.display = 'none';
+
+    if (!productId) { errEl.textContent = 'Pilih produk terlebih dahulu.'; errEl.style.display = 'block'; return; }
+    if (!nama) { errEl.textContent = 'Masukkan nama akun iklan.'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('aa-save-btn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    try {
+      const { data: { user } } = await sb.auth.getUser();
+      const payload = {
+        user_id: user.id,
+        product_id: productId,
+        nama_akun: nama,
+        saldo_saat_ini: saldo,
+        jangkauan_saldo: jangkauan,
+        kartu_kredit_nomor: ccNomor,
+        kartu_kredit_nama: ccNama,
+        updated_at: new Date().toISOString()
+      };
+      if (editId) payload.id = editId;
+
+      const { error } = await sb.from('topup_ad_accounts').upsert(payload, { onConflict: editId ? 'id' : undefined });
+      if (error) throw new Error(error.message);
+
+      showToast(editId ? 'Akun iklan diperbarui!' : 'Akun iklan disimpan!', 'success');
+      closeModal('modal-adaccount');
+      await loadAdAccounts();
+      renderAdAccounts();
+    } catch (e) {
+      errEl.textContent = e.message; errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Simpan';
+    }
+  };
+
+  window.deleteAdAccount = async function(id) {
+    if (!confirm('Hapus akun iklan ini?')) return;
+    const { error } = await sb.from('topup_ad_accounts').delete().eq('id', id);
+    if (error) { showToast('Gagal hapus: ' + error.message, 'error'); return; }
+    showToast('Akun iklan dihapus.', 'success');
+    await loadAdAccounts();
+    renderAdAccounts();
+  };
+
+  // ── Upload area (main SS) ──
   function setupUploadArea() {
     const area = document.getElementById('ss-drop');
     const inp  = document.getElementById('ss-input');
@@ -396,20 +834,6 @@
     document.getElementById('extract-result').style.display = 'block';
   }
 
-  function renderRecommendation(rec) {
-    if (!rec?.level) return;
-    const pct = rec.recommendation_pct || '-';
-    const levelLabel = { good: 'Performa Baik', moderate: 'Performa Cukup', poor: 'Performa Rendah' }[rec.level] || '-';
-    const badgeEl = document.getElementById('rec-badge-el');
-    badgeEl.innerHTML = `<span class="rec-badge ${rec.level}">⚡ ${levelLabel} — Rekomendasi Top Up ${pct}%</span>`;
-    const reasonEl = document.getElementById('rec-reason-el');
-    if (rec.reason) {
-      reasonEl.textContent = rec.reason;
-      reasonEl.style.display = 'block';
-    }
-    document.getElementById('rec-wrap').style.display = 'block';
-  }
-
   // ── Submit ──
   window.submitTopup = async function() {
     const productId = document.getElementById('tp-product').value;
@@ -430,6 +854,23 @@
       const sel = document.getElementById('tp-product');
       const productName = sel.options[sel.selectedIndex]?.textContent || '';
 
+      // Gather ad account info
+      let adAccountId = selectedAccountId || null;
+      let adAccountName = null;
+      let billingData = {};
+      if (adAccountId) {
+        const acc = adAccounts.find(a => a.id === adAccountId);
+        if (acc) {
+          adAccountName = acc.nama_akun;
+          billingData = {
+            saldo_saat_ini: acc.saldo_saat_ini,
+            jangkauan_saldo: acc.jangkauan_saldo,
+            kartu_kredit_nomor: acc.kartu_kredit_nomor,
+            kartu_kredit_nama: acc.kartu_kredit_nama
+          };
+        }
+      }
+
       const { data: saved, error: dbErr } = await sb.from('topup_requests').insert({
         user_id: user.id,
         user_name: currentProfile?.name || user.email,
@@ -438,7 +879,10 @@
         extracted_data: extractedData || {},
         ai_recommendation: recommendationData || {},
         status: 'pending',
-        approve_token: approveToken
+        approve_token: approveToken,
+        topup_ad_account_id: adAccountId,
+        ad_account_name: adAccountName,
+        billing_data: billingData
       }).select().single();
 
       if (dbErr) throw new Error(dbErr.message);
@@ -458,7 +902,9 @@
             nominal_request: nominal,
             extracted: extractedData || {},
             recommendation: recommendationData || {},
-            approve_token: approveToken
+            approve_token: approveToken,
+            ad_account_name: adAccountName,
+            billing_data: billingData
           })
         });
         const notifData = await notifResp.json();
@@ -478,7 +924,6 @@
 
   function showSuccess(nominal, ext, rec, waWarn) {
     const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
-    const recPct = rec?.recommendation_pct;
     const waStatus = waWarn
       ? `<div style="font-size:12px;color:#c2410c;margin-top:8px;background:#fff7ed;padding:8px 10px;border-radius:8px;">⚠️ WA tidak terkirim: ${waWarn}</div>`
       : `<div style="font-size:12px;color:#6ee7b7;margin-top:8px;">Notifikasi WA sudah dikirim ke admin/finance.</div>`;
@@ -502,7 +947,7 @@
     document.getElementById('tp-product').value = '';
     document.getElementById('tp-product-kpi').style.display = 'none';
     document.getElementById('tp-nominal').value = '';
-    selectedFile = null; extractedData = null; recommendationData = null;
+    selectedFile = null; extractedData = null; recommendationData = null; selectedAccountId = null;
     document.getElementById('ss-input').value = '';
     document.getElementById('ss-preview').style.display = 'none';
     document.getElementById('ss-preview').src = '';
@@ -511,6 +956,8 @@
     document.getElementById('extract-result').style.display = 'none';
     document.getElementById('rec-wrap').style.display = 'none';
     document.getElementById('tp-submit').disabled = true;
+    document.getElementById('tp-adaccount-group').style.display = 'none';
+    hideBillingBar();
   }
 
   function checkSubmitEnabled() {
@@ -525,6 +972,7 @@
     document.querySelectorAll('.topup-panel').forEach(p => p.style.display = 'none');
     document.getElementById('panel-' + tab).style.display = 'block';
     if (tab === 'riwayat') loadHistory();
+    if (tab === 'akun-iklan') renderAdAccounts();
   };
 
   window.switchStatus = function(status) {
@@ -562,6 +1010,7 @@
     const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
     const ext = r.extracted_data || {};
     const rec = r.ai_recommendation || {};
+    const bd = r.billing_data || {};
     const statusBadge = {
       pending: '<span class="badge-pending">Menunggu</span>',
       approved: '<span class="badge-approved">Disetujui</span>',
@@ -573,6 +1022,7 @@
     const productName = r.products?.name || '-';
     const recClass = { good: 'rec-good', moderate: 'rec-moderate', poor: 'rec-poor' }[rec.level] || '';
     const recLabel = { good: 'Performa Baik', moderate: 'Performa Cukup', poor: 'Performa Rendah' }[rec.level] || '';
+    const billingChip = r.ad_account_name ? `<span class="chip">💳 ${r.ad_account_name}</span>` : '';
 
     return `<div class="req-card" id="req-${r.id}">
       <div class="req-card-header">
@@ -589,13 +1039,15 @@
       </div>
       <div class="req-chips">
         <span class="chip">📦 ${productName}</span>
+        ${billingChip}
         ${ext.date_range ? `<span class="chip">📅 ${ext.date_range}</span>` : ''}
         ${ext.spend != null ? `<span class="chip">💸 Spend: Rp ${fmtNum(ext.spend)}</span>` : ''}
         ${ext.results != null ? `<span class="chip">📊 Results: ${fmtNum(ext.results)}</span>` : ''}
         ${ext.cpr != null ? `<span class="chip">💰 CPR: Rp ${fmtNum(ext.cpr)}</span>` : ''}
         ${isAdmin && rec.level ? `<span class="chip ${recClass}">⚡ ${recLabel} (${rec.recommendation_pct || '-'}%)</span>` : ''}
       </div>
-      ${r.catatan ? `<div style="margin-top:10px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">📝 ${r.catatan}</div>` : ''}
+      ${isAdmin && bd.saldo_saat_ini ? `<div style="margin-top:10px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">💰 Saldo: Rp ${fmtNum(bd.saldo_saat_ini)}  ·  📊 Jangkauan: Rp ${fmtNum(bd.jangkauan_saldo)}${bd.kartu_kredit_nomor ? `  ·  💳 ••••${bd.kartu_kredit_nomor}` : ''}</div>` : ''}
+      ${r.catatan ? `<div style="margin-top:8px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">📝 ${r.catatan}</div>` : ''}
     </div>`;
   }
 
@@ -683,7 +1135,6 @@
     el.value = raw ? Number(raw).toLocaleString('id-ID') : '';
   };
 
-  // expose helpers ke window for inline onclick
   window.openModal = (id) => document.getElementById(id)?.classList.remove('hidden');
   window.closeModal = (id) => document.getElementById(id)?.classList.add('hidden');
 </script>
