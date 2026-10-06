@@ -83,8 +83,18 @@ const htmlConfirm = (r, id, token) => {
     <div class="info-row"><span class="lbl">Produk</span><span class="val">${r.product_name || '-'}</span></div>
     <div class="info-row"><span class="lbl">Nominal Request</span><span class="val">Rp ${fmtNum(r.nominal_request)}</span></div>
     ${ext.spend != null ? `<div class="info-row"><span class="lbl">Spend Kemarin</span><span class="val">Rp ${fmtNum(ext.spend)}</span></div>` : ''}
-    ${ext.results != null ? `<div class="info-row"><span class="lbl">Hasil (Results)</span><span class="val">${fmtNum(ext.results)}</span></div>` : ''}
+    ${ext.results != null ? `<div class="info-row"><span class="lbl">Hasil (Lead)</span><span class="val">${fmtNum(ext.results)}</span></div>` : ''}
     ${ext.cpr != null ? `<div class="info-row"><span class="lbl">CPR</span><span class="val">Rp ${fmtNum(ext.cpr)}</span></div>` : ''}
+  </div>
+
+  ${(r.billing_data?.saldo_saat_ini != null || r.billing_data?.kartu_kredit_nama) ? `
+  <div style="font-size:12px;font-weight:700;color:var(--text-sub,#64748b);margin-bottom:6px;margin-top:12px;">🏦 Info Billing</div>
+  <div class="info">
+    ${r.ad_account_name ? `<div class="info-row"><span class="lbl">Akun Iklan</span><span class="val">${r.ad_account_name}</span></div>` : ''}
+    ${r.billing_data?.saldo_saat_ini != null ? `<div class="info-row"><span class="lbl">Saldo Saat Ini</span><span class="val">Rp ${fmtNum(r.billing_data.saldo_saat_ini)}</span></div>` : ''}
+    ${r.billing_data?.jangkauan_saldo != null ? `<div class="info-row"><span class="lbl">Jangkauan Saldo</span><span class="val">Rp ${fmtNum(r.billing_data.jangkauan_saldo)}</span></div>` : ''}
+    ${r.billing_data?.kartu_kredit_nama ? `<div class="info-row"><span class="lbl">Kartu Kredit</span><span class="val">${r.billing_data.kartu_kredit_nama} ····${r.billing_data.kartu_kredit_nomor || ''}</span></div>` : ''}
+  </div>` : ''}
   </div>
 
   ${rec.level ? `
@@ -348,9 +358,56 @@ Field tidak ditemukan = null.`
     }
   }
 
+  // ── extract_billing: Claude Vision extract screenshot Tagihan Meta ──
+  if (action === 'extract_billing') {
+    const { image_base64, mime_type } = body;
+    if (!image_base64) return res.status(400).json({ error: 'image_base64 required' });
+
+    const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 400,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: mime_type || 'image/png', data: image_base64 } },
+              { type: 'text', text: `Extract data dari screenshot halaman Tagihan & Pembayaran Meta Ads (versi Bahasa Indonesia).
+
+Cari 2 nilai ini:
+- "Saldo Saat Ini" → saldo_saat_ini (contoh: "Rp 1.831.573" → 1831573)
+- "Jangkauan saldo Anda" → jangkauan_saldo (contoh: "Rp 2.716.578" → 2716578)
+
+Format Indonesia: titik = pemisah ribuan. Return HANYA valid JSON:
+{"saldo_saat_ini": 1831573, "jangkauan_saldo": 2716578}
+
+Field tidak ditemukan = null.` }
+            ]
+          }]
+        })
+      });
+      const data = await resp.json();
+      if (!resp.ok) return res.status(500).json({ error: 'Claude API error' });
+      const text = data.content?.[0]?.text || '{}';
+      const match = text.match(/\{[\s\S]*?\}/);
+      try {
+        return res.json({ ok: true, data: JSON.parse(match?.[0] || '{}') });
+      } catch {
+        return res.json({ ok: false, error: 'Gagal parse response', raw: text });
+      }
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ── notify_topup: kirim WA ke admin/finance ──
   if (action === 'notify_topup') {
-    const { request_id, user_name, product_name, nominal_request, extracted, recommendation, approve_token } = body;
+    const { request_id, user_name, product_name, nominal_request, extracted, recommendation, approve_token, ad_account_name, billing_data } = body;
 
     // Ambil fonnte token — cari dari siapapun yang sudah set, fallback ke env var
     const { data: cfgWithToken } = await sb.from('app_config')
@@ -381,22 +438,35 @@ Field tidak ditemukan = null.`
     const rec = recommendation || {};
     const levelLabel = { good: 'Performa Baik ✅', moderate: 'Performa Cukup ⚠️', poor: 'Performa Rendah ❌' }[rec.level] || '-';
 
+    // Hitung status billing
+    const billing = billing_data || {};
+    let billingStatus = null;
+    if (billing.saldo_saat_ini != null && billing.jangkauan_saldo != null && billing.jangkauan_saldo > 0) {
+      const pct = ((billing.saldo_saat_ini / billing.jangkauan_saldo) * 100).toFixed(0);
+      const sisa = billing.jangkauan_saldo - billing.saldo_saat_ini;
+      billingStatus = `Saldo: Rp ${fmtNum(billing.saldo_saat_ini)} / Limit: Rp ${fmtNum(billing.jangkauan_saldo)} (${pct}%) — Sisa ruang: Rp ${fmtNum(sisa)}`;
+    }
+
     const pesan = [
       `🔔 *Request Top Up — Adsy Autopilot*`,
       ``,
       `👤 *${user_name}* minta top up:`,
       `💰 *Nominal: Rp ${fmtNum(nominal_request)}*`,
       `📦 Produk: ${product_name || '-'}`,
+      ad_account_name ? `🖥️ Akun Iklan: ${ad_account_name}` : null,
+      billing.kartu_kredit_nama ? `💳 Kartu: ${billing.kartu_kredit_nama} ····${billing.kartu_kredit_nomor || ''}` : null,
       ``,
-      `📊 *Data dari Screenshot:*`,
+      `📊 *Performa (Meta Ads):*`,
       extracted?.date_range ? `• Periode: ${extracted.date_range}` : null,
       extracted?.spend != null ? `• Spend: Rp ${fmtNum(extracted.spend)}` : null,
-      extracted?.results != null ? `• Results: ${fmtNum(extracted.results)}` : null,
+      extracted?.results != null ? `• Hasil (Lead): ${fmtNum(extracted.results)}` : null,
       extracted?.cpr != null ? `• CPR: Rp ${fmtNum(extracted.cpr)}` : null,
       ``,
       rec.level ? `⚡ *${levelLabel}*` : null,
-      rec.recommendation_pct ? `💡 Rekomendasi: Top up ${rec.recommendation_pct}%` : null,
-      rec.reason ? `_${rec.reason}_` : null,
+      rec.recommendation_pct ? `💡 Rekomendasi performa: Top up ${rec.recommendation_pct}%` : null,
+      ``,
+      billingStatus ? `🏦 *Status Billing:*` : null,
+      billingStatus ? `• ${billingStatus}` : null,
       ``,
       `🔗 *Approve request ini:*`,
       approveLink,
