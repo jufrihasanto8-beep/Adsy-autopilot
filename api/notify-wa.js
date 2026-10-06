@@ -269,34 +269,39 @@ export default async function handler(req, res) {
               },
               {
                 type: 'text',
-                text: `Kamu adalah data extractor untuk screenshot Meta Ads Manager / Facebook Ads Manager.
+                text: `Kamu adalah data extractor untuk screenshot Meta Ads Manager (versi Bahasa Indonesia).
 
-Extract data dari screenshot ini. Kemudian beri rekomendasi budget berdasarkan performa.
+Screenshot menampilkan tabel kampanye Meta Ads. Fokus pada BARIS TOTAL di paling bawah tabel (biasanya berlabel "Hasil dari X kampanye").
+
+Mapping kolom yang HARUS kamu ikuti:
+- "Hasil" → results (total lead/konversi, ambil angka di baris total)
+- "Biaya per hasil" → cpr (biaya per lead, format Rp xxx.xxx → angka saja)
+- "Jumlah yang dibelanjakan" → spend (total spend, format Rp xxx.xxx → angka saja)
+- Tanggal → date_range (cari di pojok kanan atas, format "Hari Ini: 6 Okt 2026" atau range tanggal)
 
 Target CPR produk "${product_name || 'ini'}": Rp ${target_cpr ? Number(target_cpr).toLocaleString('id-ID') : 'tidak diketahui'}
 
-Return HANYA valid JSON (tanpa markdown, tanpa penjelasan):
+Return HANYA valid JSON (tanpa markdown, tanpa komentar):
 {
   "extracted": {
-    "date_range": "periode yang tampil di screenshot (e.g. 4 Okt 2026)",
-    "spend": 150000,
-    "results": 12,
-    "cpr": 12500,
-    "ctr": 2.5
+    "date_range": "6 Okt 2026",
+    "spend": 1617715,
+    "results": 8,
+    "cpr": 202214
   },
   "recommendation": {
     "recommendation_pct": 100,
     "level": "good",
-    "reason": "CPR Rp 12.500 di bawah target Rp 15.000, performa baik. Direkomendasikan top up penuh."
+    "reason": "CPR Rp 202.214 di bawah target Rp 250.000, performa baik."
   }
 }
 
-Aturan rekomendasi:
-- level "good" (pct: 100) → CPR ≤ target_cpr
-- level "moderate" (pct: 75) → CPR antara target_cpr s/d 1.3× target_cpr
-- level "poor" (pct: 50) → CPR > 1.3× target_cpr
-- Jika target_cpr tidak diketahui → level "moderate", pct: 75, reason: "Target CPR belum diset, gunakan penilaian manual"
-- Semua angka dalam number (tanpa Rp, tanpa pemisah ribuan). Field tidak ditemukan = null.`
+Aturan rekomendasi (bandingkan cpr hasil extract dengan target_cpr):
+- level "good" (pct: 100) → cpr ≤ target_cpr
+- level "moderate" (pct: 75) → cpr antara target_cpr s/d 1.5× target_cpr
+- level "poor" (pct: 50) → cpr > 1.5× target_cpr
+- Jika target_cpr tidak diketahui atau cpr tidak bisa diekstrak → level "moderate", pct: 75
+- Semua angka dalam number murni (tanpa Rp, tanpa titik/koma pemisah ribuan). Field tidak ditemukan = null.`
               }
             ]
           }]
