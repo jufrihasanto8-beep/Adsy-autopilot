@@ -101,11 +101,6 @@
     .billing-drop { border:2px dashed #c7d2fe; border-radius:10px; padding:18px 16px; text-align:center; cursor:pointer; transition:all .2s; background:#fafbff; }
     .billing-drop:hover, .billing-drop.drag-over { border-color:var(--primary); background:#f0f2ff; }
     #billing-preview { width:100%; max-height:160px; object-fit:contain; border-radius:6px; margin-top:6px; display:none; }
-    .billing-extract-result { background:var(--gray-1); border-radius:10px; padding:12px; margin-top:8px; display:none; font-size:13px; }
-    .billing-extract-row { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--gray-2); }
-    .billing-extract-row:last-child { border-bottom:none; }
-    .billing-extract-row .lbl { color:var(--text-sub); }
-    .billing-extract-row .val { font-weight:600; }
   </style>
 </head>
 <body>
@@ -343,10 +338,6 @@
         </div>
         <input type="file" id="billing-input" accept="image/*" style="display:none;" />
         <div id="billing-filename" style="font-size:11px;color:var(--text-sub);margin-top:4px;"></div>
-        <div class="billing-extract-result" id="billing-extract-result">
-          <div style="font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:6px;">📊 Hasil Ekstrak Billing</div>
-          <div id="billing-extract-rows"></div>
-        </div>
       </div>
 
       <!-- Saldo Saat Ini & Jangkauan -->
@@ -664,16 +655,8 @@
         document.getElementById('aa-jangkauan').value = Number(ext.jangkauan_saldo).toLocaleString('id-ID');
       }
 
-      const rows = [
-        ext.saldo_saat_ini != null ? ['Saldo Saat Ini', 'Rp ' + Number(ext.saldo_saat_ini).toLocaleString('id-ID')] : null,
-        ext.jangkauan_saldo != null ? ['Jangkauan Saldo', 'Rp ' + Number(ext.jangkauan_saldo).toLocaleString('id-ID')] : null,
-      ].filter(Boolean);
-
-      if (rows.length) {
-        document.getElementById('billing-extract-rows').innerHTML = rows.map(([l, v]) =>
-          `<div class="billing-extract-row"><span class="lbl">${l}</span><span class="val">${v}</span></div>`
-        ).join('');
-        document.getElementById('billing-extract-result').style.display = 'block';
+      if (ext.saldo_saat_ini != null || ext.jangkauan_saldo != null) {
+        showToast('Billing berhasil dianalisis', 'success');
       }
 
     } catch (e) {
