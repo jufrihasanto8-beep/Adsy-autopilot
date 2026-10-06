@@ -24,20 +24,36 @@ export default async function handler(req, res) {
 
     try {
       const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-      const ext = (mime_type || 'image/jpeg').split('/')[1] || 'jpg';
-      const fileName = `ref-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const buffer = Buffer.from(image_base64, 'base64');
 
-      // Upload ke Supabase Storage
-      const { error: uploadErr } = await sb.storage
-        .from('gen-images')
-        .upload(fileName, buffer, { contentType: mime_type || 'image/jpeg', upsert: false });
+      // Support multiple images: { images: [{base64, mime_type}, ...] }
+      // atau single backward compat: { image_base64, mime_type }
+      const imageList = req.body.images?.length
+        ? req.body.images
+        : [{ base64: image_base64, mime_type }];
 
-      if (uploadErr) return res.status(500).json({ error: 'Gagal upload gambar: ' + uploadErr.message });
+      if (!imageList.length) return res.status(400).json({ error: 'Minimal 1 gambar diperlukan' });
 
-      const { data: { publicUrl } } = sb.storage.from('gen-images').getPublicUrl(fileName);
+      // Upload semua gambar ke Supabase Storage
+      const uploadedUrls = [];
+      const uploadedFiles = [];
 
-      // Kirim task ke kie.ai — JANGAN hapus file dulu, kie.ai fetch gambarnya nanti saat processing
+      for (const img of imageList) {
+        const ext = (img.mime_type || 'image/jpeg').split('/')[1] || 'jpg';
+        const fileName = `ref-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        const buffer = Buffer.from(img.base64, 'base64');
+
+        const { error: uploadErr } = await sb.storage
+          .from('gen-images')
+          .upload(fileName, buffer, { contentType: img.mime_type || 'image/jpeg', upsert: false });
+
+        if (uploadErr) return res.status(500).json({ error: 'Gagal upload gambar: ' + uploadErr.message });
+
+        const { data: { publicUrl } } = sb.storage.from('gen-images').getPublicUrl(fileName);
+        uploadedUrls.push(publicUrl);
+        uploadedFiles.push(fileName);
+      }
+
+      // Kirim task ke kie.ai
       const kieResp = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${KIE_KEY}` },
@@ -45,7 +61,7 @@ export default async function handler(req, res) {
           model: 'gpt-image-2-image-to-image',
           input: {
             prompt,
-            input_urls: [publicUrl],
+            input_urls: uploadedUrls,
             aspect_ratio: aspect_ratio || 'auto',
             resolution: resolution || '1K',
             background: background || 'opaque'
@@ -56,7 +72,7 @@ export default async function handler(req, res) {
       const kieData = await kieResp.json();
       if (kieData.code !== 200) return res.status(500).json({ error: kieData.msg || 'Gagal membuat task generate' });
 
-      return res.json({ ok: true, task_id: kieData.data.taskId, ref_file: fileName });
+      return res.json({ ok: true, task_id: kieData.data.taskId, ref_files: uploadedFiles });
 
     } catch (e) {
       return res.status(500).json({ error: e.message });
@@ -85,9 +101,13 @@ export default async function handler(req, res) {
       }
 
       // Hapus gambar referensi dari Storage saat task selesai (success/fail)
-      if ((state === 'success' || state === 'fail') && ref_file) {
-        const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-        sb.storage.from('gen-images').remove([ref_file]); // fire & forget
+      if (state === 'success' || state === 'fail') {
+        const { ref_files, ref_file } = req.body;
+        const filesToDelete = ref_files?.length ? ref_files : ref_file ? [ref_file] : [];
+        if (filesToDelete.length) {
+          const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+          sb.storage.from('gen-images').remove(filesToDelete); // fire & forget
+        }
       }
 
       return res.json({ ok: true, state, result_urls: resultUrls, fail_msg: failMsg });
