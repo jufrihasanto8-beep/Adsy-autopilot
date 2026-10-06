@@ -23,7 +23,19 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { ad_location_mode, ad_selected_provinces, ad_placement_mode, ad_manual_placements } = req.body;
+    const { ad_location_mode, ad_selected_provinces, ad_placement_mode, ad_manual_placements, topup_wa_targets } = req.body;
+
+    // Kalau hanya update topup_wa_targets, patch field itu saja
+    if (topup_wa_targets !== undefined && !ad_location_mode && !ad_placement_mode) {
+      const { error } = await sb.from('global_settings').upsert({
+        id: SETTINGS_ID,
+        topup_wa_targets,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json({ success: true });
+    }
+
     const { error } = await sb.from('global_settings').upsert({
       id: SETTINGS_ID,
       ad_location_mode,
