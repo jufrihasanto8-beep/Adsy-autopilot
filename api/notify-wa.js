@@ -95,7 +95,6 @@ const htmlConfirm = (r, id, token) => {
     ${r.billing_data?.jangkauan_saldo != null ? `<div class="info-row"><span class="lbl">Jangkauan Saldo</span><span class="val">Rp ${fmtNum(r.billing_data.jangkauan_saldo)}</span></div>` : ''}
     ${r.billing_data?.kartu_kredit_nama ? `<div class="info-row"><span class="lbl">Kartu Kredit</span><span class="val">${r.billing_data.kartu_kredit_nama} ····${r.billing_data.kartu_kredit_nomor || ''}</span></div>` : ''}
   </div>` : ''}
-  </div>
 
   ${rec.level ? `
   <div class="rec-badge">⚡ ${levelLabel} — Rekomendasi ${rec.recommendation_pct || '-'}%</div>
