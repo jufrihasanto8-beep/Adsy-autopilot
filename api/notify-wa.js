@@ -186,32 +186,33 @@ const htmlConfirm = (r, id, token) => {
 };
 
 // Hitung rekomendasi budget berdasarkan CPR vs target — pure math, tidak pakai AI
-function calcRecommendation(cpr, targetCpr) {
+function calcRecommendation(kpiActual, kpiTarget, adType = 'form') {
   const fmtRp = n => 'Rp ' + Math.round(n).toLocaleString('id-ID');
+  const label = adType === 'ctwa' ? 'CPC' : 'CPR';
 
-  if (!cpr || !targetCpr) {
-    return { level: 'moderate', recommendation_pct: 75, reason: 'Target CPR belum diset atau CPR tidak terbaca, gunakan penilaian manual.' };
+  if (!kpiActual || !kpiTarget) {
+    return { level: 'moderate', recommendation_pct: 75, reason: `Target ${label} belum diset atau ${label} tidak terbaca, gunakan penilaian manual.` };
   }
 
-  const ratio = cpr / targetCpr;
+  const ratio = kpiActual / kpiTarget;
 
   if (ratio <= 1) {
     return {
       level: 'good',
       recommendation_pct: 100,
-      reason: `CPR ${fmtRp(cpr)} ≤ target ${fmtRp(targetCpr)} (${(ratio * 100).toFixed(0)}% dari target). Performa baik, top up penuh direkomendasikan.`
+      reason: `${label} ${fmtRp(kpiActual)} ≤ target ${fmtRp(kpiTarget)} (${(ratio * 100).toFixed(0)}% dari target). Performa baik, top up penuh direkomendasikan.`
     };
   } else if (ratio <= 1.5) {
     return {
       level: 'moderate',
       recommendation_pct: 75,
-      reason: `CPR ${fmtRp(cpr)} melebihi target ${fmtRp(targetCpr)} sebesar ${((ratio - 1) * 100).toFixed(0)}%. Performa cukup, top up 75% direkomendasikan.`
+      reason: `${label} ${fmtRp(kpiActual)} melebihi target ${fmtRp(kpiTarget)} sebesar ${((ratio - 1) * 100).toFixed(0)}%. Performa cukup, top up 75% direkomendasikan.`
     };
   } else {
     return {
       level: 'poor',
       recommendation_pct: 50,
-      reason: `CPR ${fmtRp(cpr)} jauh melebihi target ${fmtRp(targetCpr)} (${(ratio * 100).toFixed(0)}% dari target). Performa rendah, top up 50% direkomendasikan.`
+      reason: `${label} ${fmtRp(kpiActual)} jauh melebihi target ${fmtRp(kpiTarget)} (${(ratio * 100).toFixed(0)}% dari target). Performa rendah, top up 50% direkomendasikan.`
     };
   }
 }
@@ -283,11 +284,16 @@ export default async function handler(req, res) {
 
   // ── extract_topup: Claude Vision extract screenshot Meta Ads + AI recommendation ──
   if (action === 'extract_topup') {
-    const { image_base64, mime_type, target_cpr, product_name } = body;
+    const { image_base64, mime_type, target_kpi, target_cpr, product_name, ad_type } = body;
     if (!image_base64) return res.status(400).json({ error: 'image_base64 required' });
 
     const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+
+    const isCtwa = ad_type === 'ctwa';
+    const effectiveTarget = target_kpi || target_cpr; // backward compat
+    const resultsLabel = isCtwa ? 'percakapan/chat yang dimulai' : 'lead/konversi';
+    const kpiLabel = isCtwa ? 'CPC (cost per chat)' : 'CPR (cost per lead)';
 
     try {
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -310,25 +316,21 @@ export default async function handler(req, res) {
               {
                 type: 'text',
                 text: `Kamu adalah data extractor untuk screenshot Meta Ads Manager (versi Bahasa Indonesia).
+Tipe iklan: ${isCtwa ? 'CTWA (Click to WhatsApp)' : 'Form/Lead Ads'}.
 
 Screenshot menampilkan tabel kampanye Meta Ads. Fokus pada BARIS TOTAL di paling bawah tabel (berlabel "Hasil dari X kampanye").
 
-Mapping kolom yang HARUS kamu ikuti (ambil dari baris total):
-- "Hasil" → results (angka total lead/konversi di baris paling bawah)
-- "Biaya per hasil" → cpr (angka biaya per lead di baris paling bawah, contoh: "Rp 202.214" → 202214)
-- "Jumlah yang dibelanjakan" → spend (total spend di baris paling bawah, contoh: "Rp 1.617.715" → 1617715)
-- Tanggal dari pojok kanan atas → date_range (contoh: "Hari Ini: 6 Okt 2026" → "6 Okt 2026")
+Mapping kolom (ambil dari baris total):
+- "Hasil" → results (angka total ${resultsLabel})
+- "Biaya per hasil" → ${isCtwa ? 'cpc' : 'cpr'} (${kpiLabel}, contoh: "Rp 202.214" → 202214)
+- "Jumlah yang dibelanjakan" → spend (total spend, contoh: "Rp 1.617.715" → 1617715)
+- Tanggal dari pojok kanan atas → date_range (contoh: "6 Okt 2026")
 
-PENTING: Semua angka kembalikan sebagai INTEGER murni. Format Indonesia: titik = pemisah ribuan, koma = desimal.
+PENTING: Semua angka kembalikan sebagai INTEGER murni. Format Indonesia: titik = pemisah ribuan.
 Contoh: "Rp 1.617.715" = 1617715, "Rp 202.214" = 202214, "Rp 25.000" = 25000.
 
-Return HANYA valid JSON (tanpa markdown, tanpa komentar):
-{
-  "date_range": "6 Okt 2026",
-  "spend": 1617715,
-  "results": 8,
-  "cpr": 202214
-}
+Return HANYA valid JSON:
+${isCtwa ? '{"date_range":"6 Okt 2026","spend":1617715,"results":8,"cpc":202214}' : '{"date_range":"6 Okt 2026","spend":1617715,"results":8,"cpr":202214}'}
 
 Field tidak ditemukan = null.`
               }
@@ -344,10 +346,8 @@ Field tidak ditemukan = null.`
       const match = text.match(/\{[\s\S]*\}/);
       try {
         const extracted = JSON.parse(match?.[0] || '{}');
-
-        // Hitung rekomendasi di server (bukan AI) — akurat & tidak bisa salah format
-        const recommendation = calcRecommendation(extracted.cpr, target_cpr);
-
+        const kpiActual = isCtwa ? extracted.cpc : extracted.cpr;
+        const recommendation = calcRecommendation(kpiActual, effectiveTarget, ad_type || 'form');
         return res.json({ ok: true, extracted, recommendation });
       } catch {
         return res.json({ ok: false, error: 'Gagal parse AI response', raw: text });
