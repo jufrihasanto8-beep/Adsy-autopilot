@@ -406,7 +406,7 @@ Field tidak ditemukan = null.` }
 
   // ── notify_topup: kirim WA ke admin/finance ──
   if (action === 'notify_topup') {
-    const { request_id, user_name, product_name, nominal_request, extracted, recommendation, approve_token, ad_account_name, billing_data } = body;
+    const { request_id, user_name, product_name, nominal_request, extracted, recommendation, approve_token, ad_account_name, billing_data, topup_time } = body;
 
     // Ambil fonnte token — cari dari siapapun yang sudah set, fallback ke env var
     const { data: cfgWithToken } = await sb.from('app_config')
@@ -446,8 +446,11 @@ Field tidak ditemukan = null.` }
       billingStatus = `Saldo: Rp ${fmtNum(billing.saldo_saat_ini)} / Limit: Rp ${fmtNum(billing.jangkauan_saldo)} (${pct}%) — Sisa ruang: Rp ${fmtNum(sisa)}`;
     }
 
+    const timeLabel = topup_time === 'sore' ? '🌆 Top Up Sore (spend hari ini)' : '🌅 Top Up Pagi (spend kemarin)';
+
     const pesan = [
       `🔔 *Request Top Up — Adsy Autopilot*`,
+      `${timeLabel}`,
       ``,
       `👤 *${user_name}* minta top up:`,
       `💰 *Nominal: Rp ${fmtNum(nominal_request)}*`,
