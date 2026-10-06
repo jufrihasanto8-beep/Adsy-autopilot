@@ -370,7 +370,6 @@
       recommendationData = data.recommendation || {};
 
       renderExtractResult(extractedData);
-      renderRecommendation(recommendationData);
 
     } catch (e) {
       showToast('Gagal analisis: ' + e.message, 'error');
@@ -494,7 +493,6 @@
           <div>Nominal: <strong>Rp ${fmtNum(nominal)}</strong></div>
           ${ext?.spend != null ? `<div>Spend kemarin: <strong>Rp ${fmtNum(ext.spend)}</strong></div>` : ''}
           ${ext?.cpr != null ? `<div>CPR: <strong>Rp ${fmtNum(ext.cpr)}</strong></div>` : ''}
-          ${recPct ? `<div>AI Rekomendasi: <strong>Top up ${recPct}%</strong></div>` : ''}
         </div>
         ${waStatus}
       </div>`;
@@ -595,7 +593,7 @@
         ${ext.spend != null ? `<span class="chip">💸 Spend: Rp ${fmtNum(ext.spend)}</span>` : ''}
         ${ext.results != null ? `<span class="chip">📊 Results: ${fmtNum(ext.results)}</span>` : ''}
         ${ext.cpr != null ? `<span class="chip">💰 CPR: Rp ${fmtNum(ext.cpr)}</span>` : ''}
-        ${rec.level ? `<span class="chip ${recClass}">⚡ ${recLabel} (${rec.recommendation_pct || '-'}%)</span>` : ''}
+        ${isAdmin && rec.level ? `<span class="chip ${recClass}">⚡ ${recLabel} (${rec.recommendation_pct || '-'}%)</span>` : ''}
       </div>
       ${r.catatan ? `<div style="margin-top:10px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">📝 ${r.catatan}</div>` : ''}
     </div>`;
