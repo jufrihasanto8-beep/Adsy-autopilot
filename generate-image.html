@@ -393,7 +393,7 @@
               <option value="16:9">16:9 Wide</option>
               <option value="9:16">9:16 Story</option>
             </select>
-            <select id="res-${s.idx}" title="Resolusi">
+            <select id="sel-res-${s.idx}" title="Resolusi">
               <option value="1K">🔲 1K</option>
               <option value="2K">🔳 2K</option>
             </select>
@@ -551,7 +551,7 @@
 
     s.settings = {
       aspect_ratio: document.getElementById(`aspect-${si}`).value,
-      resolution:   document.getElementById(`res-${si}`).value,
+      resolution:   document.getElementById(`sel-res-${si}`).value,
       background:   document.getElementById(`bg-${si}`).value,
     };
     s.prompt = prompt;
