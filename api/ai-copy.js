@@ -1,5 +1,6 @@
 // api/ai-copy.js — Generate copy iklan dengan Claude AI + Generate Image (kie.ai)
 import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -22,36 +23,29 @@ export default async function handler(req, res) {
     if (!KIE_KEY) return res.status(500).json({ error: 'KIE_API_KEY belum dikonfigurasi' });
 
     try {
-      const buffer = Buffer.from(image_base64, 'base64');
+      const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
       const ext = (mime_type || 'image/jpeg').split('/')[1] || 'jpg';
+      const fileName = `ref-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const buffer = Buffer.from(image_base64, 'base64');
 
-      // Upload langsung ke kie.ai (tidak perlu Supabase Storage)
-      const formData = new FormData();
-      formData.append('file', new Blob([buffer], { type: mime_type || 'image/jpeg' }), `ref.${ext}`);
+      // Upload ke Supabase Storage
+      const { error: uploadErr } = await sb.storage
+        .from('gen-images')
+        .upload(fileName, buffer, { contentType: mime_type || 'image/jpeg', upsert: false });
 
-      const uploadResp = await fetch('https://api.kie.ai/api/v1/files/upload', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${KIE_KEY}` },
-        body: formData
-      });
-      const uploadData = await uploadResp.json();
-      if (uploadData.code !== 200) return res.status(500).json({ error: 'Gagal upload ke kie.ai: ' + (uploadData.msg || '') });
+      if (uploadErr) return res.status(500).json({ error: 'Gagal upload gambar: ' + uploadErr.message });
 
-      const imageUrl = uploadData.data?.url || uploadData.data?.fileUrl || uploadData.data?.file_url;
-      if (!imageUrl) return res.status(500).json({ error: 'kie.ai tidak mengembalikan URL gambar', raw: uploadData });
+      const { data: { publicUrl } } = sb.storage.from('gen-images').getPublicUrl(fileName);
 
-      // Kirim task ke kie.ai
+      // Kirim task ke kie.ai — JANGAN hapus file dulu, kie.ai fetch gambarnya nanti saat processing
       const kieResp = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${KIE_KEY}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${KIE_KEY}` },
         body: JSON.stringify({
           model: 'gpt-image-2-image-to-image',
           input: {
             prompt,
-            input_urls: [imageUrl],
+            input_urls: [publicUrl],
             aspect_ratio: aspect_ratio || 'auto',
             resolution: resolution || '1K',
             background: background || 'opaque'
