@@ -16,22 +16,21 @@ export default async function handler(req, res) {
   // ── GENERATE IMAGE (kie.ai image-to-image) ──
   if (action === 'generate_image') {
     const { image_base64, mime_type, prompt, aspect_ratio, resolution, background } = req.body;
-    if (!image_base64) return res.status(400).json({ error: 'image_base64 wajib diisi' });
     if (!prompt) return res.status(400).json({ error: 'prompt wajib diisi' });
 
     const KIE_KEY = process.env.KIE_API_KEY;
     if (!KIE_KEY) return res.status(500).json({ error: 'KIE_API_KEY belum dikonfigurasi' });
 
+    // Support multiple images: { images: [{base64, mime_type}, ...] }
+    // atau single backward compat: { image_base64, mime_type }
+    const imageList = req.body.images?.length
+      ? req.body.images
+      : image_base64 ? [{ base64: image_base64, mime_type }] : [];
+
+    if (!imageList.length) return res.status(400).json({ error: 'Minimal 1 gambar diperlukan' });
+
     try {
       const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-
-      // Support multiple images: { images: [{base64, mime_type}, ...] }
-      // atau single backward compat: { image_base64, mime_type }
-      const imageList = req.body.images?.length
-        ? req.body.images
-        : [{ base64: image_base64, mime_type }];
-
-      if (!imageList.length) return res.status(400).json({ error: 'Minimal 1 gambar diperlukan' });
 
       // Upload semua gambar ke Supabase Storage
       const uploadedUrls = [];
