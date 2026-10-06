@@ -711,12 +711,15 @@
       const tgl = new Date(item.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
       const meta = [item.aspect_ratio !== 'auto' ? item.aspect_ratio : 'Auto', item.resolution].filter(Boolean).join(' · ');
       return `<div class="history-card">
-        <img src="${item.result_url}" alt="Generated" onerror="this.parentElement.style.display='none'" loading="lazy" />
+        <img src="${item.result_url}" alt="Generated" onerror="this.parentElement.style.display='none'" loading="lazy"
+          onclick="openLightbox('${item.result_url}', '${item.result_url}')"
+          style="cursor:zoom-in;" />
         <div class="history-card-body">
           <div class="history-card-prompt">${item.prompt}</div>
           <div class="history-card-meta">${meta} · ${tgl}</div>
           <div class="history-card-actions">
-            <a class="dl" href="${item.result_url}" download="gen-${item.id}.png" target="_blank">⬇️ Download</a>
+            <button onclick="openLightbox('${item.result_url}', '${item.result_url}')">🔍</button>
+            <a class="dl" href="${item.result_url}" download="gen-${item.id}.png" target="_blank">⬇️</a>
             <button onclick="deleteHistory('${item.id}', this)">🗑️</button>
           </div>
         </div>
