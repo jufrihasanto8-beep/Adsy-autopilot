@@ -1055,7 +1055,10 @@
     document.querySelectorAll('.topup-panel').forEach(p => p.style.display = 'none');
     document.getElementById('panel-' + tab).style.display = 'block';
     if (tab === 'riwayat') loadHistory();
-    if (tab === 'akun-iklan') renderAdAccounts();
+    if (tab === 'akun-iklan') {
+      document.getElementById('akun-list').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+      loadAdAccounts().then(() => renderAdAccounts());
+    }
   };
 
   window.switchStatus = function(status) {
