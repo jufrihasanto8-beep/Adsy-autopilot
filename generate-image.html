@@ -15,21 +15,36 @@
     .gen-tab.active { background:#fff; color:var(--primary); box-shadow:0 1px 4px rgba(0,0,0,0.08); }
 
     .img-drop {
-      border: 2px dashed #c7d2fe; border-radius: 14px; padding: 32px 20px;
-      text-align: center; cursor: pointer; transition: all .2s; background: #fafbff; position: relative;
+      border: 2px dashed #c7d2fe; border-radius: 14px; padding: 24px 20px;
+      text-align: center; cursor: pointer; transition: all .2s; background: #fafbff;
     }
     .img-drop:hover, .img-drop.drag-over { border-color: var(--primary); background: #f0f2ff; }
-    .img-drop .drop-icon { font-size: 36px; margin-bottom: 8px; }
+    .img-drop .drop-icon { font-size: 32px; margin-bottom: 6px; }
     .img-drop .drop-hint { font-size: 13px; color: var(--text-sub); font-weight: 500; }
-    .img-drop .drop-sub  { font-size: 11px; color: var(--gray-4); margin-top: 4px; }
-    #ref-preview { width: 100%; max-height: 300px; object-fit: contain; border-radius: 10px; margin-top: 8px; display: none; }
-    .drop-clear {
-      position: absolute; top: 10px; right: 12px; font-size: 14px; cursor: pointer;
-      background: var(--gray-2); border: none; border-radius: 50%; width: 24px; height: 24px;
-      display: none; align-items: center; justify-content: center; font-weight: 700;
-      color: var(--text-sub); transition: background .15s;
+    .img-drop .drop-sub  { font-size: 11px; color: var(--gray-4); margin-top: 3px; }
+
+    /* ── Multi-image preview grid ── */
+    .ref-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .ref-thumb {
+      position: relative; width: 80px; height: 80px; border-radius: 10px;
+      overflow: hidden; border: 1.5px solid var(--gray-2); flex-shrink: 0;
     }
-    .drop-clear:hover { background: var(--gray-3); }
+    .ref-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ref-thumb-del {
+      position: absolute; top: 3px; right: 3px; width: 18px; height: 18px;
+      border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; border: none;
+      font-size: 10px; font-weight: 700; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; line-height: 1;
+    }
+    .ref-thumb-del:hover { background: rgba(239,68,68,.85); }
+    .ref-add-btn {
+      width: 80px; height: 80px; border-radius: 10px; border: 2px dashed #c7d2fe;
+      background: #fafbff; cursor: pointer; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2px; flex-shrink: 0;
+      font-size: 20px; color: var(--primary); transition: all .15s;
+    }
+    .ref-add-btn:hover { border-color: var(--primary); background: #f0f2ff; }
+    .ref-add-btn span { font-size: 10px; font-weight: 600; color: var(--text-sub); }
 
     .gen-settings { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
     .gen-settings select {
@@ -179,17 +194,13 @@
               </div>
             </div>
 
-            <div class="img-drop" id="img-drop">
-              <button class="drop-clear" id="drop-clear" onclick="clearImage(event)">✕</button>
-              <div id="drop-placeholder">
-                <div class="drop-icon">🖼️</div>
-                <div class="drop-hint">Klik atau drag & drop gambar referensi</div>
-                <div class="drop-sub">PNG / JPG / WEBP · Maks 10MB</div>
-              </div>
-              <img id="ref-preview" src="" alt="Preview" />
+            <div class="img-drop" id="img-drop" onclick="document.getElementById('ref-input').click()">
+              <div class="drop-icon">🖼️</div>
+              <div class="drop-hint">Klik atau drag & drop gambar referensi</div>
+              <div class="drop-sub">PNG / JPG / WEBP · Maks 10MB · Bisa beberapa gambar</div>
             </div>
-            <input type="file" id="ref-input" accept="image/*" style="display:none;" />
-            <div id="ref-filename" style="font-size:11px;color:var(--text-sub);margin-top:5px;"></div>
+            <input type="file" id="ref-input" accept="image/*" multiple style="display:none;" />
+            <div class="ref-grid" id="ref-grid"></div>
 
             <div style="margin-top:18px;">
               <label class="form-label">Prompt <span style="color:var(--danger)">*</span></label>
@@ -299,9 +310,9 @@
   import { getSupabase } from './js/supabase.js';
 
   let sb, currentUser;
-  let selectedFile = null;
+  let selectedFiles = []; // array of { file, dataUrl }
   let pollInterval = null;
-  let currentPrompt = '', currentSettings = {}, currentRefFile = null;
+  let currentPrompt = '', currentSettings = {}, currentRefFiles = [];
 
   // ── Init ──
   (async () => {
@@ -327,38 +338,45 @@
   function setupUpload() {
     const area = document.getElementById('img-drop');
     const inp  = document.getElementById('ref-input');
-    area.addEventListener('click', e => { if (e.target.id !== 'drop-clear') inp.click(); });
     area.addEventListener('dragover',  e => { e.preventDefault(); area.classList.add('drag-over'); });
     area.addEventListener('dragleave', () => area.classList.remove('drag-over'));
-    area.addEventListener('drop', e => { e.preventDefault(); area.classList.remove('drag-over'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
-    inp.addEventListener('change', () => { if (inp.files[0]) handleFile(inp.files[0]); });
+    area.addEventListener('drop', e => {
+      e.preventDefault(); area.classList.remove('drag-over');
+      handleFiles([...e.dataTransfer.files]);
+    });
+    inp.addEventListener('change', () => { if (inp.files.length) handleFiles([...inp.files]); inp.value = ''; });
   }
 
-  function handleFile(file) {
-    if (!file.type.startsWith('image/')) { showToast('File harus berupa gambar', 'error'); return; }
-    if (file.size > 10 * 1024 * 1024) { showToast('Gambar terlalu besar, maks 10MB', 'error'); return; }
-    selectedFile = file;
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = document.getElementById('ref-preview');
-      img.src = e.target.result; img.style.display = 'block';
-      document.getElementById('drop-placeholder').style.display = 'none';
-      document.getElementById('drop-clear').style.display = 'flex';
-    };
-    reader.readAsDataURL(file);
-    document.getElementById('ref-filename').textContent = `📎 ${file.name}  (${(file.size/1024/1024).toFixed(1)} MB)`;
-    checkReady();
+  function handleFiles(files) {
+    files.forEach(file => {
+      if (!file.type.startsWith('image/')) { showToast(`${file.name}: bukan gambar`, 'error'); return; }
+      if (file.size > 10 * 1024 * 1024) { showToast(`${file.name}: maks 10MB`, 'error'); return; }
+      if (selectedFiles.length >= 4) { showToast('Maksimal 4 gambar referensi', 'warning'); return; }
+      const reader = new FileReader();
+      reader.onload = e => {
+        selectedFiles.push({ file, dataUrl: e.target.result });
+        renderRefGrid();
+        checkReady();
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
-  window.clearImage = function(e) {
-    e.stopPropagation();
-    selectedFile = null;
-    document.getElementById('ref-preview').style.display = 'none';
-    document.getElementById('ref-preview').src = '';
-    document.getElementById('drop-placeholder').style.display = 'block';
-    document.getElementById('drop-clear').style.display = 'none';
-    document.getElementById('ref-filename').textContent = '';
-    document.getElementById('ref-input').value = '';
+  function renderRefGrid() {
+    const grid = document.getElementById('ref-grid');
+    grid.innerHTML = selectedFiles.map((item, i) => `
+      <div class="ref-thumb" id="thumb-${i}">
+        <img src="${item.dataUrl}" alt="Ref ${i+1}" />
+        <button class="ref-thumb-del" onclick="removeRefImage(${i})">✕</button>
+      </div>`).join('') +
+      (selectedFiles.length < 4
+        ? `<div class="ref-add-btn" onclick="document.getElementById('ref-input').click()">＋<span>Tambah</span></div>`
+        : '');
+  }
+
+  window.removeRefImage = function(i) {
+    selectedFiles.splice(i, 1);
+    renderRefGrid();
     checkReady();
   };
 
@@ -374,7 +392,7 @@
   };
 
   function checkReady() {
-    const ok = !!selectedFile && document.getElementById('gen-prompt').value.trim().length > 0;
+    const ok = selectedFiles.length > 0 && document.getElementById('gen-prompt').value.trim().length > 0;
     document.getElementById('gen-btn').disabled = !ok;
   }
 
@@ -383,8 +401,8 @@
     const prompt = document.getElementById('gen-prompt').value.trim();
     const errEl  = document.getElementById('gen-err');
     errEl.style.display = 'none';
-    if (!selectedFile) { errEl.textContent = 'Upload gambar referensi terlebih dahulu.'; errEl.style.display = 'block'; return; }
-    if (!prompt)       { errEl.textContent = 'Isi prompt terlebih dahulu.'; errEl.style.display = 'block'; return; }
+    if (!selectedFiles.length) { errEl.textContent = 'Upload gambar referensi terlebih dahulu.'; errEl.style.display = 'block'; return; }
+    if (!prompt)               { errEl.textContent = 'Isi prompt terlebih dahulu.'; errEl.style.display = 'block'; return; }
 
     currentPrompt = prompt;
     currentSettings = {
@@ -395,19 +413,23 @@
 
     const btn = document.getElementById('gen-btn');
     btn.disabled = true; btn.textContent = '⏳ Memproses...';
-    showLoading('Mengupload gambar referensi...');
+    showLoading(`Mengupload ${selectedFiles.length} gambar referensi...`);
 
     try {
-      const base64 = await fileToBase64(selectedFile);
+      const images = await Promise.all(selectedFiles.map(async item => ({
+        base64:    await fileToBase64(item.file),
+        mime_type: item.file.type,
+      })));
+
       const resp = await fetch('/api/ai-copy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'generate_image', image_base64: base64, mime_type: selectedFile.type, prompt, ...currentSettings })
+        body: JSON.stringify({ action: 'generate_image', images, prompt, ...currentSettings })
       });
       const data = await resp.json();
       if (!data.ok) throw new Error(data.error || 'Gagal memulai generate');
 
-      currentRefFile = data.ref_file || null;
+      currentRefFiles = data.ref_files || [];
       updateLoadingText('AI sedang generate gambar...', 'Biasanya butuh 20–60 detik');
       startPolling(data.task_id);
 
@@ -433,7 +455,7 @@
         const resp = await fetch('/api/ai-copy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'check_image_task', task_id: taskId, ref_file: currentRefFile })
+          body: JSON.stringify({ action: 'check_image_task', task_id: taskId, ref_files: currentRefFiles })
         });
         const data = await resp.json();
         if (!data.ok) return;
