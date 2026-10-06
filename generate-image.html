@@ -301,7 +301,7 @@
   let sb, currentUser;
   let selectedFile = null;
   let pollInterval = null;
-  let currentPrompt = '', currentSettings = {};
+  let currentPrompt = '', currentSettings = {}, currentRefFile = null;
 
   // ── Init ──
   (async () => {
@@ -407,6 +407,7 @@
       const data = await resp.json();
       if (!data.ok) throw new Error(data.error || 'Gagal memulai generate');
 
+      currentRefFile = data.ref_file || null;
       updateLoadingText('AI sedang generate gambar...', 'Biasanya butuh 20–60 detik');
       startPolling(data.task_id);
 
@@ -432,7 +433,7 @@
         const resp = await fetch('/api/ai-copy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'check_image_task', task_id: taskId })
+          body: JSON.stringify({ action: 'check_image_task', task_id: taskId, ref_file: currentRefFile })
         });
         const data = await resp.json();
         if (!data.ok) return;
