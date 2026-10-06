@@ -201,9 +201,9 @@
             </div>
             <!-- Billing info display -->
             <div class="billing-info-bar" id="billing-info-bar">
-              <div class="bi-row"><span class="bi-lbl">💰 Saldo Estimasi</span><span class="bi-val" id="bi-saldo" style="color:var(--primary);">-</span></div>
-              <div class="bi-row"><span class="bi-lbl">📊 Limit (Jangkauan)</span><span class="bi-val" id="bi-jangkauan">-</span></div>
-              <div class="bi-row" id="bi-sisa-row" style="display:none;"><span class="bi-lbl">↪️ Sisa Ruang</span><span class="bi-val" id="bi-sisa">-</span></div>
+              <div class="bi-row"><span class="bi-lbl">💸 Sudah Dibelanjakan</span><span class="bi-val" id="bi-saldo">-</span></div>
+              <div class="bi-row"><span class="bi-lbl">📊 Limit Tagihan</span><span class="bi-val" id="bi-jangkauan">-</span></div>
+              <div class="bi-row" id="bi-sisa-row" style="display:none;"><span class="bi-lbl">✅ Sisa Sebelum Tagih</span><span class="bi-val" id="bi-sisa">-</span></div>
               <div class="bi-cc" id="bi-cc" style="display:none;"></div>
             </div>
           </div>
@@ -341,10 +341,10 @@
         <div id="billing-filename" style="font-size:11px;color:var(--text-sub);margin-top:4px;"></div>
       </div>
 
-      <!-- Saldo Awal & Jangkauan -->
+      <!-- Saldo & Jangkauan -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="modal-field" style="margin-bottom:0;">
-          <label>Saldo Awal <span style="font-weight:400;color:var(--text-sub);">(dari billing SS)</span></label>
+          <label>Sudah Dibelanjakan <span style="font-weight:400;color:var(--text-sub);">(dari billing SS)</span></label>
           <div class="nominal-wrap">
             <span class="prefix" style="font-size:12px;">Rp</span>
             <input type="text" class="form-input" id="aa-saldo" placeholder="0" inputmode="numeric"
@@ -352,7 +352,7 @@
           </div>
         </div>
         <div class="modal-field" style="margin-bottom:0;">
-          <label>Jangkauan Saldo</label>
+          <label>Limit Tagihan (Jangkauan)</label>
           <div class="nominal-wrap">
             <span class="prefix" style="font-size:12px;">Rp</span>
             <input type="text" class="form-input" id="aa-jangkauan" placeholder="0" inputmode="numeric"
@@ -570,6 +570,7 @@
     const jangkauan = Number(a.jangkauan_saldo) || 0;
     const sisaRuang = jangkauan > 0 ? jangkauan - saldo : null;
     const pct = jangkauan > 0 ? Math.min(100, Math.max(0, Math.round((saldo / jangkauan) * 100))) : 0;
+    const barColor = pct >= 85 ? '#ef4444' : pct >= 60 ? '#f59e0b' : '#10b981';
     const ccInfo = a.kartu_kredit_nomor
       ? `<div style="font-size:11px;color:var(--text-sub);margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-2);">💳 •••• ${a.kartu_kredit_nomor}${a.kartu_kredit_nama ? '  ·  ' + a.kartu_kredit_nama : ''}</div>`
       : '';
@@ -596,10 +597,10 @@
         <button onclick="openAddAccountModal('${a.id}')" title="Edit">✏️</button>
         <button onclick="deleteAdAccount('${a.id}')" title="Hapus" style="color:var(--danger)">🗑️</button>
       </div>
-      <div class="acct-card-row"><span class="lbl">💰 Saldo Estimasi</span><span class="val" style="color:var(--primary);">${fmtRp(a.saldo_saat_ini)}</span></div>
-      ${jangkauan > 0 ? `<div class="acct-card-row"><span class="lbl">📊 Limit (Jangkauan)</span><span class="val">${fmtRp(jangkauan)}</span></div>` : ''}
-      ${sisaRuang != null ? `<div class="acct-card-row"><span class="lbl">↪️ Sisa Ruang</span><span class="val" style="color:${sisaRuang < 0 ? '#ef4444' : '#10b981'};">${fmtRp(sisaRuang)}</span></div>` : ''}
-      ${jangkauan > 0 ? `<div class="acct-saldo-bar" title="${pct}% terpakai"><div class="acct-saldo-fill" style="width:${pct}%"></div></div>` : ''}
+      <div class="acct-card-row"><span class="lbl">💸 Sudah Dibelanjakan</span><span class="val" style="color:${pct >= 85 ? '#ef4444' : 'var(--text)'};">${fmtRp(a.saldo_saat_ini)}</span></div>
+      ${jangkauan > 0 ? `<div class="acct-card-row"><span class="lbl">📊 Limit Tagihan</span><span class="val">${fmtRp(jangkauan)}</span></div>` : ''}
+      ${sisaRuang != null ? `<div class="acct-card-row"><span class="lbl">✅ Sisa Sebelum Tagih</span><span class="val" style="color:${sisaRuang <= 0 ? '#ef4444' : '#10b981'};">${fmtRp(Math.max(0, sisaRuang))}</span></div>` : ''}
+      ${jangkauan > 0 ? `<div class="acct-saldo-bar" title="${pct}% dari limit terpakai"><div class="acct-saldo-fill" style="width:${pct}%;background:${barColor};"></div></div>` : ''}
       ${ccInfo}
       ${logHtml}
     </div>`;
