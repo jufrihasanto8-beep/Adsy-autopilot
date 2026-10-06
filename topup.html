@@ -1082,6 +1082,7 @@
 
     const { data, error } = await q;
     if (error) { el.innerHTML = `<div class="empty-state"><p>${error.message}</p></div>`; return; }
+    window._historyData = data || [];
     if (!data?.length) {
       const msg = isAdmin && currentStatus === 'pending'
         ? '<h3 style="font-size:15px;margin-bottom:4px;">Tidak ada request pending</h3><p style="font-size:13px;">Semua request sudah ditangani.</p>'
@@ -1132,9 +1133,13 @@
         ${ext.spend != null ? `<span class="chip">💸 Spend: Rp ${fmtNum(ext.spend)}</span>` : ''}
         ${ext.results != null ? `<span class="chip">📊 Results: ${fmtNum(ext.results)}</span>` : ''}
         ${ext.cpr != null ? `<span class="chip">💰 CPR: Rp ${fmtNum(ext.cpr)}</span>` : ''}
-        ${isAdmin && rec.level ? `<span class="chip ${recClass}">⚡ ${recLabel} (${rec.recommendation_pct || '-'}%)</span>` : ''}
+        ${isAdmin && rec.level ? (() => {
+          const recNominal = rec.recommendation_pct ? Math.round(r.nominal_request * rec.recommendation_pct / 100) : null;
+          return `<span class="chip ${recClass}">⚡ ${recLabel} · ${rec.recommendation_pct}%${recNominal ? ' = Rp ' + recNominal.toLocaleString('id-ID') : ''}</span>`;
+        })() : ''}
       </div>
-      ${isAdmin && bd.saldo_saat_ini ? `<div style="margin-top:10px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">💰 Saldo: Rp ${fmtNum(bd.saldo_saat_ini)}  ·  📊 Jangkauan: Rp ${fmtNum(bd.jangkauan_saldo)}${bd.kartu_kredit_nomor ? `  ·  💳 ••••${bd.kartu_kredit_nomor}` : ''}</div>` : ''}
+      ${isAdmin && rec.reason ? `<div style="margin-top:8px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;line-height:1.6;">💡 ${rec.reason}</div>` : ''}
+      ${isAdmin && bd.saldo_saat_ini ? `<div style="margin-top:6px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">💸 Terpakai: Rp ${fmtNum(bd.saldo_saat_ini)}  ·  📊 Limit: Rp ${fmtNum(bd.jangkauan_saldo)}${bd.kartu_kredit_nomor ? `  ·  💳 ••••${bd.kartu_kredit_nomor}` : ''}</div>` : ''}
       ${r.catatan ? `<div style="margin-top:8px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">📝 ${r.catatan}</div>` : ''}
     </div>`;
   }
@@ -1144,18 +1149,32 @@
     approveTarget = { id, nominalRequest };
     document.getElementById('modal-approve-title').textContent = `Review Top Up — ${userName}`;
     const fmtNum = n => Number(n).toLocaleString('id-ID');
+
+    // Ambil data rekomendasi dari card yang ada
+    const req = window._historyData?.find(r => r.id === id);
+    const rec = req?.ai_recommendation || {};
+    const recNominal = rec.recommendation_pct ? Math.round(nominalRequest * rec.recommendation_pct / 100) : nominalRequest;
+    const recLabel = { good: '✅ Performa Baik', moderate: '⚠️ Performa Cukup', poor: '❌ Performa Rendah' }[rec.level] || '';
+    const recColor = { good: '#065f46', moderate: '#92400e', poor: '#991b1b' }[rec.level] || 'var(--text-sub)';
+
     document.getElementById('modal-approve-body').innerHTML = `
-      <div style="background:var(--gray-1);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;line-height:2;">
+      <div style="background:var(--gray-1);border-radius:10px;padding:14px;margin-bottom:12px;font-size:13px;line-height:2;">
         <div><strong>Produk:</strong> ${productName}</div>
         <div><strong>Nominal Request:</strong> Rp ${fmtNum(nominalRequest)}</div>
       </div>
+      ${rec.level ? `
+      <div style="background:var(--gray-1);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:12px;">
+        <div style="font-weight:700;color:${recColor};margin-bottom:4px;">⚡ ${recLabel} — Rekomendasi ${rec.recommendation_pct}% = Rp ${fmtNum(recNominal)}</div>
+        ${rec.reason ? `<div style="color:var(--text-sub);line-height:1.6;">${rec.reason}</div>` : ''}
+      </div>` : ''}
       <div class="modal-field">
         <label>Nominal yang Disetujui <span style="color:var(--danger)">*</span></label>
         <div class="nominal-wrap">
           <span class="prefix">Rp</span>
-          <input type="text" class="form-input" id="modal-nominal" value="${fmtNum(nominalRequest)}"
+          <input type="text" class="form-input" id="modal-nominal" value="${fmtNum(recNominal)}"
             inputmode="numeric" oninput="formatNominalInput(this)" style="padding-left:42px;font-size:16px;font-weight:700;" />
         </div>
+        ${rec.recommendation_pct && rec.recommendation_pct < 100 ? `<div class="form-hint" style="margin-top:4px;">💡 Pre-filled dari rekomendasi ${rec.recommendation_pct}% · ubah jika perlu</div>` : ''}
       </div>
       <div class="modal-field">
         <label>Catatan (opsional)</label>
