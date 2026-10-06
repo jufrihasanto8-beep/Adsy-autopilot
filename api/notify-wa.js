@@ -331,16 +331,18 @@ Aturan rekomendasi:
       .maybeSingle();
 
     const fonnteToken = adminCfg?.fonnte_token || process.env.FONNTE_TOKEN;
-    if (!fonnteToken) return res.json({ ok: true, note: 'No fonnte token configured' });
+    if (!fonnteToken) return res.json({ ok: false, warn: 'fonnte_token belum dikonfigurasi di Settings' });
 
     // Ambil WA targets dari global_settings
-    const { data: gs } = await sb.from('global_settings')
+    const { data: gs, error: gsErr } = await sb.from('global_settings')
       .select('topup_wa_targets')
       .eq('id', '00000000-0000-0000-0000-000000000001')
       .single();
 
+    if (gsErr) return res.json({ ok: false, warn: 'global_settings error: ' + gsErr.message });
+
     const waTargets = gs?.topup_wa_targets || [];
-    if (!waTargets.length) return res.json({ ok: true, note: 'No WA targets configured' });
+    if (!waTargets.length) return res.json({ ok: false, warn: 'Belum ada nomor penerima notif top up di Settings' });
 
     const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
     const approveLink = `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://adsy-autopilot.vercel.app'}/api/notify-wa?action=approve&id=${request_id}&token=${approve_token}`;
