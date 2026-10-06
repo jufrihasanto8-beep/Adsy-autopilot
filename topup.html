@@ -447,22 +447,27 @@
 
       // Notif WA ke admin/finance
       btn.textContent = 'Mengirim notifikasi...';
-      await fetch('/api/notify-wa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'notify_topup',
-          request_id: saved.id,
-          user_name: currentProfile?.name || user.email,
-          product_name: productName,
-          nominal_request: nominal,
-          extracted: extractedData || {},
-          recommendation: recommendationData || {},
-          approve_token: approveToken
-        })
-      });
+      let waWarn = null;
+      try {
+        const notifResp = await fetch('/api/notify-wa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'notify_topup',
+            request_id: saved.id,
+            user_name: currentProfile?.name || user.email,
+            product_name: productName,
+            nominal_request: nominal,
+            extracted: extractedData || {},
+            recommendation: recommendationData || {},
+            approve_token: approveToken
+          })
+        });
+        const notifData = await notifResp.json();
+        if (!notifData.ok && notifData.warn) waWarn = notifData.warn;
+      } catch (_) {}
 
-      showSuccess(nominal, extractedData, recommendationData);
+      showSuccess(nominal, extractedData, recommendationData, waWarn);
       resetForm();
 
     } catch (e) {
@@ -472,15 +477,18 @@
     }
   };
 
-  function showSuccess(nominal, ext, rec) {
+  function showSuccess(nominal, ext, rec, waWarn) {
     const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
     const recPct = rec?.recommendation_pct;
+    const waStatus = waWarn
+      ? `<div style="font-size:12px;color:#c2410c;margin-top:8px;background:#fff7ed;padding:8px 10px;border-radius:8px;">⚠️ WA tidak terkirim: ${waWarn}</div>`
+      : `<div style="font-size:12px;color:#6ee7b7;margin-top:8px;">Notifikasi WA sudah dikirim ke admin/finance.</div>`;
     const box = document.getElementById('tp-success');
     box.innerHTML = `
       <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:12px;padding:20px;margin-top:16px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
           <span style="font-size:20px;">✅</span>
-          <strong style="color:#065f46;">Request berhasil dikirim!</strong>
+          <strong style="color:#065f46;">Request berhasil disimpan!</strong>
         </div>
         <div style="font-size:13px;color:#047857;line-height:2;">
           <div>Nominal: <strong>Rp ${fmtNum(nominal)}</strong></div>
@@ -488,7 +496,7 @@
           ${ext?.cpr != null ? `<div>CPR: <strong>Rp ${fmtNum(ext.cpr)}</strong></div>` : ''}
           ${recPct ? `<div>AI Rekomendasi: <strong>Top up ${recPct}%</strong></div>` : ''}
         </div>
-        <div style="font-size:12px;color:#6ee7b7;margin-top:8px;">Notifikasi sudah dikirim ke admin/finance.</div>
+        ${waStatus}
       </div>`;
   }
 
