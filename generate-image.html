@@ -15,28 +15,6 @@
     .gen-tab { padding:8px 22px; border-radius:9px; border:none; background:transparent; font-size:13px; font-weight:600; color:var(--text-sub); cursor:pointer; transition:all .18s; font-family:inherit; }
     .gen-tab.active { background:#fff; color:var(--primary); box-shadow:0 1px 4px rgba(0,0,0,0.08); }
 
-    /* ── Shared bar ── */
-    .shared-bar {
-      background:#fff; border:1.5px solid var(--gray-2); border-radius:14px;
-      padding:14px 16px; display:flex; align-items:center; gap:10px;
-      flex-wrap:wrap; margin-bottom:16px;
-    }
-    .shared-bar label { font-size:12px; font-weight:600; color:var(--text-sub); white-space:nowrap; }
-    .shared-bar select {
-      flex:1; min-width:110px; padding:7px 10px; border-radius:8px;
-      border:1.5px solid var(--gray-2); background:#fff; font-size:12px;
-      font-family:inherit; color:var(--text); font-weight:500; cursor:pointer;
-    }
-    .shared-bar select:focus { outline:none; border-color:var(--primary); }
-    .shared-bar .divider { width:1px; height:28px; background:var(--gray-2); flex-shrink:0; }
-    .btn-gen-all {
-      padding:9px 20px; background:var(--primary); color:#fff; border:none;
-      border-radius:9px; font-size:13px; font-weight:700; cursor:pointer;
-      font-family:inherit; white-space:nowrap; transition:background .15s; flex-shrink:0;
-    }
-    .btn-gen-all:hover { background:#4f46e5; }
-    .btn-gen-all:disabled { background:var(--gray-3); cursor:not-allowed; }
-
     /* ── Slots grid ── */
     .slots-grid {
       display:grid; grid-template-columns:repeat(3,1fr); gap:14px; align-items:start;
@@ -196,6 +174,14 @@
       transition:all .15s;
     }
 
+    .slot-settings { display:flex; gap:6px; flex-wrap:wrap; }
+    .slot-settings select {
+      flex:1; min-width:80px; padding:6px 8px; border-radius:8px;
+      border:1.5px solid var(--gray-2); background:#fff; font-size:11px;
+      font-family:inherit; color:var(--text); font-weight:500; cursor:pointer;
+    }
+    .slot-settings select:focus { outline:none; border-color:var(--primary); }
+
     .slot-inline-err { font-size:11px; color:var(--danger); margin-top:-6px; display:none; }
 
     /* ── Riwayat grid ── */
@@ -289,34 +275,6 @@
 
       <!-- ── Panel Generate ── -->
       <div id="panel-generate">
-
-        <!-- Shared settings bar -->
-        <div class="shared-bar">
-          <label>Aspect</label>
-          <select id="sh-aspect">
-            <option value="auto">Otomatis</option>
-            <option value="1:1">1:1 Square</option>
-            <option value="4:3">4:3 Landscape</option>
-            <option value="3:4">3:4 Portrait</option>
-            <option value="16:9">16:9 Wide</option>
-            <option value="9:16">9:16 Story</option>
-          </select>
-          <div class="divider"></div>
-          <label>Resolusi</label>
-          <select id="sh-res">
-            <option value="1K">1K</option>
-            <option value="2K">2K</option>
-          </select>
-          <div class="divider"></div>
-          <label>Background</label>
-          <select id="sh-bg">
-            <option value="opaque">Solid</option>
-            <option value="transparent">Transparan</option>
-            <option value="auto">Otomatis</option>
-          </select>
-          <div class="divider"></div>
-          <button class="btn-gen-all" id="gen-all-btn" onclick="generateAll()">⚡ Generate Semua</button>
-        </div>
 
         <!-- 3 Slots -->
         <div class="slots-grid" id="slots-grid"></div>
@@ -424,6 +382,26 @@
             <span class="tip-chip" onclick="addTip(${s.idx},'product photography style')">product photo</span>
             <span class="tip-chip" onclick="addTip(${s.idx},'remove background')">remove bg</span>
             <span class="tip-chip" onclick="addTip(${s.idx},'cinematic style')">cinematic</span>
+          </div>
+
+          <div class="slot-settings">
+            <select id="aspect-${s.idx}" title="Aspect Ratio">
+              <option value="auto">📐 Otomatis</option>
+              <option value="1:1">1:1 Square</option>
+              <option value="4:3">4:3 Landscape</option>
+              <option value="3:4">3:4 Portrait</option>
+              <option value="16:9">16:9 Wide</option>
+              <option value="9:16">9:16 Story</option>
+            </select>
+            <select id="res-${s.idx}" title="Resolusi">
+              <option value="1K">🔲 1K</option>
+              <option value="2K">🔳 2K</option>
+            </select>
+            <select id="bg-${s.idx}" title="Background">
+              <option value="opaque">🎨 Solid</option>
+              <option value="transparent">⬜ Transparan</option>
+              <option value="auto">🔄 Auto</option>
+            </select>
           </div>
 
           <div class="slot-inline-err" id="err-${s.idx}"></div>
@@ -559,14 +537,6 @@
     const s = slots[si];
     const ok = s.files.length > 0 && document.getElementById(`prompt-${si}`).value.trim().length > 0;
     document.getElementById(`gbtn-${si}`).disabled = !ok;
-    updateGenAllBtn();
-  }
-
-  function updateGenAllBtn() {
-    const anyReady = slots.some(s =>
-      s.files.length > 0 && document.getElementById(`prompt-${s.idx}`).value.trim().length > 0 && !s.pollId
-    );
-    document.getElementById('gen-all-btn').disabled = !anyReady;
   }
 
   // ── Generate single slot ──
@@ -580,9 +550,9 @@
     if (!prompt)         { errEl.textContent = 'Isi prompt dulu.'; errEl.style.display = 'block'; return; }
 
     s.settings = {
-      aspect_ratio: document.getElementById('sh-aspect').value,
-      resolution:   document.getElementById('sh-res').value,
-      background:   document.getElementById('sh-bg').value,
+      aspect_ratio: document.getElementById(`aspect-${si}`).value,
+      resolution:   document.getElementById(`res-${si}`).value,
+      background:   document.getElementById(`bg-${si}`).value,
     };
     s.prompt = prompt;
 
@@ -614,16 +584,6 @@
       showSlotError(si, 'Gagal generate', e.message);
       resetBtn(si);
     }
-  };
-
-  // ── Generate semua ──
-  window.generateAll = function() {
-    slots.forEach(s => {
-      const hasFiles  = s.files.length > 0;
-      const hasPrompt = document.getElementById(`prompt-${s.idx}`).value.trim().length > 0;
-      const notBusy   = !s.pollId;
-      if (hasFiles && hasPrompt && notBusy) generateSlot(s.idx);
-    });
   };
 
   // ── Polling ──
@@ -707,7 +667,6 @@
     const btn = document.getElementById(`gbtn-${si}`);
     btn.disabled = false; btn.textContent = '✨ Generate';
     checkReady(si);
-    updateGenAllBtn();
   }
 
   window.clearSlotResult = function(si) {
