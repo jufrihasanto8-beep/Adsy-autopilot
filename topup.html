@@ -69,6 +69,12 @@
     .modal-field { margin-bottom:14px; }
     .modal-field label { display:block; font-size:12px; font-weight:600; color:var(--text-sub); margin-bottom:6px; }
 
+    /* ── Topup time selector ── */
+    .topup-time-opt { cursor:pointer; }
+    .topup-time-card { border:2px solid var(--gray-2); border-radius:12px; padding:12px 14px; text-align:center; transition:all .18s; background:#fff; }
+    .topup-time-card:hover { border-color:var(--primary); }
+    .topup-time-card.active { border-color:var(--primary); background:#f0f2ff; }
+
     .loading-state { text-align:center; padding:48px; color:var(--text-sub); }
     .empty-state { text-align:center; padding:56px 24px; color:var(--text-sub); }
     .empty-state .icon { font-size:48px; margin-bottom:12px; }
@@ -181,6 +187,29 @@
             </div>
           </div>
 
+          <!-- Waktu Top Up -->
+          <div class="form-group">
+            <label class="form-label">Waktu Top Up <span>*</span></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <label class="topup-time-opt" id="opt-pagi">
+                <input type="radio" name="topup_time" value="pagi" checked onchange="onTopupTimeChange()" style="display:none;" />
+                <div class="topup-time-card active" id="card-pagi">
+                  <div style="font-size:18px;">🌅</div>
+                  <div style="font-weight:700;font-size:13px;margin-top:4px;">Pagi</div>
+                  <div style="font-size:11px;color:var(--text-sub);margin-top:2px;line-height:1.4;">SS spend kemarin (full day)<br>Antisipasi limit hari ini</div>
+                </div>
+              </label>
+              <label class="topup-time-opt" id="opt-sore">
+                <input type="radio" name="topup_time" value="sore" onchange="onTopupTimeChange()" style="display:none;" />
+                <div class="topup-time-card" id="card-sore">
+                  <div style="font-size:18px;">🌆</div>
+                  <div style="font-weight:700;font-size:13px;margin-top:4px;">Sore</div>
+                  <div style="font-size:11px;color:var(--text-sub);margin-top:2px;line-height:1.4;">SS spend hari ini 00:00–skrg<br>Antisipasi sisa hari ini</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
           <!-- Pilih Produk -->
           <div class="form-group">
             <label class="form-label">Produk <span>*</span></label>
@@ -210,11 +239,11 @@
 
           <!-- Screenshot -->
           <div class="form-group">
-            <label class="form-label">Screenshot Meta Ads Manager <span>*</span></label>
+            <label class="form-label" id="ss-label">Screenshot Meta Ads — Spend Kemarin <span>*</span></label>
             <div class="ss-drop" id="ss-drop">
               <div class="ss-placeholder" id="ss-placeholder">
                 <div class="upload-icon">📸</div>
-                <div class="upload-hint">Klik atau drag & drop screenshot di sini</div>
+                <div class="upload-hint" id="ss-hint">Upload SS total spend kemarin (full day)</div>
                 <div class="upload-sub">PNG / JPG / WEBP · Maks 4MB</div>
               </div>
               <img id="ss-preview" src="" alt="Preview" />
@@ -444,6 +473,32 @@
     });
   }
 
+  // ── Topup time toggle ──
+  window.onTopupTimeChange = function() {
+    const val = document.querySelector('input[name="topup_time"]:checked')?.value || 'pagi';
+    document.getElementById('card-pagi').classList.toggle('active', val === 'pagi');
+    document.getElementById('card-sore').classList.toggle('active', val === 'sore');
+    if (val === 'pagi') {
+      document.getElementById('ss-label').innerHTML = 'Screenshot Meta Ads — Spend Kemarin <span>*</span>';
+      document.getElementById('ss-hint').textContent = 'Upload SS total spend kemarin (full day)';
+    } else {
+      document.getElementById('ss-label').innerHTML = 'Screenshot Meta Ads — Spend Hari Ini <span>*</span>';
+      document.getElementById('ss-hint').textContent = 'Upload SS spend hari ini jam 00:00 – sekarang';
+    }
+    // Reset file kalau ada
+    if (selectedFile) {
+      selectedFile = null; extractedData = null; recommendationData = null;
+      document.getElementById('ss-input').value = '';
+      document.getElementById('ss-preview').style.display = 'none';
+      document.getElementById('ss-preview').src = '';
+      document.getElementById('ss-placeholder').style.display = 'flex';
+      document.getElementById('ss-filename').textContent = '';
+      document.getElementById('extract-result').style.display = 'none';
+      document.getElementById('rec-wrap').style.display = 'none';
+      checkSubmitEnabled();
+    }
+  };
+
   window.onProductChange = function() {
     const sel = document.getElementById('tp-product');
     const opt = sel.options[sel.selectedIndex];
@@ -575,21 +630,21 @@
       ? `<div style="font-size:11px;color:var(--text-sub);margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-2);">💳 •••• ${a.kartu_kredit_nomor}${a.kartu_kredit_nama ? '  ·  ' + a.kartu_kredit_nama : ''}</div>`
       : '';
 
-    // Mini log (maks 4 entri)
-    const logs = adAccountLogs.filter(l => l.ad_account_id === a.id).slice(0, 4);
-    const logHtml = logs.length ? `
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-2);">
-        ${logs.map(l => {
-          const tgl = new Date(l.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short' });
-          const icon = l.type === 'topup' ? '📈' : '📉';
-          const color = l.type === 'topup' ? '#10b981' : '#ef4444';
-          const sign = l.type === 'topup' ? '+' : '';
-          return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;">
-            <span style="color:var(--text-sub);">${icon} ${tgl} · ${l.catatan || '-'}</span>
-            <span style="font-weight:700;color:${color};">${sign}Rp ${Math.abs(Number(l.amount)).toLocaleString('id-ID')}</span>
+    // Riwayat top up (type='topup' saja, semua entri)
+    const topupLogs = adAccountLogs.filter(l => l.ad_account_id === a.id && l.type === 'topup');
+    const logHtml = topupLogs.length ? `
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-2);">
+        <div style="font-size:11px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Riwayat Top Up <span style="font-weight:400;text-transform:none;letter-spacing:0;">(${topupLogs.length}x)</span></div>
+        <div style="max-height:160px;overflow-y:auto;">
+        ${topupLogs.map(l => {
+          const tgl = new Date(l.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+          return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:5px 0;border-bottom:1px solid var(--gray-1);">
+            <span style="color:var(--text-sub);">${tgl}</span>
+            <span style="font-weight:700;color:#10b981;">+Rp ${Math.abs(Number(l.amount)).toLocaleString('id-ID')}</span>
           </div>`;
         }).join('')}
-      </div>` : '';
+        </div>
+      </div>` : `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-2);font-size:12px;color:var(--text-sub);text-align:center;">Belum ada riwayat top up</div>`;
 
     return `<div class="acct-card" id="acct-${a.id}">
       <div class="acct-card-name">${a.nama_akun}</div>
@@ -877,6 +932,7 @@
       const approveToken = crypto.randomUUID();
       const sel = document.getElementById('tp-product');
       const productName = sel.options[sel.selectedIndex]?.textContent || '';
+      const topupTime = document.querySelector('input[name="topup_time"]:checked')?.value || 'pagi';
 
       // Gather ad account info
       let adAccountId = selectedAccountId || null;
@@ -904,6 +960,7 @@
         ai_recommendation: recommendationData || {},
         status: 'pending',
         approve_token: approveToken,
+        topup_time: topupTime,
         topup_ad_account_id: adAccountId,
         ad_account_name: adAccountName,
         billing_data: billingData
@@ -929,7 +986,8 @@
             approve_token: approveToken,
             ad_account_id: adAccountId,
             ad_account_name: adAccountName,
-            billing_data: billingData
+            billing_data: billingData,
+            topup_time: topupTime
           })
         });
         const notifData = await notifResp.json();
@@ -1048,6 +1106,7 @@
     const recClass = { good: 'rec-good', moderate: 'rec-moderate', poor: 'rec-poor' }[rec.level] || '';
     const recLabel = { good: 'Performa Baik', moderate: 'Performa Cukup', poor: 'Performa Rendah' }[rec.level] || '';
     const billingChip = r.ad_account_name ? `<span class="chip">💳 ${r.ad_account_name}</span>` : '';
+    const timeChip = r.topup_time === 'sore' ? `<span class="chip">🌆 Top Up Sore</span>` : `<span class="chip">🌅 Top Up Pagi</span>`;
 
     return `<div class="req-card" id="req-${r.id}">
       <div class="req-card-header">
@@ -1064,6 +1123,7 @@
       </div>
       <div class="req-chips">
         <span class="chip">📦 ${productName}</span>
+        ${timeChip}
         ${billingChip}
         ${ext.date_range ? `<span class="chip">📅 ${ext.date_range}</span>` : ''}
         ${ext.spend != null ? `<span class="chip">💸 Spend: Rp ${fmtNum(ext.spend)}</span>` : ''}
