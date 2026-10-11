@@ -668,7 +668,7 @@ Field tidak ditemukan = null.` }
 
   // ── notify_selow_transfer: WA ke finance dengan nominal transfer dari Selow.id ──
   if (action === 'notify_selow_transfer') {
-    const { user_name, nominal_disetujui, nominal_transfer, ad_account_name, billing_data } = body;
+    const { user_name, nominal_disetujui, nominal_transfer, transfer_bank, ad_account_name, billing_data } = body;
 
     const { data: cfgWithToken } = await sb.from('app_config')
       .select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle();
@@ -676,10 +676,12 @@ Field tidak ditemukan = null.` }
     if (!fonnteToken) return res.json({ ok: false, warn: 'Fonnte token belum dikonfigurasi' });
 
     const { data: gs } = await sb.from('global_settings')
-      .select('topup_wa_targets').eq('id', '00000000-0000-0000-0000-000000000001').single();
+      .select('topup_wa_targets, selow_va_bri, selow_va_mandiri').eq('id', '00000000-0000-0000-0000-000000000001').single();
     const waTargets = gs?.topup_wa_targets || [];
     if (!waTargets.length) return res.json({ ok: false, warn: 'Belum ada nomor penerima notif top up di Settings' });
 
+    const selowVaBri = gs?.selow_va_bri || null;
+    const selowVaMandiri = gs?.selow_va_mandiri || null;
     const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
     const bd = billing_data || {};
 
@@ -693,7 +695,12 @@ Field tidak ditemukan = null.` }
       `✅ Disetujui: Rp ${fmtNum(nominal_disetujui)}`,
       `💰 *Nominal Transfer: Rp ${fmtNum(nominal_transfer)}*`,
       ``,
-      `Silakan transfer nominal di atas ke kartu kredit advertiser.`,
+      (() => {
+        const isBri = transfer_bank === 'bri';
+        const va = isBri ? selowVaBri : selowVaMandiri;
+        const bankName = isBri ? 'BRI' : 'Mandiri';
+        return va ? `🏦 *Transfer via ${bankName}: ${va}*` : `🏦 Bank: ${bankName} (VA belum diset di Settings)`;
+      })(),
       `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
     ].filter(Boolean).join('\n');
 
