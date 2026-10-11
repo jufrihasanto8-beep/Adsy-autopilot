@@ -897,10 +897,11 @@
         headers: { 'Authorization': token }
       });
       const data = await resp.json();
+      console.log('[fetch-group] raw response:', JSON.stringify(data));
 
       // Fonnte mengembalikan array group atau object dengan key data/groups
       const groups = Array.isArray(data) ? data : (data.data || data.groups || []);
-      if (!groups.length) { showToast('Tidak ada group ditemukan di device ini', 'warning'); return; }
+      if (!groups.length) { showToast('Tidak ada group. Cek Console (F12) untuk lihat response asli.', 'warning'); return; }
 
       const sel = document.getElementById('group-dropdown');
       sel.innerHTML = '<option value="">— Pilih group —</option>';
