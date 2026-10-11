@@ -665,9 +665,17 @@
 
     if (adAccounts.length) {
       const ids = adAccounts.map(a => a.id);
+      // Ambil dari awal bulan lalu supaya summary bulan lalu akurat
+      const firstDayLastMonth = (() => {
+        const d = new Date();
+        d.setDate(1);
+        d.setMonth(d.getMonth() - 1);
+        return d.toISOString().split('T')[0];
+      })();
       const { data: logs } = await sb.from('topup_ad_account_logs')
         .select('*').in('ad_account_id', ids)
-        .order('created_at', { ascending: false }).limit(100);
+        .gte('created_at', firstDayLastMonth + 'T00:00:00Z')
+        .order('created_at', { ascending: false }).limit(500);
       adAccountLogs = logs || [];
     }
   }
@@ -710,11 +718,60 @@
 
     // Riwayat top up (type='topup' saja, semua entri)
     const topupLogs = adAccountLogs.filter(l => l.ad_account_id === a.id && l.type === 'topup');
-    const logHtml = topupLogs.length ? `
+
+    // Agregasi per periode
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const lastMonth = (() => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    })();
+
+    const sumLogs = (logs) => logs.reduce((s, l) => s + Math.abs(Number(l.amount)), 0);
+    const logsToday    = topupLogs.filter(l => l.created_at?.startsWith(todayStr));
+    const logsMonth    = topupLogs.filter(l => l.created_at?.startsWith(thisMonth));
+    const logsLastMonth= topupLogs.filter(l => l.created_at?.startsWith(lastMonth));
+    const totalToday   = sumLogs(logsToday);
+    const totalMonth   = sumLogs(logsMonth);
+    const totalLastMonth = sumLogs(logsLastMonth);
+    const totalAll     = sumLogs(topupLogs);
+
+    const fmtRpShort = n => n >= 1000000
+      ? 'Rp ' + (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'jt'
+      : n >= 1000 ? 'Rp ' + (n / 1000).toFixed(0) + 'rb'
+      : 'Rp ' + n.toLocaleString('id-ID');
+
+    const summaryHtml = `
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-2);">
-        <div style="font-size:11px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Riwayat Top Up <span style="font-weight:400;text-transform:none;letter-spacing:0;">(${topupLogs.length}x)</span></div>
-        <div style="max-height:160px;overflow-y:auto;">
-        ${topupLogs.map(l => {
+        <div style="font-size:11px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Ringkasan Top Up</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+          <div style="background:var(--gray-1);border-radius:8px;padding:8px 10px;">
+            <div style="font-size:10px;color:var(--text-sub);margin-bottom:2px;">Hari Ini</div>
+            <div style="font-size:14px;font-weight:700;color:${totalToday > 0 ? '#10b981' : 'var(--text-sub)'};">${totalToday > 0 ? fmtRpShort(totalToday) : '—'}</div>
+            ${logsToday.length > 0 ? `<div style="font-size:10px;color:var(--text-sub);">${logsToday.length}x transaksi</div>` : ''}
+          </div>
+          <div style="background:var(--gray-1);border-radius:8px;padding:8px 10px;">
+            <div style="font-size:10px;color:var(--text-sub);margin-bottom:2px;">Bulan Ini</div>
+            <div style="font-size:14px;font-weight:700;color:${totalMonth > 0 ? '#3b82f6' : 'var(--text-sub)'};">${totalMonth > 0 ? fmtRpShort(totalMonth) : '—'}</div>
+            ${logsMonth.length > 0 ? `<div style="font-size:10px;color:var(--text-sub);">${logsMonth.length}x transaksi</div>` : ''}
+          </div>
+          <div style="background:var(--gray-1);border-radius:8px;padding:8px 10px;">
+            <div style="font-size:10px;color:var(--text-sub);margin-bottom:2px;">Bulan Lalu</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text-sub);">${totalLastMonth > 0 ? fmtRpShort(totalLastMonth) : '—'}</div>
+            ${logsLastMonth.length > 0 ? `<div style="font-size:10px;color:var(--text-sub);">${logsLastMonth.length}x transaksi</div>` : ''}
+          </div>
+          <div style="background:var(--gray-1);border-radius:8px;padding:8px 10px;">
+            <div style="font-size:10px;color:var(--text-sub);margin-bottom:2px;">Total</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);">${totalAll > 0 ? fmtRpShort(totalAll) : '—'}</div>
+            ${topupLogs.length > 0 ? `<div style="font-size:10px;color:var(--text-sub);">${topupLogs.length}x transaksi</div>` : ''}
+          </div>
+        </div>`;
+
+    const logHtml = summaryHtml + (topupLogs.length ? `
+        <div style="font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:6px;">Riwayat Terbaru</div>
+        <div style="max-height:140px;overflow-y:auto;">
+        ${topupLogs.slice(0, 10).map(l => {
           const tgl = new Date(l.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
           return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:5px 0;border-bottom:1px solid var(--gray-1);">
             <span style="color:var(--text-sub);">${tgl}</span>
@@ -722,7 +779,7 @@
           </div>`;
         }).join('')}
         </div>
-      </div>` : `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-2);font-size:12px;color:var(--text-sub);text-align:center;">Belum ada riwayat top up</div>`;
+      </div>`) : `<div style="font-size:12px;color:var(--text-sub);text-align:center;padding:4px 0;">Belum ada riwayat top up</div></div>`;
 
     const adTypeBadge = a.ad_type === 'ctwa'
       ? `<span style="display:inline-block;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:6px;">💬 CTWA</span>`
