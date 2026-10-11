@@ -250,6 +250,14 @@
             </div>
             <button class="btn btn-outline" id="btn-save-selow-va" onclick="saveSelowVa()">Simpan VA</button>
           </div>
+
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-2);">
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">💬 Group WA Selow.id</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;">Notif "Siap Transfer" Selow.id akan dikirim ke group ini. Kosongkan agar dikirim ke nomor finance/SPV seperti biasa.</div>
+            <input type="text" class="form-input" id="selow-wa-group" placeholder="Contoh: 628xxx@g.us" style="margin-bottom:8px;" />
+            <div style="font-size:11px;color:var(--text-sub);margin-bottom:10px;">Cari Group ID di Fonnte → Device → klik nama group → copy ID (format: xxxxxxxxxx@g.us)</div>
+            <button class="btn btn-outline" id="btn-save-selow-group" onclick="saveSelowWaGroup()">Simpan Group</button>
+          </div>
         </div>
       </div>
 
@@ -804,6 +812,7 @@
     renderTopupWaList();
     if (data?.selow_va_bri) document.getElementById('selow-va-bri').value = data.selow_va_bri;
     if (data?.selow_va_mandiri) document.getElementById('selow-va-mandiri').value = data.selow_va_mandiri;
+    if (data?.selow_wa_group) document.getElementById('selow-wa-group').value = data.selow_wa_group;
   }
 
   function renderTopupWaList() {
@@ -864,6 +873,21 @@
     btn.disabled = false; btn.textContent = 'Simpan VA';
     if (!resp.ok || data.error) return showToast('Gagal simpan: ' + (data.error || 'Unknown error'), 'error');
     showToast('VA Selow.id disimpan!', 'success');
+  };
+
+  window.saveSelowWaGroup = async function() {
+    const group = document.getElementById('selow-wa-group').value.trim();
+    const btn = document.getElementById('btn-save-selow-group');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    const resp = await fetch('/api/global-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selow_wa_group: group || null })
+    });
+    const data = await resp.json();
+    btn.disabled = false; btn.textContent = 'Simpan Group';
+    if (!resp.ok || data.error) return showToast('Gagal simpan: ' + (data.error || 'Unknown error'), 'error');
+    showToast(group ? 'Group WA Selow.id disimpan!' : 'Group WA dihapus, fallback ke nomor finance/SPV', 'success');
   };
 
   // ── TOKEN ──
