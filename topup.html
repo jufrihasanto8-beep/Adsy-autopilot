@@ -267,11 +267,11 @@
 
           <!-- Omset + CAQ -->
           <div class="form-group" style="margin-top:16px;">
-            <label class="form-label">Omset dari Iklan Ini <span style="color:var(--text-sub);font-weight:400;">(opsional)</span></label>
+            <label class="form-label">Omset dari Iklan Ini <span>*</span></label>
             <div class="nominal-wrap">
               <span class="prefix">Rp</span>
               <input type="text" id="tp-omset" placeholder="0" inputmode="numeric"
-                oninput="formatNominalInput(this); calcCAQ()" class="form-input" />
+                oninput="formatNominalInput(this); calcCAQ(); checkSubmitEnabled()" class="form-input" />
             </div>
             <div id="caq-display" style="display:none; margin-top:8px; padding:10px 14px; border-radius:10px; font-size:13px; font-weight:700; display:none; align-items:center; gap:8px;">
               <span id="caq-icon"></span>
@@ -1023,8 +1023,10 @@
     const errEl = document.getElementById('tp-err');
     errEl.style.display = 'none';
 
+    const omsetCheck = parseInt(document.getElementById('tp-omset').value.replace(/\D/g, '')) || 0;
     if (!productId) { errEl.textContent = 'Pilih produk terlebih dahulu.'; errEl.style.display = 'block'; return; }
     if (!selectedFile) { errEl.textContent = 'Upload screenshot Meta Ads terlebih dahulu.'; errEl.style.display = 'block'; return; }
+    if (!omsetCheck || omsetCheck < 1000) { errEl.textContent = 'Masukkan omset dari iklan ini.'; errEl.style.display = 'block'; return; }
     if (!nominal || nominal < 1000) { errEl.textContent = 'Masukkan nominal top up yang valid.'; errEl.style.display = 'block'; return; }
 
     const btn = document.getElementById('tp-submit');
@@ -1159,7 +1161,8 @@
   function checkSubmitEnabled() {
     const hasProduct = !!document.getElementById('tp-product').value;
     const hasFile = !!selectedFile;
-    document.getElementById('tp-submit').disabled = !(hasProduct && hasFile);
+    const hasOmset = (parseInt(document.getElementById('tp-omset').value.replace(/\D/g, '')) || 0) >= 1000;
+    document.getElementById('tp-submit').disabled = !(hasProduct && hasFile && hasOmset);
   }
 
   // ── Tabs ──
