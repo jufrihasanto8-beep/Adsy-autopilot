@@ -265,8 +265,22 @@
             <div class="rec-reason" id="rec-reason-el" style="display:none;"></div>
           </div>
 
-          <!-- Nominal -->
+          <!-- Omset + CAQ -->
           <div class="form-group" style="margin-top:16px;">
+            <label class="form-label">Omset dari Iklan Ini <span style="color:var(--text-sub);font-weight:400;">(opsional)</span></label>
+            <div class="nominal-wrap">
+              <span class="prefix">Rp</span>
+              <input type="text" id="tp-omset" placeholder="0" inputmode="numeric"
+                oninput="formatNominalInput(this); calcCAQ()" class="form-input" />
+            </div>
+            <div id="caq-display" style="display:none; margin-top:8px; padding:10px 14px; border-radius:10px; font-size:13px; font-weight:700; display:none; align-items:center; gap:8px;">
+              <span id="caq-icon"></span>
+              <span id="caq-text"></span>
+            </div>
+          </div>
+
+          <!-- Nominal -->
+          <div class="form-group" style="margin-top:4px;">
             <label class="form-label">Nominal yang Diminta <span>*</span></label>
             <div class="nominal-wrap">
               <span class="prefix">Rp</span>
@@ -974,7 +988,33 @@
       `<div class="extract-row"><span class="lbl">${lbl}</span><span class="val">${val}</span></div>`
     ).join('');
     document.getElementById('extract-result').style.display = 'block';
+    calcCAQ();
   }
+
+  window.calcCAQ = function() {
+    const omset = parseInt(document.getElementById('tp-omset').value.replace(/\D/g, '')) || 0;
+    const spend = extractedData?.spend;
+    const el = document.getElementById('caq-display');
+
+    if (!omset || !spend || spend <= 0) { el.style.display = 'none'; return; }
+
+    const caq = (spend / omset) * 100;
+    let bg, color, icon, label;
+    if (caq <= 15) {
+      bg = '#d1fae5'; color = '#065f46'; icon = '🟢'; label = 'Murah';
+    } else if (caq <= 25) {
+      bg = '#fef3c7'; color = '#92400e'; icon = '🟡'; label = 'Cukup';
+    } else {
+      bg = '#fee2e2'; color = '#991b1b'; icon = '🔴'; label = 'Mahal';
+    }
+
+    el.style.background = bg;
+    el.style.color = color;
+    el.style.border = `1.5px solid ${color}33`;
+    document.getElementById('caq-icon').textContent = icon;
+    document.getElementById('caq-text').textContent = `CAQ ${caq.toFixed(1)}% — ${label} (Spend Rp ${Number(spend).toLocaleString('id-ID')} ÷ Omset Rp ${omset.toLocaleString('id-ID')})`;
+    el.style.display = 'flex';
+  };
 
   // ── Submit ──
   window.submitTopup = async function() {
@@ -1014,12 +1054,20 @@
         }
       }
 
+      // Gabungkan omset + CAQ ke extracted_data
+      const omset = parseInt(document.getElementById('tp-omset').value.replace(/\D/g, '')) || null;
+      const finalExtracted = { ...(extractedData || {}) };
+      if (omset) {
+        finalExtracted.omset = omset;
+        if (finalExtracted.spend) finalExtracted.caq_pct = parseFloat(((finalExtracted.spend / omset) * 100).toFixed(2));
+      }
+
       const { data: saved, error: dbErr } = await sb.from('topup_requests').insert({
         user_id: user.id,
         user_name: currentProfile?.name || user.email,
         product_id: productId,
         nominal_request: nominal,
-        extracted_data: extractedData || {},
+        extracted_data: finalExtracted,
         ai_recommendation: recommendationData || {},
         status: 'pending',
         approve_token: approveToken,
@@ -1044,7 +1092,7 @@
             user_name: currentProfile?.name || user.email,
             product_name: productName,
             nominal_request: nominal,
-            extracted: extractedData || {},
+            extracted: finalExtracted,
             recommendation: recommendationData || {},
             approve_token: approveToken,
             ad_account_id: adAccountId,
@@ -1058,7 +1106,7 @@
         else if (!notifData.ok) waWarn = 'Gagal kirim WA (tidak ada detail error)';
       } catch (_) {}
 
-      showSuccess(nominal, extractedData, recommendationData, waWarn);
+      showSuccess(nominal, finalExtracted, recommendationData, waWarn);
       resetForm();
 
     } catch (e) {
@@ -1093,6 +1141,8 @@
     document.getElementById('tp-product').value = '';
     document.getElementById('tp-product-kpi').style.display = 'none';
     document.getElementById('tp-nominal').value = '';
+    document.getElementById('tp-omset').value = '';
+    document.getElementById('caq-display').style.display = 'none';
     selectedFile = null; extractedData = null; recommendationData = null; selectedAccountId = null; selectedAccount = null;
     document.getElementById('ss-input').value = '';
     document.getElementById('ss-preview').style.display = 'none';
@@ -1197,6 +1247,13 @@
         ${ext.results != null ? `<span class="chip">📊 Results: ${fmtNum(ext.results)}</span>` : ''}
         ${ext.cpr != null ? `<span class="chip">💰 CPR: Rp ${fmtNum(ext.cpr)}</span>` : ''}
         ${ext.cpc != null ? `<span class="chip">💬 CPC: Rp ${fmtNum(ext.cpc)}</span>` : ''}
+        ${ext.omset != null ? `<span class="chip">🛒 Omset: Rp ${fmtNum(ext.omset)}</span>` : ''}
+        ${ext.caq_pct != null ? (() => {
+          const caq = ext.caq_pct;
+          const cls = caq <= 15 ? 'rec-good' : caq <= 25 ? 'rec-moderate' : 'rec-poor';
+          const lbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
+          return `<span class="chip ${cls}">📉 CAQ ${caq.toFixed(1)}% — ${lbl}</span>`;
+        })() : ''}
         ${isAdmin && rec.level ? (() => {
           const recNominal = rec.recommendation_pct ? Math.round(r.nominal_request * rec.recommendation_pct / 100) : null;
           return `<span class="chip ${recClass}">⚡ ${recLabel} · ${rec.recommendation_pct}%${recNominal ? ' = Rp ' + recNominal.toLocaleString('id-ID') : ''}</span>`;
@@ -1225,6 +1282,14 @@
       <div style="background:var(--gray-1);border-radius:10px;padding:14px;margin-bottom:12px;font-size:13px;line-height:2;">
         <div><strong>Produk:</strong> ${productName}</div>
         <div><strong>Nominal Request:</strong> Rp ${fmtNum(nominalRequest)}</div>
+        ${req?.extracted_data?.spend != null ? `<div><strong>Spend:</strong> Rp ${fmtNum(req.extracted_data.spend)}</div>` : ''}
+        ${req?.extracted_data?.omset != null ? `<div><strong>Omset:</strong> Rp ${fmtNum(req.extracted_data.omset)}</div>` : ''}
+        ${req?.extracted_data?.caq_pct != null ? (() => {
+          const caq = req.extracted_data.caq_pct;
+          const color = caq <= 15 ? '#065f46' : caq <= 25 ? '#92400e' : '#991b1b';
+          const lbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
+          return `<div><strong>CAQ:</strong> <span style="color:${color};font-weight:700;">${caq.toFixed(1)}% — ${lbl}</span></div>`;
+        })() : ''}
       </div>
       ${rec.level ? `
       <div style="background:var(--gray-1);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:12px;">
