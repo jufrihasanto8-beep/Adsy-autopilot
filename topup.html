@@ -489,6 +489,9 @@
   let selectedFile = null, extractedData = null, recommendationData = null;
   let currentStatus = 'pending';
   let approveTarget = null;
+  const HISTORY_PAGE_SIZE = 10;
+  let historyPage = 0;
+  let historyTotal = 0;
   let adAccounts = [];
   let adAccountLogs = [];
   let selectedAccountId = null;
@@ -1279,7 +1282,7 @@
     document.querySelectorAll('.topup-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
     document.querySelectorAll('.topup-panel').forEach(p => p.style.display = 'none');
     document.getElementById('panel-' + tab).style.display = 'block';
-    if (tab === 'riwayat') loadHistory();
+    if (tab === 'riwayat') { historyPage = 0; loadHistory(); }
     if (tab === 'akun-iklan') {
       if (adAccounts.length) {
         renderAdAccounts();
@@ -1292,6 +1295,7 @@
 
   window.switchStatus = function(status) {
     currentStatus = status;
+    historyPage = 0;
     document.querySelectorAll('.status-tab').forEach(t => t.classList.toggle('active', t.dataset.status === status));
     loadHistory();
   };
@@ -1303,15 +1307,21 @@
     const { data: { user } } = await sb.auth.getUser();
     const isAdmin = ['admin', 'superadmin'].includes(currentProfile?.role);
 
+    const from = historyPage * HISTORY_PAGE_SIZE;
+    const to   = from + HISTORY_PAGE_SIZE - 1;
+
     let q = sb.from('topup_requests')
-      .select('*, products(name)')
-      .order('created_at', { ascending: false });
+      .select('*, products(name)', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to);
     if (!isAdmin) q = q.eq('user_id', user.id);
     if (isAdmin && currentStatus) q = q.eq('status', currentStatus);
 
-    const { data, error } = await q;
+    const { data, error, count } = await q;
     if (error) { el.innerHTML = `<div class="empty-state"><p>${error.message}</p></div>`; return; }
     window._historyData = data || [];
+    historyTotal = count || 0;
+
     if (!data?.length) {
       const msg = isAdmin && currentStatus === 'pending'
         ? '<h3 style="font-size:15px;margin-bottom:4px;">Tidak ada request pending</h3><p style="font-size:13px;">Semua request sudah ditangani.</p>'
@@ -1319,8 +1329,28 @@
       el.innerHTML = `<div class="empty-state"><div class="icon">💳</div>${msg}</div>`;
       return;
     }
-    el.innerHTML = data.map(r => renderCard(r, isAdmin)).join('');
+
+    const totalPages = Math.ceil(historyTotal / HISTORY_PAGE_SIZE);
+    const cardsHtml = data.map(r => renderCard(r, isAdmin)).join('');
+    const paginationHtml = totalPages > 1 ? renderHistoryPagination(historyPage, totalPages) : '';
+    el.innerHTML = cardsHtml + paginationHtml;
   }
+
+  function renderHistoryPagination(page, totalPages) {
+    const info = 'Halaman ' + (page + 1) + ' dari ' + totalPages + ' · ' + historyTotal + ' request';
+    const prevDisabled = page === 0 ? 'disabled' : '';
+    const nextDisabled = page >= totalPages - 1 ? 'disabled' : '';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding:12px 4px;border-top:1px solid var(--gray-2);">'
+      + '<button class="btn btn-outline btn-sm" onclick="goHistoryPage(' + (page - 1) + ')" ' + prevDisabled + ' style="min-width:80px;">← Sebelum</button>'
+      + '<span style="font-size:12px;color:var(--text-sub);">' + info + '</span>'
+      + '<button class="btn btn-outline btn-sm" onclick="goHistoryPage(' + (page + 1) + ')" ' + nextDisabled + ' style="min-width:80px;">Berikutnya →</button>'
+      + '</div>';
+  }
+
+  window.goHistoryPage = function(page) {
+    historyPage = page;
+    loadHistory();
+  };
 
   function renderCard(r, isAdmin) {
     const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
