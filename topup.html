@@ -1260,12 +1260,12 @@
     hideBillingBar();
   }
 
-  function checkSubmitEnabled() {
+  window.checkSubmitEnabled = function checkSubmitEnabled() {
     const hasProduct = !!document.getElementById('tp-product').value;
     const hasFile = !!selectedFile;
     const hasOmset = document.getElementById('tp-omset').value.trim() !== '';
     document.getElementById('tp-submit').disabled = !(hasProduct && hasFile && hasOmset);
-  }
+  };
 
   // ── Tabs ──
   window.switchTab = function(tab) {
