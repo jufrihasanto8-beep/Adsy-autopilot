@@ -802,13 +802,46 @@ Field tidak ditemukan = null.` }
     if (!id || !token) return res.status(400).json({ error: 'id dan token diperlukan' });
 
     const { data: req_data } = await sb.from('topup_requests')
-      .select('extracted_data, approve_token').eq('id', id).eq('approve_token', token).single();
+      .select('*, extracted_data, approve_token').eq('id', id).eq('approve_token', token).single();
     if (!req_data) return res.status(404).json({ error: 'Request tidak ditemukan atau token salah' });
     if (req_data.extracted_data?.transfer_confirmed) return res.json({ ok: true, already: true });
 
     const newExt = { ...(req_data.extracted_data || {}), transfer_confirmed: true, transfer_confirmed_at: new Date().toISOString() };
     const { error } = await sb.from('topup_requests').update({ extracted_data: newExt, updated_at: new Date().toISOString() }).eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
+
+    // Kirim notif WA ke advertiser
+    try {
+      const { data: userCfg } = await sb.from('app_config').select('wa_target').eq('user_id', req_data.user_id).single();
+      const { data: adminCfg } = await sb.from('app_config').select('fonnte_token').not('fonnte_token', 'is', null).limit(1).maybeSingle();
+      const fonnteToken = adminCfg?.fonnte_token || process.env.FONNTE_TOKEN;
+      const noWa = userCfg?.wa_target;
+
+      if (fonnteToken && noWa) {
+        let target = String(noWa).replace(/\D/g, '');
+        if (target.startsWith('0')) target = '62' + target.slice(1);
+        else if (!target.startsWith('62')) target = '62' + target;
+
+        const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
+        const pesan = [
+          `✅ *Transfer Budget Selesai!*`,
+          ``,
+          `Halo *${req_data.user_name}*,`,
+          `Finance sudah melakukan transfer budget ke akun Meta Ads kamu.`,
+          `💰 *Nominal: Rp ${fmtNum(req_data.nominal_disetujui || req_data.nominal_request)}*`,
+          ``,
+          `Silakan cek kartu dan lakukan pembayaran ke Meta Ads.`,
+          `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+        ].join('\n');
+
+        await fetch('https://api.fonnte.com/send', {
+          method: 'POST',
+          headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target, message: pesan, countryCode: '62' })
+        });
+      }
+    } catch (_) {}
+
     return res.json({ ok: true });
   }
 
