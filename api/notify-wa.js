@@ -732,6 +732,14 @@ Field tidak ditemukan = null.` }
   if (action === 'notify_selow_transfer') {
     const { request_id, user_name, nominal_disetujui, nominal_transfer, transfer_bank, ad_account_name, billing_data } = body;
 
+    // Update DB pakai service key (bypass RLS)
+    if (request_id && nominal_transfer && transfer_bank) {
+      const { error: updErr } = await sb.from('topup_requests')
+        .update({ nominal_transfer: Number(nominal_transfer), transfer_bank, updated_at: new Date().toISOString() })
+        .eq('id', request_id);
+      if (updErr) return res.status(500).json({ error: 'Gagal simpan nominal: ' + updErr.message });
+    }
+
     const { data: cfgWithToken } = await sb.from('app_config')
       .select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle();
     const fonnteToken = cfgWithToken?.fonnte_token || process.env.FONNTE_TOKEN;
