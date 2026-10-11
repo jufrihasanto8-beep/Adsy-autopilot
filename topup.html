@@ -428,6 +428,29 @@
         </div>
       </div>
 
+      <!-- Metode Pembayaran -->
+      <div class="modal-field" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-2);">
+        <label>Metode Pembayaran <span style="color:var(--danger)">*</span></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <label style="cursor:pointer;">
+            <input type="radio" name="aa_payment_method" value="line_bank" checked onchange="onPaymentMethodChange()" style="display:none;" />
+            <div class="topup-time-card active" id="aa-card-linebank">
+              <div style="font-size:16px;">🏦</div>
+              <div style="font-weight:700;font-size:13px;margin-top:4px;">Line Bank</div>
+              <div style="font-size:11px;color:var(--text-sub);margin-top:2px;">Transfer langsung</div>
+            </div>
+          </label>
+          <label style="cursor:pointer;">
+            <input type="radio" name="aa_payment_method" value="selow" onchange="onPaymentMethodChange()" style="display:none;" />
+            <div class="topup-time-card" id="aa-card-selow">
+              <div style="font-size:16px;">🔵</div>
+              <div style="font-weight:700;font-size:13px;margin-top:4px;">Selow.id</div>
+              <div style="font-size:11px;color:var(--text-sub);margin-top:2px;">Pakai nominal unik</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <!-- Kartu Kredit -->
       <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-2);">
         <div style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:10px;">💳 Info Kartu Kredit (opsional)</div>
@@ -704,9 +727,12 @@
     const adTypeBadge = a.ad_type === 'ctwa'
       ? `<span style="display:inline-block;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:6px;">💬 CTWA</span>`
       : `<span style="display:inline-block;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:6px;">📋 Form</span>`;
+    const pmBadge = a.payment_method === 'selow'
+      ? `<span style="display:inline-block;background:#eff6ff;color:#0369a1;border:1px solid #bae6fd;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:4px;">🔵 Selow.id</span>`
+      : `<span style="display:inline-block;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:4px;">🏦 Line Bank</span>`;
 
     return `<div class="acct-card" id="acct-${a.id}">
-      <div class="acct-card-name">${a.nama_akun}${adTypeBadge}</div>
+      <div class="acct-card-name">${a.nama_akun}${adTypeBadge}${pmBadge}</div>
       <div class="acct-card-actions">
         <button onclick="openAddAccountModal('${a.id}')" title="Edit">✏️</button>
         <button onclick="deleteAdAccount('${a.id}')" title="Hapus" style="color:var(--danger)">🗑️</button>
@@ -726,6 +752,12 @@
     document.getElementById('aa-card-ctwa').classList.toggle('active', val === 'ctwa');
   };
 
+  window.onPaymentMethodChange = function() {
+    const val = document.querySelector('input[name="aa_payment_method"]:checked')?.value || 'line_bank';
+    document.getElementById('aa-card-linebank').classList.toggle('active', val === 'line_bank');
+    document.getElementById('aa-card-selow').classList.toggle('active', val === 'selow');
+  };
+
   // ── Add/Edit Account Modal ──
   window.openAddAccountModal = function(editId) {
     document.getElementById('aa-edit-id').value = editId || '';
@@ -740,6 +772,9 @@
     // Reset ad_type to form
     document.querySelectorAll('input[name="aa_ad_type"]').forEach(r => r.checked = r.value === 'form');
     onAdTypeChange();
+    // Reset payment method to line_bank
+    document.querySelectorAll('input[name="aa_payment_method"]').forEach(r => r.checked = r.value === 'line_bank');
+    onPaymentMethodChange();
     billingFile = null;
     document.getElementById('billing-input').value = '';
     document.getElementById('billing-preview').style.display = 'none';
@@ -759,6 +794,9 @@
         const adType = existing.ad_type || 'form';
         document.querySelectorAll('input[name="aa_ad_type"]').forEach(r => r.checked = r.value === adType);
         onAdTypeChange();
+        const pm = existing.payment_method || 'line_bank';
+        document.querySelectorAll('input[name="aa_payment_method"]').forEach(r => r.checked = r.value === pm);
+        onPaymentMethodChange();
       }
     }
 
@@ -838,6 +876,7 @@
     const productId = document.getElementById('aa-product').value;
     const nama = document.getElementById('aa-nama').value.trim();
     const adType = document.querySelector('input[name="aa_ad_type"]:checked')?.value || 'form';
+    const paymentMethod = document.querySelector('input[name="aa_payment_method"]:checked')?.value || 'line_bank';
     const saldo = parseInt(document.getElementById('aa-saldo').value.replace(/\D/g, '')) || null;
     const jangkauan = parseInt(document.getElementById('aa-jangkauan').value.replace(/\D/g, '')) || null;
     const ccNomor = document.getElementById('aa-cc-nomor').value.trim() || null;
@@ -859,6 +898,7 @@
         product_id: productId,
         nama_akun: nama,
         ad_type: adType,
+        payment_method: paymentMethod,
         saldo_saat_ini: saldo,
         jangkauan_saldo: jangkauan,
         kartu_kredit_nomor: ccNomor,
@@ -1063,6 +1103,10 @@
         finalExtracted.omset = omset;
         if (finalExtracted.spend) finalExtracted.caq_pct = parseFloat(((finalExtracted.spend / omset) * 100).toFixed(2));
       }
+      // Simpan payment_method dari akun iklan yang dipilih
+      if (selectedAccount?.payment_method) {
+        finalExtracted.payment_method = selectedAccount.payment_method;
+      }
 
       const { data: saved, error: dbErr } = await sb.from('topup_requests').insert({
         user_id: user.id,
@@ -1265,8 +1309,81 @@
       ${isAdmin && rec.reason ? `<div style="margin-top:8px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;line-height:1.6;">💡 ${rec.reason}</div>` : ''}
       ${isAdmin && bd.saldo_saat_ini ? `<div style="margin-top:6px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">💸 Terpakai: Rp ${fmtNum(bd.saldo_saat_ini)}  ·  📊 Limit: Rp ${fmtNum(bd.jangkauan_saldo)}${bd.kartu_kredit_nomor ? `  ·  💳 ••••${bd.kartu_kredit_nomor}` : ''}</div>` : ''}
       ${r.catatan ? `<div style="margin-top:8px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">📝 ${r.catatan}</div>` : ''}
+      ${(() => {
+        const isSelow = ext.payment_method === 'selow';
+        const isApproved = r.status === 'approved';
+        const nominalTf = r.nominal_transfer;
+        if (!isSelow || !isApproved) return '';
+        if (nominalTf) {
+          // Sudah input nominal transfer — tampilkan copyable
+          return `<div style="margin-top:12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px;">🔵 Selow.id — Nominal Transfer</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;font-weight:800;color:#1e293b;" id="ntf-${r.id}">Rp ${Number(nominalTf).toLocaleString('id-ID')}</span>
+              <button onclick="copyNominal('${r.id}', ${nominalTf})" style="border:none;background:#dbeafe;color:#1d4ed8;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;">📋 Copy</button>
+            </div>
+            <div style="font-size:11px;color:#64748b;margin-top:4px;">Sudah dikirim ke finance via WA</div>
+          </div>`;
+        }
+        // Belum input — tampilkan form input
+        return `<div style="margin-top:12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">
+          <div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:8px;">🔵 Selow.id — Input Nominal Transfer</div>
+          <div style="font-size:12px;color:#475569;margin-bottom:8px;">Buka Selow.id → request Rp ${fmtNum(r.nominal_disetujui || r.nominal_request)} → input nominal yang diberikan Selow.id di bawah:</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="nominal-wrap" style="flex:1;">
+              <span class="prefix" style="font-size:13px;">Rp</span>
+              <input type="text" id="selow-input-${r.id}" class="form-input" placeholder="Contoh: ${fmtNum(r.nominal_disetujui || r.nominal_request).replace(/\./g, '')}.303"
+                inputmode="numeric" oninput="formatNominalInput(this)" style="padding-left:38px;font-size:15px;font-weight:700;" />
+            </div>
+            <button onclick="submitNominalTransfer('${r.id}')" class="btn btn-primary btn-sm" style="white-space:nowrap;">Kirim ke Finance</button>
+          </div>
+        </div>`;
+      })()}
     </div>`;
   }
+
+  // ── Selow.id: Submit Nominal Transfer ──
+  window.submitNominalTransfer = async function(requestId) {
+    const inputEl = document.getElementById(`selow-input-${requestId}`);
+    const nominalTf = parseInt(inputEl?.value.replace(/\D/g, '')) || 0;
+    if (!nominalTf || nominalTf < 1000) { showToast('Masukkan nominal transfer dari Selow.id', 'warning'); return; }
+
+    const btn = inputEl.nextElementSibling || inputEl.parentElement.querySelector('button');
+    const req = window._historyData?.find(r => r.id === requestId);
+    if (!req) return;
+
+    try {
+      // Simpan nominal_transfer ke DB
+      const { error } = await sb.from('topup_requests')
+        .update({ nominal_transfer: nominalTf, updated_at: new Date().toISOString() })
+        .eq('id', requestId);
+      if (error) throw new Error(error.message);
+
+      // WA ke finance
+      await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'notify_selow_transfer',
+          request_id: requestId,
+          user_name: req.user_name,
+          nominal_disetujui: req.nominal_disetujui || req.nominal_request,
+          nominal_transfer: nominalTf,
+          ad_account_name: req.ad_account_name,
+          billing_data: req.billing_data || {}
+        })
+      });
+
+      showToast('Nominal transfer dikirim ke finance!', 'success');
+      loadHistory();
+    } catch (e) {
+      showToast('Error: ' + e.message, 'error');
+    }
+  };
+
+  window.copyNominal = function(id, nominal) {
+    navigator.clipboard.writeText(String(nominal)).then(() => showToast('Nominal disalin!', 'success'));
+  };
 
   // ── Admin: Open Approve Modal ──
   window.openApproveModal = function(id, nominalRequest, userName, productName) {
