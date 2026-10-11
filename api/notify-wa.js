@@ -633,6 +633,9 @@ Field tidak ditemukan = null.` }
         else if (!target.startsWith('62')) target = '62' + target;
         const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
 
+        const isSelow = req_data.extracted_data?.payment_method === 'selow';
+        const approvedNominal = fmtNum(nominal_disetujui || req_data.nominal_request);
+
         const pesan = reject
           ? [
               `❌ *Top Up Ditolak*`,
@@ -648,10 +651,9 @@ Field tidak ditemukan = null.` }
               ``,
               `Halo *${req_data.user_name}*,`,
               `Request top up kamu sudah disetujui!`,
-              `💰 *Nominal disetujui: Rp ${fmtNum(nominal_disetujui || req_data.nominal_request)}*`,
-              catatan ? `📝 Catatan: ${catatan}` : null,
+              `💰 *Nominal disetujui: Rp ${approvedNominal}*`,
+              catatan ? `\n📝 Catatan: ${catatan}` : null,
               ``,
-              `Silakan cek budget Meta Ads kamu.`,
               `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
             ].filter(Boolean).join('\n');
 
