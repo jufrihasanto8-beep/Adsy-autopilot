@@ -224,6 +224,16 @@ function calcRecommendation(kpiActual, kpiTarget, adType = 'form') {
   }
 }
 
+// Format target WA — support nomor individu & group ID Fonnte (xxx@g.us)
+function formatWaTarget(no) {
+  const s = String(no).trim();
+  if (s.includes('@g.us')) return s; // group ID — biarkan as-is
+  const digits = s.replace(/\D/g, '');
+  if (digits.startsWith('0')) return '62' + digits.slice(1);
+  if (!digits.startsWith('62')) return '62' + digits;
+  return digits;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -547,8 +557,7 @@ Field tidak ditemukan = null.` }
 
     const results = await Promise.all(
       waTargets.map(async no => {
-        // Nomor sudah dalam format 62xxx dari Settings, strip non-digit saja
-        const target = String(no).replace(/\D/g, '');
+        const target = formatWaTarget(no);
         try {
           const r2 = await fetch('https://api.fonnte.com/send', {
             method: 'POST',
@@ -684,9 +693,7 @@ Field tidak ditemukan = null.` }
       const noWa = userCfg?.wa_target;
 
       if (fonnteToken && noWa) {
-        let target = String(noWa).replace(/\D/g, '');
-        if (target.startsWith('0')) target = '62' + target.slice(1);
-        else if (!target.startsWith('62')) target = '62' + target;
+        const target = formatWaTarget(noWa);
         const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
 
         const isSelow = req_data.extracted_data?.payment_method === 'selow';
@@ -742,9 +749,12 @@ Field tidak ditemukan = null.` }
     if (!fonnteToken) return res.json({ ok: false, warn: 'Fonnte token belum dikonfigurasi' });
 
     const { data: gs } = await sb.from('global_settings')
-      .select('topup_wa_targets, selow_va_bri, selow_va_mandiri').eq('id', '00000000-0000-0000-0000-000000000001').single();
-    const waTargets = gs?.topup_wa_targets || [];
-    if (!waTargets.length) return res.json({ ok: false, warn: 'Belum ada nomor penerima notif top up di Settings' });
+      .select('topup_wa_targets, selow_va_bri, selow_va_mandiri, selow_wa_group').eq('id', '00000000-0000-0000-0000-000000000001').single();
+    // Kalau selow_wa_group diset, kirim ke group itu saja; kalau tidak, fallback ke topup_wa_targets
+    const waTargets = gs?.selow_wa_group
+      ? [gs.selow_wa_group]
+      : (gs?.topup_wa_targets || []);
+    if (!waTargets.length) return res.json({ ok: false, warn: 'Belum ada nomor/group penerima notif Selow di Settings' });
 
     // Ambil approve_token dari request untuk buat confirm link
     let confirmLink = null;
@@ -780,7 +790,7 @@ Field tidak ditemukan = null.` }
     ].filter(Boolean).join('\n');
 
     const results = await Promise.all(waTargets.map(async no => {
-      const target = String(no).replace(/\D/g, '');
+      const target = formatWaTarget(no);
       try {
         const r2 = await fetch('https://api.fonnte.com/send', {
           method: 'POST',
@@ -818,9 +828,7 @@ Field tidak ditemukan = null.` }
       const noWa = userCfg?.wa_target;
 
       if (fonnteToken && noWa) {
-        let target = String(noWa).replace(/\D/g, '');
-        if (target.startsWith('0')) target = '62' + target.slice(1);
-        else if (!target.startsWith('62')) target = '62' + target;
+        const target = formatWaTarget(noWa);
 
         const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
         const pesan = [

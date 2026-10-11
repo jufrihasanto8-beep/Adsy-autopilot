@@ -36,13 +36,14 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    // Kalau hanya update selow_va
-    const { selow_va_bri, selow_va_mandiri } = req.body;
-    if ((selow_va_bri !== undefined || selow_va_mandiri !== undefined) && !ad_location_mode && !ad_placement_mode) {
+    // Kalau hanya update selow_va atau selow_wa_group
+    const { selow_va_bri, selow_va_mandiri, selow_wa_group } = req.body;
+    if ((selow_va_bri !== undefined || selow_va_mandiri !== undefined || selow_wa_group !== undefined) && !ad_location_mode && !ad_placement_mode) {
       const { error } = await sb.from('global_settings').upsert({
         id: SETTINGS_ID,
         ...(selow_va_bri !== undefined && { selow_va_bri }),
         ...(selow_va_mandiri !== undefined && { selow_va_mandiri }),
+        ...(selow_wa_group !== undefined && { selow_wa_group }),
         updated_at: new Date().toISOString()
       }, { onConflict: 'id' });
       if (error) return res.status(500).json({ error: error.message });
