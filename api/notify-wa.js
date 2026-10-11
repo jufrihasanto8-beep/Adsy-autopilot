@@ -381,25 +381,21 @@ async function doConfirm() {
               },
               {
                 type: 'text',
-                text: `Kamu adalah data extractor untuk screenshot Meta Ads Manager (versi Bahasa Indonesia).
-Tipe iklan: ${isCtwa ? 'CTWA (Click to WhatsApp)' : 'Form/Lead Ads'}.
+                text: `Kamu adalah data extractor screenshot Meta Ads Manager (Bahasa Indonesia).
 
-Screenshot menampilkan tabel kampanye Meta Ads. Fokus pada BARIS TOTAL di paling bawah tabel (berlabel "Hasil dari X kampanye").
+Cari BARIS TOTAL paling bawah tabel (berlabel "Hasil dari X kampanye") dan baca nilai dari kolom-kolom ini berdasarkan NAMA HEADER PERSIS:
 
-Mapping kolom — ambil dari baris total, HANYA kolom yang namanya PERSIS sesuai:
-- Kolom "Hasil" → results (jumlah ${resultsLabel}). BUKAN kolom "Jangkauan" (reach/impresi). Jika nilainya "—" atau kosong, kembalikan null.
-- Kolom "Biaya per hasil" → ${isCtwa ? 'cpc' : 'cpr'} (${kpiLabel}). Jika "—", kembalikan null.
-- Kolom "Jumlah yang dibelanjakan" → spend. Jika "—", kembalikan null.
-- Tanggal dari pojok kanan atas → date_range (contoh: "11 Okt 2026").
+1. Header "Hasil" → results. Jika isinya "—" atau kosong → null.
+2. Header "Biaya per hasil" → ${isCtwa ? 'cpc' : 'cpr'}. Jika "—" → null.
+3. Header "Jumlah yang dibelanjakan" → spend. Jika "—" → null.
+4. Tanggal di pojok kanan atas halaman → date_range.
 
-JANGAN ambil kolom: "Jangkauan" (reach), "Frekuensi", "Anggaran", "Tayangan" — itu bukan results.
-PENTING: Semua angka kembalikan sebagai INTEGER murni (tanpa "Rp", tanpa titik). Titik = pemisah ribuan di format Indonesia.
-Contoh: "Rp 1.617.715" → 1617715, "Rp 49.947" → 49947, "—" → null.
+Format angka Indonesia: titik adalah pemisah ribuan (bukan desimal). "Rp 49.947" = 49947. Kembalikan INTEGER murni.
 
-Return HANYA valid JSON, tidak ada teks lain:
-${isCtwa ? '{"date_range":"11 Okt 2026","spend":49947,"results":null,"cpc":null}' : '{"date_range":"11 Okt 2026","spend":49947,"results":null,"cpr":null}'}
+Return HANYA JSON ini, tanpa teks lain:
+${isCtwa ? '{"date_range":"...","spend":...,"results":...,"cpc":...}' : '{"date_range":"...","spend":...,"results":...,"cpr":...}'}
 
-Field tidak ditemukan = null.`
+Nilai tidak ditemukan atau "—" = null.`
               }
             ]
           }]
