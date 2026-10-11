@@ -514,6 +514,7 @@
 
     await loadProducts();
     await loadAdAccounts();
+    filterProductsByAccounts();
     setupUploadArea();
     await loadHistory();
   })();
@@ -678,6 +679,18 @@
         .order('created_at', { ascending: false }).limit(500);
       adAccountLogs = logs || [];
     }
+  }
+
+  // ── Filter produk request sesuai akun iklan user ──
+  function filterProductsByAccounts() {
+    if (!adAccounts.length) return; // kalau belum ada akun iklan, tampilkan semua produk
+
+    const linkedProductIds = new Set(adAccounts.map(a => a.product_id).filter(Boolean));
+    const sel = document.getElementById('tp-product');
+    Array.from(sel.options).forEach(opt => {
+      if (!opt.value) return; // biarkan placeholder "— Pilih Produk —"
+      opt.style.display = linkedProductIds.has(opt.value) ? '' : 'none';
+    });
   }
 
   function renderAdAccounts() {
