@@ -1324,6 +1324,59 @@
     const billingChip = r.ad_account_name ? `<span class="chip">💳 ${r.ad_account_name}</span>` : '';
     const timeChip = r.topup_time === 'sore' ? `<span class="chip">🌆 Top Up Sore</span>` : `<span class="chip">🌅 Top Up Pagi</span>`;
 
+    // Pre-compute chips & sections to avoid nested IIFE inside template literal
+    let caqChipHtml = '';
+    if (ext.caq_pct != null) {
+      const caq = ext.caq_pct;
+      const cls = caq <= 15 ? 'rec-good' : caq <= 25 ? 'rec-moderate' : 'rec-poor';
+      const lbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
+      caqChipHtml = '<span class="chip ' + cls + '">📉 CAQ ' + caq.toFixed(1) + '% — ' + lbl + '</span>';
+    }
+    let recChipHtml = '';
+    if (isAdmin && rec.level) {
+      const recNominal = rec.recommendation_pct ? Math.round(r.nominal_request * rec.recommendation_pct / 100) : null;
+      recChipHtml = '<span class="chip ' + recClass + '">⚡ ' + recLabel + ' · ' + rec.recommendation_pct + '%' + (recNominal ? ' = Rp ' + recNominal.toLocaleString('id-ID') : '') + '</span>';
+    }
+    let selowHtml = '';
+    if (ext.payment_method === 'selow' && r.status === 'approved') {
+      const nominalTf = r.nominal_transfer;
+      if (nominalTf) {
+        selowHtml = '<div style="margin-top:12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">'
+          + '<div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px;">🔵 Selow.id — Nominal Transfer</div>'
+          + '<div style="display:flex;align-items:center;gap:8px;">'
+          + '<span style="font-size:18px;font-weight:800;color:#1e293b;">Rp ' + Number(nominalTf).toLocaleString('id-ID') + '</span>'
+          + '<button onclick="copyNominal(' + nominalTf + ')" style="border:none;background:#dbeafe;color:#1d4ed8;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;">📋 Copy</button>'
+          + '</div>'
+          + (r.transfer_bank ? '<div style="font-size:11px;color:#1d4ed8;margin-top:4px;font-weight:600;">🏦 Bank: ' + (r.transfer_bank === 'bri' ? 'BRI' : 'Mandiri') + '</div>' : '')
+          + '<div style="font-size:11px;color:#64748b;margin-top:2px;">Sudah dikirim ke finance via WA</div>'
+          + '</div>';
+      } else {
+        const nominalLabel = fmtNum(r.nominal_disetujui || r.nominal_request);
+        const nominalRaw = (r.nominal_disetujui || r.nominal_request || '').toString().replace(/\./g, '');
+        selowHtml = '<div style="margin-top:12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">'
+          + '<div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:8px;">🔵 Selow.id — Input Nominal Transfer</div>'
+          + '<div style="font-size:12px;color:#475569;margin-bottom:10px;">Buka Selow.id → request Rp ' + nominalLabel + ' → input nominal yang diberikan Selow.id di bawah:</div>'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
+          + '<label style="cursor:pointer;" onclick="document.getElementById(\'selow-bank-bri-' + r.id + '\').checked=true;document.getElementById(\'selow-card-bri-' + r.id + '\').classList.add(\'active\');document.getElementById(\'selow-card-mandiri-' + r.id + '\').classList.remove(\'active\');">'
+          + '<input type="radio" name="selow-bank-' + r.id + '" id="selow-bank-bri-' + r.id + '" value="bri" checked style="display:none;" />'
+          + '<div class="topup-time-card active" id="selow-card-bri-' + r.id + '" style="padding:8px 10px;"><div style="font-size:13px;font-weight:700;">🏦 BRI</div></div>'
+          + '</label>'
+          + '<label style="cursor:pointer;" onclick="document.getElementById(\'selow-bank-mandiri-' + r.id + '\').checked=true;document.getElementById(\'selow-card-mandiri-' + r.id + '\').classList.add(\'active\');document.getElementById(\'selow-card-bri-' + r.id + '\').classList.remove(\'active\');">'
+          + '<input type="radio" name="selow-bank-' + r.id + '" id="selow-bank-mandiri-' + r.id + '" value="mandiri" style="display:none;" />'
+          + '<div class="topup-time-card" id="selow-card-mandiri-' + r.id + '" style="padding:8px 10px;"><div style="font-size:13px;font-weight:700;">🏦 Mandiri</div></div>'
+          + '</label>'
+          + '</div>'
+          + '<div style="display:flex;gap:8px;align-items:center;">'
+          + '<div class="nominal-wrap" style="flex:1;">'
+          + '<span class="prefix" style="font-size:13px;">Rp</span>'
+          + '<input type="text" id="selow-input-' + r.id + '" class="form-input" placeholder="Contoh: ' + nominalRaw + '.303" inputmode="numeric" oninput="formatNominalInput(this)" style="padding-left:38px;font-size:15px;font-weight:700;" />'
+          + '</div>'
+          + '<button onclick="submitNominalTransfer(\'' + r.id + '\')" class="btn btn-primary btn-sm" style="white-space:nowrap;">Kirim ke Finance</button>'
+          + '</div>'
+          + '</div>';
+      }
+    }
+
     return `<div class="req-card" id="req-${r.id}">
       <div class="req-card-header">
         <div>
@@ -1347,65 +1400,13 @@
         ${ext.cpr != null ? `<span class="chip">💰 CPR: Rp ${fmtNum(ext.cpr)}</span>` : ''}
         ${ext.cpc != null ? `<span class="chip">💬 CPC: Rp ${fmtNum(ext.cpc)}</span>` : ''}
         ${ext.omset != null ? `<span class="chip">🛒 Omset: Rp ${fmtNum(ext.omset)}</span>` : ''}
-        ${ext.caq_pct != null ? (() => {
-          const caq = ext.caq_pct;
-          const cls = caq <= 15 ? 'rec-good' : caq <= 25 ? 'rec-moderate' : 'rec-poor';
-          const lbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
-          return `<span class="chip ${cls}">📉 CAQ ${caq.toFixed(1)}% — ${lbl}</span>`;
-        })() : ''}
-        ${isAdmin && rec.level ? (() => {
-          const recNominal = rec.recommendation_pct ? Math.round(r.nominal_request * rec.recommendation_pct / 100) : null;
-          return `<span class="chip ${recClass}">⚡ ${recLabel} · ${rec.recommendation_pct}%${recNominal ? ' = Rp ' + recNominal.toLocaleString('id-ID') : ''}</span>`;
-        })() : ''}
+        ${caqChipHtml}
+        ${recChipHtml}
       </div>
       ${isAdmin && rec.reason ? `<div style="margin-top:8px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;line-height:1.6;">💡 ${rec.reason}</div>` : ''}
       ${isAdmin && bd.saldo_saat_ini ? `<div style="margin-top:6px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">💸 Terpakai: Rp ${fmtNum(bd.saldo_saat_ini)}  ·  📊 Limit: Rp ${fmtNum(bd.jangkauan_saldo)}${bd.kartu_kredit_nomor ? `  ·  💳 ••••${bd.kartu_kredit_nomor}` : ''}</div>` : ''}
       ${r.catatan ? `<div style="margin-top:8px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">📝 ${r.catatan}</div>` : ''}
-      ${(() => {
-        const isSelow = ext.payment_method === 'selow';
-        const isApproved = r.status === 'approved';
-        const nominalTf = r.nominal_transfer;
-        if (!isSelow || !isApproved) return '';
-        if (nominalTf) {
-          // Sudah input nominal transfer — tampilkan copyable
-          return `<div style="margin-top:12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">
-            <div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px;">🔵 Selow.id — Nominal Transfer</div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:18px;font-weight:800;color:#1e293b;">Rp ${Number(nominalTf).toLocaleString('id-ID')}</span>
-              <button onclick="copyNominal(${nominalTf})" style="border:none;background:#dbeafe;color:#1d4ed8;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;">📋 Copy</button>
-            </div>
-            ${r.transfer_bank ? `<div style="font-size:11px;color:#1d4ed8;margin-top:4px;font-weight:600;">🏦 Bank: ${r.transfer_bank === 'bri' ? 'BRI' : 'Mandiri'}</div>` : ''}
-            <div style="font-size:11px;color:#64748b;margin-top:2px;">Sudah dikirim ke finance via WA</div>
-          </div>`;
-        }
-        // Belum input — tampilkan form input
-        return `<div style="margin-top:12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">
-          <div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:8px;">🔵 Selow.id — Input Nominal Transfer</div>
-          <div style="font-size:12px;color:#475569;margin-bottom:10px;">Buka Selow.id → request Rp ${fmtNum(r.nominal_disetujui || r.nominal_request)} → input nominal yang diberikan Selow.id di bawah:</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-            <label style="cursor:pointer;" onclick="document.getElementById('selow-bank-bri-${r.id}').checked=true;document.getElementById('selow-card-bri-${r.id}').classList.add('active');document.getElementById('selow-card-mandiri-${r.id}').classList.remove('active');">
-              <input type="radio" name="selow-bank-${r.id}" id="selow-bank-bri-${r.id}" value="bri" checked style="display:none;" />
-              <div class="topup-time-card active" id="selow-card-bri-${r.id}" style="padding:8px 10px;">
-                <div style="font-size:13px;font-weight:700;">🏦 BRI</div>
-              </div>
-            </label>
-            <label style="cursor:pointer;" onclick="document.getElementById('selow-bank-mandiri-${r.id}').checked=true;document.getElementById('selow-card-mandiri-${r.id}').classList.add('active');document.getElementById('selow-card-bri-${r.id}').classList.remove('active');">
-              <input type="radio" name="selow-bank-${r.id}" id="selow-bank-mandiri-${r.id}" value="mandiri" style="display:none;" />
-              <div class="topup-time-card" id="selow-card-mandiri-${r.id}" style="padding:8px 10px;">
-                <div style="font-size:13px;font-weight:700;">🏦 Mandiri</div>
-              </div>
-            </label>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <div class="nominal-wrap" style="flex:1;">
-              <span class="prefix" style="font-size:13px;">Rp</span>
-              <input type="text" id="selow-input-${r.id}" class="form-input" placeholder="Contoh: ${fmtNum(r.nominal_disetujui || r.nominal_request).replace(/\./g, '')}.303"
-                inputmode="numeric" oninput="formatNominalInput(this)" style="padding-left:38px;font-size:15px;font-weight:700;" />
-            </div>
-            <button onclick="submitNominalTransfer('${r.id}')" class="btn btn-primary btn-sm" style="white-space:nowrap;">Kirim ke Finance</button>
-          </div>
-        </div>`;
-      })()}
+      ${selowHtml}
     </div>`;
   }
 
@@ -1468,18 +1469,21 @@
     const recLabel = { good: '✅ Performa Baik', moderate: '⚠️ Performa Cukup', poor: '❌ Performa Rendah' }[rec.level] || '';
     const recColor = { good: '#065f46', moderate: '#92400e', poor: '#991b1b' }[rec.level] || 'var(--text-sub)';
 
+    let caqModalHtml = '';
+    if (req?.extracted_data?.caq_pct != null) {
+      const caq = req.extracted_data.caq_pct;
+      const caqColor = caq <= 15 ? '#065f46' : caq <= 25 ? '#92400e' : '#991b1b';
+      const caqLbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
+      caqModalHtml = '<div><strong>CAQ:</strong> <span style="color:' + caqColor + ';font-weight:700;">' + caq.toFixed(1) + '% — ' + caqLbl + '</span></div>';
+    }
+
     document.getElementById('modal-approve-body').innerHTML = `
       <div style="background:var(--gray-1);border-radius:10px;padding:14px;margin-bottom:12px;font-size:13px;line-height:2;">
         <div><strong>Produk:</strong> ${productName}</div>
         <div><strong>Nominal Request:</strong> Rp ${fmtNum(nominalRequest)}</div>
         ${req?.extracted_data?.spend != null ? `<div><strong>Spend:</strong> Rp ${fmtNum(req.extracted_data.spend)}</div>` : ''}
         ${req?.extracted_data?.omset != null ? `<div><strong>Omset:</strong> Rp ${fmtNum(req.extracted_data.omset)}</div>` : ''}
-        ${req?.extracted_data?.caq_pct != null ? (() => {
-          const caq = req.extracted_data.caq_pct;
-          const color = caq <= 15 ? '#065f46' : caq <= 25 ? '#92400e' : '#991b1b';
-          const lbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
-          return `<div><strong>CAQ:</strong> <span style="color:${color};font-weight:700;">${caq.toFixed(1)}% — ${lbl}</span></div>`;
-        })() : ''}
+        ${caqModalHtml}
       </div>
       ${rec.level ? `
       <div style="background:var(--gray-1);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:12px;">
