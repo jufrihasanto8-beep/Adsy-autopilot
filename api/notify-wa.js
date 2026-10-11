@@ -246,22 +246,37 @@ export default async function handler(req, res) {
       if (rows.extracted_data?.transfer_confirmed) return res.send(htmlPage('✅', 'Sudah Dikonfirmasi', `Transfer dari <strong>${rows.user_name}</strong> sudah pernah dikonfirmasi.`, '#10b981'));
 
       const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
-      const bankLabel = rows.transfer_bank === 'bri' ? 'BRI' : rows.transfer_bank === 'mandiri' ? 'Mandiri' : '-';
+      const isBri = rows.transfer_bank === 'bri';
+      const bankLabel = isBri ? 'BRI' : rows.transfer_bank === 'mandiri' ? 'Mandiri' : '-';
+
+      // Ambil VA dari global_settings
+      const { data: gs2 } = await sb.from('global_settings')
+        .select('selow_va_bri, selow_va_mandiri').eq('id', '00000000-0000-0000-0000-000000000001').single();
+      const va = isBri ? (gs2?.selow_va_bri || '-') : (gs2?.selow_va_mandiri || '-');
+
       return res.send(`<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Konfirmasi Transfer Selow.id</title>
-<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6fa;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}.card{background:#fff;border-radius:20px;padding:36px 28px;max-width:420px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08);}h1{font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;}.sub{font-size:13px;color:#64748b;margin-bottom:20px;}.info{background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:20px;}.row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid #f1f5f9;}.row:last-child{border-bottom:none;}.lbl{color:#64748b;}.val{font-weight:600;color:#1e293b;}.btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;background:#10b981;color:#fff;transition:background .2s;}.btn:hover{background:#059669;}.btn:disabled{background:#94a3b8;cursor:not-allowed;}.note{font-size:11px;color:#94a3b8;text-align:center;margin-top:12px;}</style></head>
+<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6fa;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}.card{background:#fff;border-radius:20px;padding:36px 28px;max-width:420px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08);}h1{font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;}.sub{font-size:13px;color:#64748b;margin-bottom:20px;}.info{background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:16px;}.row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px solid #f1f5f9;}.row:last-child{border-bottom:none;}.lbl{color:#64748b;}.val{font-weight:600;color:#1e293b;display:flex;align-items:center;gap:8px;}.copy-btn{border:none;background:#e0f2fe;color:#0369a1;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;}.va-box{background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin-bottom:16px;}.va-label{font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px;}.va-number{font-size:20px;font-weight:800;color:#1e293b;letter-spacing:1px;}.btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;background:#10b981;color:#fff;transition:background .2s;}.btn:hover{background:#059669;}.btn:disabled{background:#94a3b8;cursor:not-allowed;}.note{font-size:11px;color:#94a3b8;text-align:center;margin-top:12px;}</style></head>
 <body><div class="card">
   <h1>🔵 Konfirmasi Transfer Selow.id</h1>
   <div class="sub">Konfirmasi setelah transfer berhasil dilakukan</div>
   <div class="info">
     <div class="row"><span class="lbl">👤 Advertiser</span><span class="val">${rows.user_name}</span></div>
     <div class="row"><span class="lbl">💰 Nominal Disetujui</span><span class="val">Rp ${fmtNum(rows.nominal_disetujui)}</span></div>
-    <div class="row"><span class="lbl">💸 Nominal Transfer</span><span class="val">Rp ${fmtNum(rows.nominal_transfer)}</span></div>
+    <div class="row"><span class="lbl">💸 Nominal Transfer</span><span class="val">Rp ${fmtNum(rows.nominal_transfer)} <button class="copy-btn" onclick="copyText('${rows.nominal_transfer}')">📋 Copy</button></span></div>
     <div class="row"><span class="lbl">🏦 Bank</span><span class="val">${bankLabel}</span></div>
+  </div>
+  <div class="va-box">
+    <div class="va-label">🏦 Nomor VA ${bankLabel}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="va-number">${va}</div>
+      <button class="copy-btn" style="font-size:13px;padding:6px 12px;" onclick="copyText('${va}')">📋 Copy VA</button>
+    </div>
   </div>
   <button class="btn" id="btn-confirm" onclick="doConfirm()">✅ Konfirmasi Transfer Selesai</button>
   <div class="note" id="note">Tekan tombol setelah transfer berhasil.</div>
 </div>
 <script>
+function copyText(t) { navigator.clipboard.writeText(String(t)).then(() => alert('Disalin!')); }
 async function doConfirm() {
   const btn = document.getElementById('btn-confirm');
   btn.disabled = true; btn.textContent = 'Memproses...';
