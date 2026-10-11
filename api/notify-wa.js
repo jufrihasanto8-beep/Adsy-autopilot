@@ -85,6 +85,13 @@ const htmlConfirm = (r, id, token) => {
     ${ext.spend != null ? `<div class="info-row"><span class="lbl">Spend Kemarin</span><span class="val">Rp ${fmtNum(ext.spend)}</span></div>` : ''}
     ${ext.results != null ? `<div class="info-row"><span class="lbl">Hasil (Lead)</span><span class="val">${fmtNum(ext.results)}</span></div>` : ''}
     ${ext.cpr != null ? `<div class="info-row"><span class="lbl">CPR</span><span class="val">Rp ${fmtNum(ext.cpr)}</span></div>` : ''}
+    ${ext.omset != null ? `<div class="info-row"><span class="lbl">Omset</span><span class="val">Rp ${fmtNum(ext.omset)}</span></div>` : ''}
+    ${ext.caq_pct != null ? (() => {
+      const caq = ext.caq_pct;
+      const color = caq <= 15 ? '#10b981' : caq <= 25 ? '#f59e0b' : '#ef4444';
+      const lbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
+      return `<div class="info-row"><span class="lbl">CAQ</span><span class="val" style="color:${color}">${caq.toFixed(1)}% — ${lbl}</span></div>`;
+    })() : ''}
   </div>
 
   ${(r.billing_data?.saldo_saat_ini != null || r.billing_data?.kartu_kredit_nama) ? `
@@ -463,6 +470,12 @@ Field tidak ditemukan = null.` }
       extracted?.spend != null ? `• Spend: Rp ${fmtNum(extracted.spend)}` : null,
       extracted?.results != null ? `• Hasil (Lead): ${fmtNum(extracted.results)}` : null,
       extracted?.cpr != null ? `• CPR: Rp ${fmtNum(extracted.cpr)}` : null,
+      extracted?.omset != null ? `• Omset: Rp ${fmtNum(extracted.omset)}` : null,
+      extracted?.caq_pct != null ? (() => {
+        const caq = extracted.caq_pct;
+        const lbl = caq <= 15 ? 'Murah ✅' : caq <= 25 ? 'Cukup ⚠️' : 'Mahal ❌';
+        return `• CAQ: ${caq.toFixed(1)}% — ${lbl}`;
+      })() : null,
       ``,
       rec.level ? `⚡ *${levelLabel}*` : null,
       rec.recommendation_pct ? `💡 Rekomendasi performa: Top up ${rec.recommendation_pct}%` : null,
