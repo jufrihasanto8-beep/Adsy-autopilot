@@ -254,8 +254,16 @@
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-2);">
             <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">💬 Group WA Selow.id</div>
             <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;">Notif "Siap Transfer" Selow.id akan dikirim ke group ini. Kosongkan agar dikirim ke nomor finance/SPV seperti biasa.</div>
-            <input type="text" class="form-input" id="selow-wa-group" placeholder="Contoh: 628xxx@g.us" style="margin-bottom:8px;" />
-            <div style="font-size:11px;color:var(--text-sub);margin-bottom:10px;">Cari Group ID di Fonnte → Device → klik nama group → copy ID (format: xxxxxxxxxx@g.us)</div>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="text" class="form-input" id="selow-wa-group" placeholder="Contoh: 628xxx@g.us" style="flex:1;" />
+              <button class="btn btn-outline btn-sm" id="btn-fetch-groups" onclick="fetchWaGroups()" style="white-space:nowrap;">📋 Ambil List Group</button>
+            </div>
+            <div id="group-dropdown-wrap" style="display:none;margin-bottom:10px;">
+              <select class="form-input" id="group-dropdown" onchange="selectWaGroup(this.value)" style="width:100%;">
+                <option value="">— Pilih group —</option>
+              </select>
+            </div>
+            <div style="font-size:11px;color:var(--text-sub);margin-bottom:10px;">Klik "Ambil List Group" untuk pilih dari daftar group WA yang ada di device Fonnte.</div>
             <button class="btn btn-outline" id="btn-save-selow-group" onclick="saveSelowWaGroup()">Simpan Group</button>
           </div>
         </div>
@@ -873,6 +881,53 @@
     btn.disabled = false; btn.textContent = 'Simpan VA';
     if (!resp.ok || data.error) return showToast('Gagal simpan: ' + (data.error || 'Unknown error'), 'error');
     showToast('VA Selow.id disimpan!', 'success');
+  };
+
+  window.fetchWaGroups = async function() {
+    const btn = document.getElementById('btn-fetch-groups');
+    btn.disabled = true; btn.textContent = 'Mengambil...';
+    try {
+      // Ambil fonnte token dari app_config
+      const { data: cfg } = await sb.from('app_config').select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle();
+      const token = cfg?.fonnte_token;
+      if (!token) { showToast('Fonnte token belum diset di bagian Token di bawah', 'warning'); return; }
+
+      const resp = await fetch('https://api.fonnte.com/fetch-group', {
+        method: 'POST',
+        headers: { 'Authorization': token }
+      });
+      const data = await resp.json();
+
+      // Fonnte mengembalikan array group atau object dengan key data/groups
+      const groups = Array.isArray(data) ? data : (data.data || data.groups || []);
+      if (!groups.length) { showToast('Tidak ada group ditemukan di device ini', 'warning'); return; }
+
+      const sel = document.getElementById('group-dropdown');
+      sel.innerHTML = '<option value="">— Pilih group —</option>';
+      groups.forEach(g => {
+        const id = g.id || g.jid || g.group_id || '';
+        const name = g.name || g.subject || g.group_name || id;
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = name;
+        sel.appendChild(opt);
+      });
+
+      // Set nilai aktif kalau sudah ada
+      const current = document.getElementById('selow-wa-group').value.trim();
+      if (current) sel.value = current;
+
+      document.getElementById('group-dropdown-wrap').style.display = 'block';
+      showToast(`${groups.length} group ditemukan`, 'success');
+    } catch(e) {
+      showToast('Gagal ambil group: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '📋 Ambil List Group';
+    }
+  };
+
+  window.selectWaGroup = function(val) {
+    if (val) document.getElementById('selow-wa-group').value = val;
   };
 
   window.saveSelowWaGroup = async function() {
