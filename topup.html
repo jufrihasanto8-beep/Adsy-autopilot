@@ -1482,8 +1482,16 @@
         })
       });
 
+      // Update data lokal & re-render card langsung tanpa reload semua
+      const idx = window._historyData?.findIndex(r => r.id === requestId);
+      if (idx !== -1) {
+        window._historyData[idx].nominal_transfer = nominalTf;
+        window._historyData[idx].transfer_bank = bank;
+        const isAdmin = ['admin', 'superadmin'].includes(currentProfile?.role);
+        const cardEl = document.getElementById('req-' + requestId);
+        if (cardEl) cardEl.outerHTML = renderCard(window._historyData[idx], isAdmin);
+      }
       showToast('Nominal transfer dikirim ke finance!', 'success');
-      loadHistory();
     } catch (e) {
       showToast('Error: ' + e.message, 'error');
       if (btn) { btn.disabled = false; btn.textContent = 'Kirim ke Finance'; }
