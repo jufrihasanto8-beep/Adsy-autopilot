@@ -86,11 +86,14 @@ const htmlConfirm = (r, id, token) => {
     ${ext.results != null ? `<div class="info-row"><span class="lbl">Hasil (Lead)</span><span class="val">${fmtNum(ext.results)}</span></div>` : ''}
     ${ext.cpr != null ? `<div class="info-row"><span class="lbl">CPR</span><span class="val">Rp ${fmtNum(ext.cpr)}</span></div>` : ''}
     ${ext.omset != null ? `<div class="info-row"><span class="lbl">Omset</span><span class="val">Rp ${fmtNum(ext.omset)}</span></div>` : ''}
-    ${ext.caq_pct != null ? (() => {
-      const caq = ext.caq_pct;
-      const color = caq <= 15 ? '#10b981' : caq <= 25 ? '#f59e0b' : '#ef4444';
-      const lbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
-      return `<div class="info-row"><span class="lbl">CAQ</span><span class="val" style="color:${color}">${caq.toFixed(1)}% — ${lbl}</span></div>`;
+    ${ext.omset != null ? (() => {
+      if (ext.caq_pct != null) {
+        const caq = ext.caq_pct;
+        const color = caq <= 15 ? '#10b981' : caq <= 25 ? '#f59e0b' : '#ef4444';
+        const lbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
+        return `<div class="info-row"><span class="lbl">CAQ</span><span class="val" style="color:${color}">${caq.toFixed(1)}% — ${lbl}</span></div>`;
+      }
+      return `<div class="info-row"><span class="lbl">CAQ</span><span class="val" style="color:#6b7280">— (omset 0)</span></div>`;
     })() : ''}
   </div>
 
@@ -393,19 +396,28 @@ async function doConfirm() {
                 type: 'text',
                 text: `Kamu adalah data extractor screenshot Meta Ads Manager (Bahasa Indonesia).
 
-Cari BARIS TOTAL paling bawah tabel (berlabel "Hasil dari X kampanye") dan baca nilai dari kolom-kolom ini berdasarkan NAMA HEADER PERSIS:
+Lihat BARIS PALING BAWAH berlabel "Hasil dari X kampanye". Baris ini adalah baris total/summary.
 
-1. Header "Hasil" → results. Jika isinya "—" atau kosong → null.
-2. Header "Biaya per hasil" → ${isCtwa ? 'cpc' : 'cpr'}. Jika "—" → null.
-3. Header "Jumlah yang dibelanjakan" → spend. Jika "—" → null.
-4. Tanggal di pojok kanan atas halaman → date_range.
+LANGKAH 1 — identifikasi posisi kolom dari baris HEADER di atas tabel.
+LANGKAH 2 — baca nilai di baris total untuk kolom-kolom ini:
 
-Format angka Indonesia: titik adalah pemisah ribuan (bukan desimal). "Rp 49.947" = 49947. Kembalikan INTEGER murni.
+A. Kolom "Hasil" → results.
+   PENTING: Kolom ini sering menampilkan DUA baris teks — baris pertama adalah ANGKA atau "—", baris kedua adalah nama event (contoh: "Pembelian di Situs Web", "Prospek", dll).
+   Baca HANYA baris pertama (angka atau "—"). Jika "—" → null.
+   JANGAN membaca angka dari kolom lain seperti "Jangkauan" (Reach) meski posisinya berdekatan.
 
-Return HANYA JSON ini, tanpa teks lain:
+B. Kolom "${isCtwa ? 'Biaya per klik (semua)' : 'Biaya per hasil'}" → ${isCtwa ? 'cpc' : 'cpr'}. Jika "—" → null.
+
+C. Kolom "Jumlah yang dibelanjakan" → spend. Jika "—" → null.
+
+D. Tanggal periode di pojok kanan atas → date_range (contoh: "11 Okt 2026").
+
+Format angka Indonesia: titik = pemisah ribuan. "Rp 49.947" = 49947. Kembalikan angka INTEGER murni.
+
+Return HANYA JSON ini tanpa teks lain:
 ${isCtwa ? '{"date_range":"...","spend":...,"results":...,"cpc":...}' : '{"date_range":"...","spend":...,"results":...,"cpr":...}'}
 
-Nilai tidak ditemukan atau "—" = null.`
+"—" atau tidak ditemukan = null.`
               }
             ]
           }]
@@ -537,11 +549,11 @@ Field tidak ditemukan = null.` }
       extracted?.results != null ? `• Hasil (Lead): ${fmtNum(extracted.results)}` : null,
       extracted?.cpr != null ? `• CPR: Rp ${fmtNum(extracted.cpr)}` : null,
       extracted?.omset != null ? `• Omset: Rp ${fmtNum(extracted.omset)}` : null,
-      extracted?.caq_pct != null ? (() => {
+      extracted?.omset != null ? (extracted?.caq_pct != null ? (() => {
         const caq = extracted.caq_pct;
         const lbl = caq <= 15 ? 'Murah ✅' : caq <= 25 ? 'Cukup ⚠️' : 'Mahal ❌';
         return `• CAQ: ${caq.toFixed(1)}% — ${lbl}`;
-      })() : null,
+      })() : `• CAQ: — (omset 0)`) : null,
       ``,
       rec.level ? `⚡ *${levelLabel}*` : null,
       rec.recommendation_pct ? `💡 Rekomendasi performa: Top up ${rec.recommendation_pct}%` : null,
