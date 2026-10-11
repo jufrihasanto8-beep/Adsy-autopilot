@@ -234,6 +234,22 @@
             <button class="btn btn-outline" onclick="addTopupWaNumber()">+ Tambah</button>
           </div>
           <div class="form-hint">Format: 08xxx atau 628xxx. Setiap nomor menerima notif + link approve langsung dari WA.</div>
+
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--gray-2);">
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">🔵 VA Selow.id (Global)</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;">Nomor VA Selow.id untuk transfer top up — finance akan menerima info VA ini setiap ada request Selow.id</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--text-sub);display:block;margin-bottom:4px;">Bank BRI</label>
+                <input type="text" class="form-input" id="selow-va-bri" placeholder="Contoh: 088801234567890" />
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--text-sub);display:block;margin-bottom:4px;">Bank Mandiri</label>
+                <input type="text" class="form-input" id="selow-va-mandiri" placeholder="Contoh: 8880012345678" />
+              </div>
+            </div>
+            <button class="btn btn-outline" id="btn-save-selow-va" onclick="saveSelowVa()">Simpan VA</button>
+          </div>
         </div>
       </div>
 
@@ -786,6 +802,8 @@
     const data = await resp.json();
     topupWaNumbers = data?.topup_wa_targets || [];
     renderTopupWaList();
+    if (data?.selow_va_bri) document.getElementById('selow-va-bri').value = data.selow_va_bri;
+    if (data?.selow_va_mandiri) document.getElementById('selow-va-mandiri').value = data.selow_va_mandiri;
   }
 
   function renderTopupWaList() {
@@ -830,6 +848,23 @@
     if (!resp.ok || data.error) return showToast('Gagal simpan: ' + (data.error || 'Unknown error'), 'error');
     showToast('Penerima notif top up disimpan!', 'success');
   }
+
+  window.saveSelowVa = async function() {
+    const bri = document.getElementById('selow-va-bri').value.trim();
+    const mandiri = document.getElementById('selow-va-mandiri').value.trim();
+    if (!bri && !mandiri) { showToast('Masukkan minimal 1 nomor VA', 'warning'); return; }
+    const btn = document.getElementById('btn-save-selow-va');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    const resp = await fetch('/api/global-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selow_va_bri: bri, selow_va_mandiri: mandiri })
+    });
+    const data = await resp.json();
+    btn.disabled = false; btn.textContent = 'Simpan VA';
+    if (!resp.ok || data.error) return showToast('Gagal simpan: ' + (data.error || 'Unknown error'), 'error');
+    showToast('VA Selow.id disimpan!', 'success');
+  };
 
   // ── TOKEN ──
   async function loadToken() {

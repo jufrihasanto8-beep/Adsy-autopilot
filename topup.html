@@ -1319,16 +1319,31 @@
           return `<div style="margin-top:12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">
             <div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px;">🔵 Selow.id — Nominal Transfer</div>
             <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:18px;font-weight:800;color:#1e293b;" id="ntf-${r.id}">Rp ${Number(nominalTf).toLocaleString('id-ID')}</span>
-              <button onclick="copyNominal('${r.id}', ${nominalTf})" style="border:none;background:#dbeafe;color:#1d4ed8;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;">📋 Copy</button>
+              <span style="font-size:18px;font-weight:800;color:#1e293b;">Rp ${Number(nominalTf).toLocaleString('id-ID')}</span>
+              <button onclick="copyNominal(${nominalTf})" style="border:none;background:#dbeafe;color:#1d4ed8;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;">📋 Copy</button>
             </div>
-            <div style="font-size:11px;color:#64748b;margin-top:4px;">Sudah dikirim ke finance via WA</div>
+            ${r.transfer_bank ? `<div style="font-size:11px;color:#1d4ed8;margin-top:4px;font-weight:600;">🏦 Bank: ${r.transfer_bank === 'bri' ? 'BRI' : 'Mandiri'}</div>` : ''}
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Sudah dikirim ke finance via WA</div>
           </div>`;
         }
         // Belum input — tampilkan form input
         return `<div style="margin-top:12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">
           <div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:8px;">🔵 Selow.id — Input Nominal Transfer</div>
-          <div style="font-size:12px;color:#475569;margin-bottom:8px;">Buka Selow.id → request Rp ${fmtNum(r.nominal_disetujui || r.nominal_request)} → input nominal yang diberikan Selow.id di bawah:</div>
+          <div style="font-size:12px;color:#475569;margin-bottom:10px;">Buka Selow.id → request Rp ${fmtNum(r.nominal_disetujui || r.nominal_request)} → input nominal yang diberikan Selow.id di bawah:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <label style="cursor:pointer;" onclick="document.getElementById('selow-bank-bri-${r.id}').checked=true;document.getElementById('selow-card-bri-${r.id}').classList.add('active');document.getElementById('selow-card-mandiri-${r.id}').classList.remove('active');">
+              <input type="radio" name="selow-bank-${r.id}" id="selow-bank-bri-${r.id}" value="bri" checked style="display:none;" />
+              <div class="topup-time-card active" id="selow-card-bri-${r.id}" style="padding:8px 10px;">
+                <div style="font-size:13px;font-weight:700;">🏦 BRI</div>
+              </div>
+            </label>
+            <label style="cursor:pointer;" onclick="document.getElementById('selow-bank-mandiri-${r.id}').checked=true;document.getElementById('selow-card-mandiri-${r.id}').classList.add('active');document.getElementById('selow-card-bri-${r.id}').classList.remove('active');">
+              <input type="radio" name="selow-bank-${r.id}" id="selow-bank-mandiri-${r.id}" value="mandiri" style="display:none;" />
+              <div class="topup-time-card" id="selow-card-mandiri-${r.id}" style="padding:8px 10px;">
+                <div style="font-size:13px;font-weight:700;">🏦 Mandiri</div>
+              </div>
+            </label>
+          </div>
           <div style="display:flex;gap:8px;align-items:center;">
             <div class="nominal-wrap" style="flex:1;">
               <span class="prefix" style="font-size:13px;">Rp</span>
@@ -1346,20 +1361,21 @@
   window.submitNominalTransfer = async function(requestId) {
     const inputEl = document.getElementById(`selow-input-${requestId}`);
     const nominalTf = parseInt(inputEl?.value.replace(/\D/g, '')) || 0;
+    const bank = document.querySelector(`input[name="selow-bank-${requestId}"]:checked`)?.value || 'bri';
     if (!nominalTf || nominalTf < 1000) { showToast('Masukkan nominal transfer dari Selow.id', 'warning'); return; }
 
-    const btn = inputEl.nextElementSibling || inputEl.parentElement.querySelector('button');
     const req = window._historyData?.find(r => r.id === requestId);
     if (!req) return;
 
+    const btn = inputEl.closest('div').querySelector('button');
+    if (btn) { btn.disabled = true; btn.textContent = 'Mengirim...'; }
+
     try {
-      // Simpan nominal_transfer ke DB
       const { error } = await sb.from('topup_requests')
-        .update({ nominal_transfer: nominalTf, updated_at: new Date().toISOString() })
+        .update({ nominal_transfer: nominalTf, transfer_bank: bank, updated_at: new Date().toISOString() })
         .eq('id', requestId);
       if (error) throw new Error(error.message);
 
-      // WA ke finance
       await fetch('/api/notify-wa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1369,6 +1385,7 @@
           user_name: req.user_name,
           nominal_disetujui: req.nominal_disetujui || req.nominal_request,
           nominal_transfer: nominalTf,
+          transfer_bank: bank,
           ad_account_name: req.ad_account_name,
           billing_data: req.billing_data || {}
         })
@@ -1378,10 +1395,11 @@
       loadHistory();
     } catch (e) {
       showToast('Error: ' + e.message, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Kirim ke Finance'; }
     }
   };
 
-  window.copyNominal = function(id, nominal) {
+  window.copyNominal = function(nominal) {
     navigator.clipboard.writeText(String(nominal)).then(() => showToast('Nominal disalin!', 'success'));
   };
 
