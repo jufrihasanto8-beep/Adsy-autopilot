@@ -1117,10 +1117,9 @@
     const errEl = document.getElementById('tp-err');
     errEl.style.display = 'none';
 
-    const omsetCheck = parseInt(document.getElementById('tp-omset').value.replace(/\D/g, '')) || 0;
     if (!productId) { errEl.textContent = 'Pilih produk terlebih dahulu.'; errEl.style.display = 'block'; return; }
     if (!selectedFile) { errEl.textContent = 'Upload screenshot Meta Ads terlebih dahulu.'; errEl.style.display = 'block'; return; }
-    if (!omsetCheck || omsetCheck < 1000) { errEl.textContent = 'Masukkan omset dari iklan ini.'; errEl.style.display = 'block'; return; }
+    if (document.getElementById('tp-omset').value.trim() === '') { errEl.textContent = 'Masukkan omset dari iklan ini (isi 0 jika belum ada closing).'; errEl.style.display = 'block'; return; }
     if (!nominal || nominal < 1000) { errEl.textContent = 'Masukkan nominal top up yang valid.'; errEl.style.display = 'block'; return; }
 
     const btn = document.getElementById('tp-submit');
@@ -1151,11 +1150,12 @@
       }
 
       // Gabungkan omset + CAQ ke extracted_data
-      const omset = parseInt(document.getElementById('tp-omset').value.replace(/\D/g, '')) || null;
+      const omsetRaw = document.getElementById('tp-omset').value.trim();
+      const omset = omsetRaw !== '' ? (parseInt(omsetRaw.replace(/\D/g, '')) || 0) : null;
       const finalExtracted = { ...(extractedData || {}) };
-      if (omset) {
+      if (omset !== null) {
         finalExtracted.omset = omset;
-        if (finalExtracted.spend) finalExtracted.caq_pct = parseFloat(((finalExtracted.spend / omset) * 100).toFixed(2));
+        if (omset > 0 && finalExtracted.spend) finalExtracted.caq_pct = parseFloat(((finalExtracted.spend / omset) * 100).toFixed(2));
       }
       // Simpan payment_method dari akun iklan yang dipilih
       if (selectedAccount?.payment_method) {
@@ -1259,7 +1259,7 @@
   function checkSubmitEnabled() {
     const hasProduct = !!document.getElementById('tp-product').value;
     const hasFile = !!selectedFile;
-    const hasOmset = (parseInt(document.getElementById('tp-omset').value.replace(/\D/g, '')) || 0) >= 1000;
+    const hasOmset = document.getElementById('tp-omset').value.trim() !== '';
     document.getElementById('tp-submit').disabled = !(hasProduct && hasFile && hasOmset);
   }
 
