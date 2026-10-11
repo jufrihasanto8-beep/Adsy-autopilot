@@ -1494,17 +1494,11 @@
     const bank = document.querySelector(`input[name="selow-bank-${requestId}"]:checked`)?.value || 'bri';
     if (!nominalTf || nominalTf < 1000) { showToast('Masukkan nominal transfer dari Selow.id', 'warning'); return; }
 
-    const req = window._historyData?.find(r => r.id === requestId);
-    if (!req) return;
-
-    const btn = inputEl.closest('div').querySelector('button');
+    const btn = document.querySelector(`button[onclick="submitNominalTransfer('${requestId}')"]`);
     if (btn) { btn.disabled = true; btn.textContent = 'Mengirim...'; }
 
     try {
-      const { error } = await sb.from('topup_requests')
-        .update({ nominal_transfer: nominalTf, transfer_bank: bank, updated_at: new Date().toISOString() })
-        .eq('id', requestId);
-      if (error) throw new Error(error.message);
+      const req = window._historyData?.find(r => r.id === requestId);
 
       await fetch('/api/notify-wa', {
         method: 'POST',
@@ -1512,18 +1506,18 @@
         body: JSON.stringify({
           action: 'notify_selow_transfer',
           request_id: requestId,
-          user_name: req.user_name,
-          nominal_disetujui: req.nominal_disetujui || req.nominal_request,
+          user_name: req?.user_name || '',
+          nominal_disetujui: req?.nominal_disetujui || req?.nominal_request || 0,
           nominal_transfer: nominalTf,
           transfer_bank: bank,
-          ad_account_name: req.ad_account_name,
-          billing_data: req.billing_data || {}
+          ad_account_name: req?.ad_account_name || '',
+          billing_data: req?.billing_data || {}
         })
       });
 
-      // Update data lokal & re-render card langsung tanpa reload semua
+      // Update data lokal & re-render card
       const idx = window._historyData?.findIndex(r => r.id === requestId);
-      if (idx !== -1) {
+      if (idx !== -1 && idx !== undefined) {
         window._historyData[idx].nominal_transfer = nominalTf;
         window._historyData[idx].transfer_bank = bank;
         const isAdmin = ['admin', 'superadmin'].includes(currentProfile?.role);
