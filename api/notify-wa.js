@@ -666,5 +666,53 @@ Field tidak ditemukan = null.` }
     return res.json({ ok: true, status: newStatus });
   }
 
-  return res.status(400).json({ error: 'Invalid action. Use: send | extract_topup | notify_topup | approve_topup' });
+  // ── notify_selow_transfer: WA ke finance dengan nominal transfer dari Selow.id ──
+  if (action === 'notify_selow_transfer') {
+    const { user_name, nominal_disetujui, nominal_transfer, ad_account_name, billing_data } = body;
+
+    const { data: cfgWithToken } = await sb.from('app_config')
+      .select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle();
+    const fonnteToken = cfgWithToken?.fonnte_token || process.env.FONNTE_TOKEN;
+    if (!fonnteToken) return res.json({ ok: false, warn: 'Fonnte token belum dikonfigurasi' });
+
+    const { data: gs } = await sb.from('global_settings')
+      .select('topup_wa_targets').eq('id', '00000000-0000-0000-0000-000000000001').single();
+    const waTargets = gs?.topup_wa_targets || [];
+    if (!waTargets.length) return res.json({ ok: false, warn: 'Belum ada nomor penerima notif top up di Settings' });
+
+    const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
+    const bd = billing_data || {};
+
+    const pesan = [
+      `🔵 *Selow.id — Siap Transfer*`,
+      ``,
+      `👤 Advertiser: *${user_name}*`,
+      ad_account_name ? `🖥️ Akun Iklan: ${ad_account_name}` : null,
+      bd.kartu_kredit_nama ? `💳 Kartu: ${bd.kartu_kredit_nama} ····${bd.kartu_kredit_nomor || ''}` : null,
+      ``,
+      `✅ Disetujui: Rp ${fmtNum(nominal_disetujui)}`,
+      `💰 *Nominal Transfer: Rp ${fmtNum(nominal_transfer)}*`,
+      ``,
+      `Silakan transfer nominal di atas ke kartu kredit advertiser.`,
+      `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+    ].filter(Boolean).join('\n');
+
+    const results = await Promise.all(waTargets.map(async no => {
+      const target = String(no).replace(/\D/g, '');
+      try {
+        const r2 = await fetch('https://api.fonnte.com/send', {
+          method: 'POST',
+          headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target, message: pesan })
+        });
+        const d = await r2.json();
+        return { no: target, ok: d.status !== false };
+      } catch (e) { return { no: target, ok: false }; }
+    }));
+
+    const allFailed = results.every(r => !r.ok);
+    return res.json({ ok: !allFailed });
+  }
+
+  return res.status(400).json({ error: 'Invalid action. Use: send | extract_topup | notify_topup | approve_topup | notify_selow_transfer' });
 }
