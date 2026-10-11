@@ -1375,23 +1375,65 @@
       const recNominal = rec.recommendation_pct ? Math.round(r.nominal_request * rec.recommendation_pct / 100) : null;
       recChipHtml = '<span class="chip ' + recClass + '">⚡ ' + recLabel + ' · ' + rec.recommendation_pct + '%' + (recNominal ? ' = Rp ' + recNominal.toLocaleString('id-ID') : '') + '</span>';
     }
+    // ── Selow.id: step indicator + section per state ──
     let selowHtml = '';
-    if (ext.payment_method === 'selow' && r.status === 'approved') {
+    let selowBadge = '';
+    if (ext.payment_method === 'selow') {
       const nominalTf = r.nominal_transfer;
-      if (nominalTf) {
-        selowHtml = '<div style="margin-top:12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">'
-          + '<div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px;">🔵 Selow.id — Nominal Transfer</div>'
-          + '<div style="display:flex;align-items:center;gap:8px;">'
-          + '<span style="font-size:18px;font-weight:800;color:#1e293b;">Rp ' + Number(nominalTf).toLocaleString('id-ID') + '</span>'
-          + '<button onclick="copyNominal(' + nominalTf + ')" style="border:none;background:#dbeafe;color:#1d4ed8;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;">📋 Copy</button>'
-          + '</div>'
-          + (r.transfer_bank ? '<div style="font-size:11px;color:#1d4ed8;margin-top:4px;font-weight:600;">🏦 Bank: ' + (r.transfer_bank === 'bri' ? 'BRI' : 'Mandiri') + '</div>' : '')
-          + '<div style="font-size:11px;color:#64748b;margin-top:2px;">Sudah dikirim ke finance via WA</div>'
+      const tfConfirmed = ext.transfer_confirmed;
+
+      // Tentukan step saat ini
+      // step 1: pending, step 2: approved+belum input, step 3: input+belum confirm, step 4: confirmed
+      const step = r.status === 'rejected' ? 0
+        : r.status === 'pending' ? 1
+        : tfConfirmed ? 4
+        : nominalTf ? 3
+        : 2;
+
+      // Badge status override untuk Selow.id
+      const stepLabels = { 0:'Ditolak', 1:'Menunggu ACC', 2:'Menunggu Nominal', 3:'Menunggu Transfer', 4:'Selesai' };
+      const stepColors = { 0:'#fee2e2:#991b1b', 1:'#fff7ed:#c2410c', 2:'#eff6ff:#1d4ed8', 3:'#fef3c7:#92400e', 4:'#d1fae5:#065f46' };
+      const [bgC, txC] = (stepColors[step] || stepColors[1]).split(':');
+      selowBadge = '<span style="background:' + bgC + ';color:' + txC + ';border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;">' + (stepLabels[step] || '-') + '</span>';
+
+      // Progress bar steps
+      const steps = ['ACC', 'Input Nominal', 'Transfer', 'Selesai'];
+      const stepsHtml = steps.map((s, i) => {
+        const stepNum = i + 1; // step 1=ACC(=2), 2=Input(=2), 3=Transfer(=3), 4=Selesai(=4)
+        // mapping: ACC = step>=2, Input = step>=3, Transfer = step>=4, Selesai = step=4
+        const done = (i === 0 && step >= 2) || (i === 1 && step >= 3) || (i === 2 && step >= 4) || (i === 3 && step >= 4);
+        const active = (i === 0 && step === 2) || (i === 1 && step === 3) || (i === 2 && step === 4);
+        const c = done ? '#10b981' : active ? '#3b82f6' : '#d1d5db';
+        return '<div style="display:flex;flex-direction:column;align-items:center;flex:1;">'
+          + '<div style="width:24px;height:24px;border-radius:50%;background:' + c + ';display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:700;">' + (done ? '✓' : (i + 1)) + '</div>'
+          + '<div style="font-size:10px;color:' + (done || active ? '#374151' : '#9ca3af') + ';margin-top:3px;text-align:center;">' + s + '</div>'
           + '</div>';
-      } else {
+      }).join('<div style="flex:1;height:2px;background:#e5e7eb;margin-top:11px;"></div>');
+
+      const progressHtml = r.status !== 'pending' && r.status !== 'rejected'
+        ? '<div style="margin-top:12px;display:flex;align-items:flex-start;">' + stepsHtml + '</div>'
+        : '';
+
+      if (step === 4) {
+        // Transfer sudah dikonfirmasi finance
+        selowHtml = progressHtml
+          + '<div style="margin-top:10px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:10px 14px;">'
+          + '<div style="font-size:12px;font-weight:700;color:#166534;">✅ Transfer selesai dikonfirmasi finance</div>'
+          + (nominalTf && r.transfer_bank ? '<div style="font-size:11px;color:#166534;margin-top:2px;">🏦 ' + (r.transfer_bank === 'bri' ? 'BRI' : 'Mandiri') + ' · Rp ' + Number(nominalTf).toLocaleString('id-ID') + '</div>' : '')
+          + '</div>';
+      } else if (step === 3) {
+        // Nominal sudah dikirim, menunggu finance transfer
+        selowHtml = progressHtml
+          + '<div style="margin-top:10px;background:#fefce8;border:1.5px solid #fde68a;border-radius:10px;padding:10px 14px;">'
+          + '<div style="font-size:12px;font-weight:700;color:#92400e;">⏳ Menunggu finance transfer</div>'
+          + (nominalTf && r.transfer_bank ? '<div style="font-size:11px;color:#92400e;margin-top:2px;">🏦 ' + (r.transfer_bank === 'bri' ? 'BRI' : 'Mandiri') + ' · Rp ' + Number(nominalTf).toLocaleString('id-ID') + '</div>' : '')
+          + '</div>';
+      } else if (step === 2) {
+        // Approved — belum input nominal
         const nominalLabel = fmtNum(r.nominal_disetujui || r.nominal_request);
-        const nominalRaw = (r.nominal_disetujui || r.nominal_request || '').toString().replace(/\./g, '');
-        selowHtml = '<div style="margin-top:12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">'
+        const nominalRaw = String(r.nominal_disetujui || r.nominal_request || '').replace(/\D/g, '');
+        selowHtml = progressHtml
+          + '<div style="margin-top:10px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">'
           + '<div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:8px;">🔵 Selow.id — Input Nominal Transfer</div>'
           + '<div style="font-size:12px;color:#475569;margin-bottom:10px;">Buka Selow.id → request Rp ' + nominalLabel + ' → input nominal yang diberikan Selow.id di bawah:</div>'
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
@@ -1405,13 +1447,10 @@
           + '</label>'
           + '</div>'
           + '<div style="display:flex;gap:8px;align-items:center;">'
-          + '<div class="nominal-wrap" style="flex:1;">'
-          + '<span class="prefix" style="font-size:13px;">Rp</span>'
-          + '<input type="text" id="selow-input-' + r.id + '" class="form-input" placeholder="Contoh: ' + nominalRaw + '.303" inputmode="numeric" oninput="formatNominalInput(this)" style="padding-left:38px;font-size:15px;font-weight:700;" />'
-          + '</div>'
+          + '<div class="nominal-wrap" style="flex:1;"><span class="prefix" style="font-size:13px;">Rp</span>'
+          + '<input type="text" id="selow-input-' + r.id + '" class="form-input" placeholder="Contoh: ' + nominalRaw + '.303" inputmode="numeric" oninput="formatNominalInput(this)" style="padding-left:38px;font-size:15px;font-weight:700;" /></div>'
           + '<button onclick="submitNominalTransfer(\'' + r.id + '\')" class="btn btn-primary btn-sm" style="white-space:nowrap;">Kirim ke Finance</button>'
-          + '</div>'
-          + '</div>';
+          + '</div></div>';
       }
     }
 
@@ -1424,7 +1463,7 @@
           <div style="font-size:11px;color:var(--text-sub);margin-top:2px;">${tgl}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-          ${statusBadge}
+          ${selowBadge || statusBadge}
           ${isAdmin && r.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="openApproveModal('${r.id}', ${r.nominal_request}, '${r.user_name}', '${productName}')">Review</button>` : ''}
         </div>
       </div>
