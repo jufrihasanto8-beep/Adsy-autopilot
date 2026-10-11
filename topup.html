@@ -742,44 +742,39 @@
       : n >= 1000 ? 'Rp ' + (n / 1000).toFixed(0) + 'rb'
       : 'Rp ' + n.toLocaleString('id-ID');
 
-    const summaryHtml = `
-      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-2);">
-        <div style="font-size:11px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Ringkasan Top Up</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
-          <div style="background:var(--gray-1);border-radius:8px;padding:8px 10px;">
-            <div style="font-size:10px;color:var(--text-sub);margin-bottom:2px;">Hari Ini</div>
-            <div style="font-size:14px;font-weight:700;color:${totalToday > 0 ? '#10b981' : 'var(--text-sub)'};">${totalToday > 0 ? fmtRpShort(totalToday) : '—'}</div>
-            ${logsToday.length > 0 ? `<div style="font-size:10px;color:var(--text-sub);">${logsToday.length}x transaksi</div>` : ''}
-          </div>
-          <div style="background:var(--gray-1);border-radius:8px;padding:8px 10px;">
-            <div style="font-size:10px;color:var(--text-sub);margin-bottom:2px;">Bulan Ini</div>
-            <div style="font-size:14px;font-weight:700;color:${totalMonth > 0 ? '#3b82f6' : 'var(--text-sub)'};">${totalMonth > 0 ? fmtRpShort(totalMonth) : '—'}</div>
-            ${logsMonth.length > 0 ? `<div style="font-size:10px;color:var(--text-sub);">${logsMonth.length}x transaksi</div>` : ''}
-          </div>
-          <div style="background:var(--gray-1);border-radius:8px;padding:8px 10px;">
-            <div style="font-size:10px;color:var(--text-sub);margin-bottom:2px;">Bulan Lalu</div>
-            <div style="font-size:14px;font-weight:700;color:var(--text-sub);">${totalLastMonth > 0 ? fmtRpShort(totalLastMonth) : '—'}</div>
-            ${logsLastMonth.length > 0 ? `<div style="font-size:10px;color:var(--text-sub);">${logsLastMonth.length}x transaksi</div>` : ''}
-          </div>
-          <div style="background:var(--gray-1);border-radius:8px;padding:8px 10px;">
-            <div style="font-size:10px;color:var(--text-sub);margin-bottom:2px;">Total</div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);">${totalAll > 0 ? fmtRpShort(totalAll) : '—'}</div>
-            ${topupLogs.length > 0 ? `<div style="font-size:10px;color:var(--text-sub);">${topupLogs.length}x transaksi</div>` : ''}
-          </div>
-        </div>`;
+    const mkCell = (label, total, count, color) => {
+      const valColor = total > 0 ? color : 'var(--text-sub)';
+      const valText  = total > 0 ? fmtRpShort(total) : '—';
+      const countHtml = count > 0 ? '<div style="font-size:10px;color:var(--text-sub);">' + count + 'x transaksi</div>' : '';
+      return '<div style="background:var(--gray-1);border-radius:8px;padding:8px 10px;">'
+        + '<div style="font-size:10px;color:var(--text-sub);margin-bottom:2px;">' + label + '</div>'
+        + '<div style="font-size:14px;font-weight:700;color:' + valColor + ';">' + valText + '</div>'
+        + countHtml + '</div>';
+    };
 
-    const logHtml = summaryHtml + (topupLogs.length ? `
-        <div style="font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:6px;">Riwayat Terbaru</div>
-        <div style="max-height:140px;overflow-y:auto;">
-        ${topupLogs.slice(0, 10).map(l => {
-          const tgl = new Date(l.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
-          return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:5px 0;border-bottom:1px solid var(--gray-1);">
-            <span style="color:var(--text-sub);">${tgl}</span>
-            <span style="font-weight:700;color:#10b981;">+Rp ${Math.abs(Number(l.amount)).toLocaleString('id-ID')}</span>
-          </div>`;
-        }).join('')}
-        </div>
-      </div>`) : `<div style="font-size:12px;color:var(--text-sub);text-align:center;padding:4px 0;">Belum ada riwayat top up</div></div>`;
+    const recentRows = topupLogs.slice(0, 10).map(function(l) {
+      const tgl = new Date(l.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+      return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:5px 0;border-bottom:1px solid var(--gray-1);">'
+        + '<span style="color:var(--text-sub);">' + tgl + '</span>'
+        + '<span style="font-weight:700;color:#10b981;">+Rp ' + Math.abs(Number(l.amount)).toLocaleString('id-ID') + '</span>'
+        + '</div>';
+    }).join('');
+
+    const recentHtml = topupLogs.length
+      ? '<div style="font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:6px;">Riwayat Terbaru</div>'
+        + '<div style="max-height:140px;overflow-y:auto;">' + recentRows + '</div>'
+      : '<div style="font-size:12px;color:var(--text-sub);text-align:center;padding:4px 0;">Belum ada riwayat top up</div>';
+
+    const logHtml = '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-2);">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Ringkasan Top Up</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">'
+      + mkCell('Hari Ini',    totalToday,     logsToday.length,     '#10b981')
+      + mkCell('Bulan Ini',   totalMonth,     logsMonth.length,     '#3b82f6')
+      + mkCell('Bulan Lalu',  totalLastMonth, logsLastMonth.length, '#6b7280')
+      + mkCell('Total',       totalAll,       topupLogs.length,     'var(--text)')
+      + '</div>'
+      + recentHtml
+      + '</div>';
 
     const adTypeBadge = a.ad_type === 'ctwa'
       ? `<span style="display:inline-block;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:6px;">💬 CTWA</span>`
