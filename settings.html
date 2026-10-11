@@ -892,12 +892,19 @@
       const token = cfg?.fonnte_token;
       if (!token) { showToast('Fonnte token belum diset di bagian Token di bawah', 'warning'); return; }
 
-      const resp = await fetch('https://api.fonnte.com/fetch-group', {
+      // Step 1: sync group list
+      await fetch('https://api.fonnte.com/fetch-group', {
         method: 'POST',
         headers: { 'Authorization': token }
       });
-      const data = await resp.json();
-      console.log('[fetch-group] raw response:', JSON.stringify(data));
+
+      // Step 2: ambil list group
+      const resp2 = await fetch('https://api.fonnte.com/get-whatsapp-group', {
+        method: 'POST',
+        headers: { 'Authorization': token }
+      });
+      const data = await resp2.json();
+      console.log('[get-group] raw response:', JSON.stringify(data));
 
       // Fonnte mengembalikan array group atau object dengan key data/groups
       const groups = Array.isArray(data) ? data : (data.data || data.groups || []);
