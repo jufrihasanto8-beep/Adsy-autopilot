@@ -651,7 +651,9 @@
     } else {
       ccEl.style.display = 'none';
     }
-    document.getElementById('billing-info-bar').style.display = 'block';
+    if (['admin', 'superadmin'].includes(currentProfile?.role)) {
+      document.getElementById('billing-info-bar').style.display = 'block';
+    }
   };
 
   function hideBillingBar() {
@@ -1081,7 +1083,9 @@
     document.getElementById('extract-rows').innerHTML = rows.map(([lbl, val]) =>
       `<div class="extract-row"><span class="lbl">${lbl}</span><span class="val">${val}</span></div>`
     ).join('');
-    document.getElementById('extract-result').style.display = 'block';
+    if (['admin', 'superadmin'].includes(currentProfile?.role)) {
+      document.getElementById('extract-result').style.display = 'block';
+    }
     calcCAQ();
   }
 
