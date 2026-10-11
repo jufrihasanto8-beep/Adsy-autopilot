@@ -386,17 +386,18 @@ Tipe iklan: ${isCtwa ? 'CTWA (Click to WhatsApp)' : 'Form/Lead Ads'}.
 
 Screenshot menampilkan tabel kampanye Meta Ads. Fokus pada BARIS TOTAL di paling bawah tabel (berlabel "Hasil dari X kampanye").
 
-Mapping kolom (ambil dari baris total):
-- "Hasil" → results (angka total ${resultsLabel})
-- "Biaya per hasil" → ${isCtwa ? 'cpc' : 'cpr'} (${kpiLabel}, contoh: "Rp 202.214" → 202214)
-- "Jumlah yang dibelanjakan" → spend (total spend, contoh: "Rp 1.617.715" → 1617715)
-- Tanggal dari pojok kanan atas → date_range (contoh: "6 Okt 2026")
+Mapping kolom — ambil dari baris total, HANYA kolom yang namanya PERSIS sesuai:
+- Kolom "Hasil" → results (jumlah ${resultsLabel}). BUKAN kolom "Jangkauan" (reach/impresi). Jika nilainya "—" atau kosong, kembalikan null.
+- Kolom "Biaya per hasil" → ${isCtwa ? 'cpc' : 'cpr'} (${kpiLabel}). Jika "—", kembalikan null.
+- Kolom "Jumlah yang dibelanjakan" → spend. Jika "—", kembalikan null.
+- Tanggal dari pojok kanan atas → date_range (contoh: "11 Okt 2026").
 
-PENTING: Semua angka kembalikan sebagai INTEGER murni. Format Indonesia: titik = pemisah ribuan.
-Contoh: "Rp 1.617.715" = 1617715, "Rp 202.214" = 202214, "Rp 25.000" = 25000.
+JANGAN ambil kolom: "Jangkauan" (reach), "Frekuensi", "Anggaran", "Tayangan" — itu bukan results.
+PENTING: Semua angka kembalikan sebagai INTEGER murni (tanpa "Rp", tanpa titik). Titik = pemisah ribuan di format Indonesia.
+Contoh: "Rp 1.617.715" → 1617715, "Rp 49.947" → 49947, "—" → null.
 
-Return HANYA valid JSON:
-${isCtwa ? '{"date_range":"6 Okt 2026","spend":1617715,"results":8,"cpc":202214}' : '{"date_range":"6 Okt 2026","spend":1617715,"results":8,"cpr":202214}'}
+Return HANYA valid JSON, tidak ada teks lain:
+${isCtwa ? '{"date_range":"11 Okt 2026","spend":49947,"results":null,"cpc":null}' : '{"date_range":"11 Okt 2026","spend":49947,"results":null,"cpr":null}'}
 
 Field tidak ditemukan = null.`
               }
