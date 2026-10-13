@@ -1718,10 +1718,15 @@
     const fmtRp = n => n > 0 ? 'Rp ' + Number(n).toLocaleString('id-ID') : 'Rp 0';
 
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const firstThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const firstLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-    const firstThisMonthISO = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const WIB = 7 * 60 * 60 * 1000;
+
+    // Hitung batas waktu dalam UTC tapi mengacu ke WIB (UTC+7)
+    const nowWIB = new Date(now.getTime() + WIB);
+    const y = nowWIB.getUTCFullYear(), m = nowWIB.getUTCMonth(), d = nowWIB.getUTCDate();
+    const startToday     = Date.UTC(y, m, d)     - WIB; // 00:00 WIB hari ini → UTC
+    const startTomorrow  = startToday + 86400000;
+    const startThisMonth = Date.UTC(y, m, 1)     - WIB;
+    const startLastMonth = Date.UTC(y, m - 1, 1) - WIB;
 
     // Ambil semua approved (hitung di client, pakai updated_at = waktu approve)
     const { data } = await sb.from('topup_requests')
@@ -1732,12 +1737,12 @@
 
     let today = 0, thisMonth = 0, lastMonth = 0, total = 0;
     (data || []).forEach(r => {
-      const d = new Date(r.updated_at);
+      const ts = new Date(r.updated_at).getTime();
       const n = Number(r.nominal_disetujui) || 0;
       total += n;
-      if (r.updated_at.startsWith(todayStr)) today += n;
-      if (d >= new Date(firstThisMonth)) thisMonth += n;
-      if (d >= new Date(firstLastMonth) && d < new Date(firstThisMonth)) lastMonth += n;
+      if (ts >= startToday     && ts < startTomorrow)  today += n;
+      if (ts >= startThisMonth)                         thisMonth += n;
+      if (ts >= startLastMonth && ts < startThisMonth)  lastMonth += n;
     });
 
     document.getElementById('sum-today').textContent = fmtRp(today);
