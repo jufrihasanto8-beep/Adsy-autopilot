@@ -36,6 +36,15 @@ export default async function handler(req, res) {
 
     for (const camp of campaigns) {
       try {
+        // Cek apakah di-pause oleh autopilot (ada action_log) vs user manual (tidak ada log)
+        // Kalau user yang pause manual, jangan resume otomatis jam 3 pagi
+        const { data: autopilotLog } = await sb.from('action_logs')
+          .select('id').eq('user_id', camp.user_id).eq('campaign_name', camp.name)
+          .eq('action_type', 'pause')
+          .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+          .limit(1).maybeSingle();
+        if (!autopilotLog) continue; // User yang pause manual, skip
+
         const { data: config } = await sb.from('app_config')
           .select('meta_token').eq('user_id', camp.user_id).single();
         const token = config?.meta_token || process.env.META_ACCESS_TOKEN;
@@ -82,6 +91,35 @@ export default async function handler(req, res) {
       } catch (err) {
         console.error(`Error resuming campaign ${camp.name}:`, err.message);
       }
+    }
+
+    // ── Cleanup topup-ss storage: hapus SS yang sudah direview atau >1 hari ──
+    try {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: oldReqs } = await sb.from('topup_requests')
+        .select('ss_url')
+        .not('ss_url', 'is', null)
+        .or(`status.neq.pending,created_at.lt.${oneDayAgo}`);
+
+      if (oldReqs?.length) {
+        const paths = oldReqs
+          .map(r => {
+            try { return decodeURIComponent(new URL(r.ss_url).pathname.split('/topup-ss/')[1]); }
+            catch { return null; }
+          })
+          .filter(Boolean);
+
+        if (paths.length) {
+          await sb.storage.from('topup-ss').remove(paths);
+          // Kosongkan ss_url di DB agar tidak coba hapus lagi
+          await sb.from('topup_requests')
+            .update({ ss_url: null })
+            .in('ss_url', oldReqs.map(r => r.ss_url));
+        }
+      }
+    } catch (cleanErr) {
+      console.error('topup-ss cleanup error:', cleanErr.message);
+      // Tidak block return utama
     }
 
     return res.status(200).json({ success: true, resumed, logs });
