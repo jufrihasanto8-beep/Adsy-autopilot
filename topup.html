@@ -321,7 +321,7 @@
         </div>
 
         <div class="card">
-          <div class="card-title" style="margin-bottom:14px;">⏳ Pending Approval</div>
+          <div class="card-title" style="margin-bottom:14px;">✅ Transaksi Berhasil</div>
           <div id="summary-pending">
             <div class="loading-state"><div class="spinner"></div></div>
           </div>
@@ -521,6 +521,9 @@
   const HISTORY_PAGE_SIZE = 10;
   let historyPage = 0;
   let historyTotal = 0;
+  const SUMMARY_PAGE_SIZE = 10;
+  let summaryPage = 0;
+  let summaryTotal = 0;
   let adAccounts = [];
   let adAccountLogs = [];
   let selectedAccountId = null;
@@ -1326,7 +1329,7 @@
     document.querySelectorAll('.topup-panel').forEach(p => p.style.display = 'none');
     document.getElementById('panel-' + tab).style.display = 'block';
     if (tab === 'riwayat') { historyPage = 0; loadHistory(); }
-    if (tab === 'summary') { loadSummary(); }
+    if (tab === 'summary') { summaryPage = 0; loadSummary(); }
     if (tab === 'akun-iklan') {
       if (adAccounts.length) {
         renderAdAccounts();
@@ -1740,39 +1743,51 @@
     document.getElementById('sum-lastmonth').textContent = fmtRp(lastMonth);
     document.getElementById('sum-total').textContent = fmtRp(total);
 
-    // Pending approvals
-    const { data: pending } = await sb.from('topup_requests')
-      .select('*, products(name)')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
+    // Transaksi berhasil (approved) dengan pagination
+    const from = summaryPage * SUMMARY_PAGE_SIZE;
+    const to   = from + SUMMARY_PAGE_SIZE - 1;
+    const { data: approved, count } = await sb.from('topup_requests')
+      .select('*, products(name)', { count: 'exact' })
+      .eq('status', 'approved')
+      .order('updated_at', { ascending: false })
+      .range(from, to);
 
+    summaryTotal = count || 0;
     const el = document.getElementById('summary-pending');
-    if (!pending?.length) {
-      el.innerHTML = '<div class="empty-state" style="padding:24px 0;"><div class="icon">✅</div><p style="font-size:13px;">Tidak ada request pending</p></div>';
+
+    if (!approved?.length) {
+      el.innerHTML = '<div class="empty-state" style="padding:24px 0;"><div class="icon">💳</div><p style="font-size:13px;">Belum ada transaksi</p></div>';
       return;
     }
 
-    el.innerHTML = pending.map(r => {
-      const rec = r.ai_recommendation || {};
-      const recNom = rec.recommendation_pct ? Math.round(r.nominal_request * rec.recommendation_pct / 100) : r.nominal_request;
-      const recColor = { good: '#065f46', moderate: '#92400e', poor: '#991b1b' }[rec.level] || 'var(--text-sub)';
-      const tgl = new Date(r.created_at).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' });
+    const totalPages = Math.ceil(summaryTotal / SUMMARY_PAGE_SIZE);
+    const prevDisabled = summaryPage === 0 ? 'disabled' : '';
+    const nextDisabled = summaryPage >= totalPages - 1 ? 'disabled' : '';
+
+    el.innerHTML = approved.map(r => {
+      const tgl = new Date(r.updated_at || r.created_at).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' });
       return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);gap:12px;">
         <div style="min-width:0;flex:1;">
           <div style="font-weight:700;font-size:14px;">${r.user_name || '—'}</div>
           <div style="font-size:12px;color:var(--text-sub);">${r.ad_account_name || r.products?.name || '—'} · ${r.topup_time === 'sore' ? '🌆' : '🌅'} ${tgl}</div>
-          ${rec.level ? `<div style="font-size:11px;color:${recColor};margin-top:2px;">⚡ Rek: Rp ${recNom.toLocaleString('id-ID')} (${rec.recommendation_pct}%)</div>` : ''}
         </div>
         <div style="text-align:right;flex-shrink:0;">
-          <div style="font-weight:700;font-size:15px;">Rp ${Number(r.nominal_request).toLocaleString('id-ID')}</div>
-          <button class="btn btn-primary btn-sm" style="margin-top:6px;"
-            onclick='openApproveModal("${r.id}", ${r.nominal_request}, "${(r.user_name||'').replace(/"/g,'')}", "${(r.products?.name||'').replace(/"/g,'')}");window._historyData=(window._historyData||[]).filter(x=>x.id!="${r.id}").concat([${JSON.stringify(r).replace(/</g,'\\u003c')}])'>
-            Review
-          </button>
+          <div style="font-weight:700;font-size:15px;color:#065f46;">+Rp ${Number(r.nominal_disetujui || r.nominal_request).toLocaleString('id-ID')}</div>
+          <div style="font-size:11px;color:var(--text-sub);margin-top:2px;">✅ Berhasil</div>
         </div>
       </div>`;
-    }).join('') + '<div style="font-size:12px;color:var(--text-sub);margin-top:10px;">' + pending.length + ' request menunggu</div>';
+    }).join('')
+    + `<div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+        <button class="btn btn-outline btn-sm" onclick="goSummaryPage(${summaryPage - 1})" ${prevDisabled} style="min-width:80px;">← Sebelum</button>
+        <span style="font-size:12px;color:var(--text-sub);">${from + 1}–${Math.min(to + 1, summaryTotal)} dari ${summaryTotal}</span>
+        <button class="btn btn-outline btn-sm" onclick="goSummaryPage(${summaryPage + 1})" ${nextDisabled} style="min-width:80px;">Berikutnya →</button>
+      </div>`;
   }
+
+  window.goSummaryPage = function(page) {
+    summaryPage = page;
+    loadSummary();
+  };
 
   window.openTopupLightbox = function(src) {
     document.getElementById('topup-lb-img').src = src;
