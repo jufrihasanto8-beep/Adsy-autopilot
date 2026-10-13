@@ -1723,20 +1723,21 @@
     const firstLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
     const firstThisMonthISO = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    // Ambil semua approved (cukup 1 query, hitung di client)
+    // Ambil semua approved (hitung di client, pakai updated_at = waktu approve)
     const { data } = await sb.from('topup_requests')
-      .select('nominal_disetujui, created_at')
+      .select('nominal_disetujui, updated_at')
       .eq('status', 'approved')
-      .not('nominal_disetujui', 'is', null);
+      .not('nominal_disetujui', 'is', null)
+      .limit(10000);
 
     let today = 0, thisMonth = 0, lastMonth = 0, total = 0;
     (data || []).forEach(r => {
-      const d = new Date(r.created_at);
+      const d = new Date(r.updated_at);
       const n = Number(r.nominal_disetujui) || 0;
       total += n;
-      if (r.created_at.startsWith(todayStr)) today += n;
+      if (r.updated_at.startsWith(todayStr)) today += n;
       if (d >= new Date(firstThisMonth)) thisMonth += n;
-      if (d >= new Date(firstLastMonth) && d < new Date(firstThisMonthISO)) lastMonth += n;
+      if (d >= new Date(firstLastMonth) && d < new Date(firstThisMonth)) lastMonth += n;
     });
 
     document.getElementById('sum-today').textContent = fmtRp(today);
