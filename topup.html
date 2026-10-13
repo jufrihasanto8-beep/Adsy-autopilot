@@ -1520,6 +1520,7 @@
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           ${selowBadge || statusBadge}
+          ${isAdmin && r.ss_url ? `<button class="btn btn-outline btn-sm" onclick="openTopupLightbox('${r.ss_url}')" title="Lihat Screenshot">📸</button>` : ''}
           ${isAdmin && r.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="openApproveModal('${r.id}', ${r.nominal_request}, '${r.user_name}', '${productName}')">Review</button>` : ''}
         </div>
       </div>
