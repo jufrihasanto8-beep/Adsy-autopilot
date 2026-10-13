@@ -1166,6 +1166,18 @@
         finalExtracted.payment_method = selectedAccount.payment_method;
       }
 
+      // Upload screenshot ke Supabase Storage
+      let ssUrl = null;
+      if (selectedFile) {
+        const ext = selectedFile.name.split('.').pop() || 'jpg';
+        const path = `${user.id}/${Date.now()}.${ext}`;
+        const { error: upErr } = await sb.storage.from('topup-ss').upload(path, selectedFile, { upsert: true });
+        if (!upErr) {
+          const { data: urlData } = sb.storage.from('topup-ss').getPublicUrl(path);
+          ssUrl = urlData?.publicUrl || null;
+        }
+      }
+
       const { data: saved, error: dbErr } = await sb.from('topup_requests').insert({
         user_id: user.id,
         user_name: currentProfile?.name || user.email,
@@ -1178,7 +1190,8 @@
         topup_time: topupTime,
         topup_ad_account_id: adAccountId,
         ad_account_name: adAccountName,
-        billing_data: billingData
+        billing_data: billingData,
+        ss_url: ssUrl
       }).select().single();
 
       if (dbErr) throw new Error(dbErr.message);
@@ -1564,6 +1577,15 @@
         ${req?.extracted_data?.omset != null ? `<div><strong>Omset:</strong> Rp ${fmtNum(req.extracted_data.omset)}</div>` : ''}
         ${caqModalHtml}
       </div>
+      ${req?.ss_url ? `
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--text-sub);margin-bottom:6px;">📸 Screenshot</div>
+        <img src="${req.ss_url}" alt="Screenshot"
+          style="max-width:100%;max-height:280px;object-fit:contain;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;display:block;"
+          onclick="openTopupLightbox(this.src)"
+          onerror="this.parentElement.style.display='none'">
+        <a href="${req.ss_url}" target="_blank" style="color:var(--primary);font-size:11px;display:inline-block;margin-top:6px;">🔗 Buka di tab baru</a>
+      </div>` : ''}
       ${rec.level ? `
       <div style="background:var(--gray-1);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:12px;">
         <div style="font-weight:700;color:${recColor};margin-bottom:4px;">⚡ ${recLabel} — Rekomendasi ${rec.recommendation_pct}% = Rp ${fmtNum(recNominal)}</div>
@@ -1646,6 +1668,30 @@
 
   window.openModal = (id) => document.getElementById(id)?.classList.remove('hidden');
   window.closeModal = (id) => document.getElementById(id)?.classList.add('hidden');
+
+  window.openTopupLightbox = function(src) {
+    document.getElementById('topup-lb-img').src = src;
+    document.getElementById('topup-lb-link').href = src;
+    document.getElementById('topup-lightbox').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  };
+  window.closeTopupLightbox = function() {
+    document.getElementById('topup-lightbox').style.display = 'none';
+    document.body.style.overflow = '';
+  };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') window.closeTopupLightbox(); });
 </script>
+
+<!-- Lightbox SS -->
+<div id="topup-lightbox" onclick="closeTopupLightbox()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;cursor:zoom-out;align-items:center;justify-content:center;">
+  <img id="topup-lb-img" src="" alt="" style="max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.5);">
+  <button onclick="closeTopupLightbox()" style="position:fixed;top:16px;right:20px;background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:22px;width:40px;height:40px;border-radius:50%;cursor:pointer;line-height:1;">✕</button>
+  <a id="topup-lb-link" href="" target="_blank" onclick="event.stopPropagation()"
+    style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.15);color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;text-decoration:none;">
+    🔗 Buka di tab baru
+  </a>
+</div>
+
 </body>
 </html>
