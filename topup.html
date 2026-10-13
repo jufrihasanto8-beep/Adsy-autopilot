@@ -537,6 +537,7 @@
     const session = await requireAuth();
     if (!session) return;
     sb = await getSupabase();
+    window._sb = sb;
     currentProfile = await renderUserInfo();
     initSidebar();
 
@@ -1214,7 +1215,9 @@
         const ext = selectedFile.name.split('.').pop() || 'jpg';
         const path = `${user.id}/${Date.now()}.${ext}`;
         const { error: upErr } = await sb.storage.from('topup-ss').upload(path, selectedFile, { upsert: true });
-        if (!upErr) {
+        if (upErr) {
+          console.error('[topup-ss upload error]', upErr);
+        } else {
           const { data: urlData } = sb.storage.from('topup-ss').getPublicUrl(path);
           ssUrl = urlData?.publicUrl || null;
         }
