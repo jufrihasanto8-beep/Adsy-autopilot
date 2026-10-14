@@ -297,8 +297,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
   import { requireAuth, renderUserInfo } from './js/auth.js';
-  import { initSidebar, showToast, formatRupiah } from './js/sidebar.js';
+  import { initSidebar, showToast, formatRupiah, openModal, closeModal } from './js/sidebar.js';
   import { getSupabase } from './js/supabase.js';
+
+  window.openModal = openModal;
+  window.closeModal = closeModal;
 
   let sb, currentProfile, cards = [];
   let selectedCardId = null;
