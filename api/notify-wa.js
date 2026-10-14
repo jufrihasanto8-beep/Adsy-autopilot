@@ -716,6 +716,9 @@ Field tidak ditemukan = null.` }
 
     if (updErr) return res.status(500).json({ error: updErr.message });
 
+    // Helper tanggal WIB untuk log
+    const todayWIBLog = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
     // Update saldo akun iklan saat approve (kurangi nominal_disetujui)
     if (!reject && nominal_disetujui && req_data.topup_ad_account_id) {
       try {
@@ -728,7 +731,7 @@ Field tidak ditemukan = null.` }
           amount: -Number(nominal_disetujui),
           request_id: req_data.id,
           catatan: 'Top up disetujui',
-          tanggal: new Date().toISOString().split('T')[0]
+          tanggal: todayWIBLog
         });
       } catch (_) {}
     }
@@ -736,11 +739,11 @@ Field tidak ditemukan = null.` }
     // Reverse saldo saat ditolak (batalkan spend yang sudah direcord saat submit)
     if (reject && req_data.topup_ad_account_id) {
       try {
-        // Cek apakah ada log spend untuk request ini
         const { data: spendLog } = await sb.from('topup_ad_account_logs')
           .select('amount')
           .eq('request_id', req_data.id)
           .eq('type', 'spend')
+          .limit(1)
           .maybeSingle();
 
         if (spendLog?.amount > 0) {
@@ -753,7 +756,7 @@ Field tidak ditemukan = null.` }
             amount: -spendLog.amount,
             request_id: req_data.id,
             catatan: 'Request ditolak — spend di-reverse',
-            tanggal: new Date().toISOString().split('T')[0]
+            tanggal: todayWIBLog
           });
         }
       } catch (_) {}

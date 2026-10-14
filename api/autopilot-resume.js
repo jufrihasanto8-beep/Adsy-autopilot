@@ -126,7 +126,7 @@ export default async function handler(req, res) {
                 amount: -spendLog.amount,
                 request_id: req.id,
                 catatan: 'Auto-expire — tidak direview >1 hari',
-                tanggal: new Date().toISOString().split('T')[0]
+                tanggal: new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
               });
             }
           }
