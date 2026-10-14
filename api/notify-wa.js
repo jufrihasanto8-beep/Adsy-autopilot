@@ -666,7 +666,7 @@ Field tidak ditemukan = null.` }
 
     if (updErr) return res.status(500).json({ error: updErr.message });
 
-    // Update saldo akun iklan saat approve (tambah nominal_disetujui)
+    // Update saldo akun iklan saat approve (kurangi nominal_disetujui)
     if (!reject && nominal_disetujui && req_data.topup_ad_account_id) {
       try {
         const { data: acct } = await sb.from('topup_ad_accounts').select('saldo_saat_ini').eq('id', req_data.topup_ad_account_id).single();
@@ -680,6 +680,32 @@ Field tidak ditemukan = null.` }
           catatan: 'Top up disetujui',
           tanggal: new Date().toISOString().split('T')[0]
         });
+      } catch (_) {}
+    }
+
+    // Reverse saldo saat ditolak (batalkan spend yang sudah direcord saat submit)
+    if (reject && req_data.topup_ad_account_id) {
+      try {
+        // Cek apakah ada log spend untuk request ini
+        const { data: spendLog } = await sb.from('topup_ad_account_logs')
+          .select('amount')
+          .eq('request_id', req_data.id)
+          .eq('type', 'spend')
+          .maybeSingle();
+
+        if (spendLog?.amount > 0) {
+          const { data: acct } = await sb.from('topup_ad_accounts').select('saldo_saat_ini').eq('id', req_data.topup_ad_account_id).single();
+          const newSaldo = Math.max(0, (Number(acct?.saldo_saat_ini) || 0) - spendLog.amount);
+          await sb.from('topup_ad_accounts').update({ saldo_saat_ini: newSaldo, updated_at: new Date().toISOString() }).eq('id', req_data.topup_ad_account_id);
+          await sb.from('topup_ad_account_logs').insert({
+            ad_account_id: req_data.topup_ad_account_id,
+            type: 'spend_reversed',
+            amount: -spendLog.amount,
+            request_id: req_data.id,
+            catatan: 'Request ditolak — spend di-reverse',
+            tanggal: new Date().toISOString().split('T')[0]
+          });
+        }
       } catch (_) {}
     }
 
