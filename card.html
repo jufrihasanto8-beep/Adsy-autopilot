@@ -250,7 +250,14 @@
       <div class="modal-field">
         <label>Warna Kartu</label>
         <div class="color-picker" id="mc-color-picker">
-          ${[0,1,2,3,4,5,6,7].map(i => `<div class="color-swatch color-swatch-${i}${i===0?' selected':''}" data-idx="${i}" onclick="selectColor(${i})"></div>`).join('')}
+          <div class="color-swatch color-swatch-0 selected" data-idx="0" onclick="selectColor(0)"></div>
+          <div class="color-swatch color-swatch-1" data-idx="1" onclick="selectColor(1)"></div>
+          <div class="color-swatch color-swatch-2" data-idx="2" onclick="selectColor(2)"></div>
+          <div class="color-swatch color-swatch-3" data-idx="3" onclick="selectColor(3)"></div>
+          <div class="color-swatch color-swatch-4" data-idx="4" onclick="selectColor(4)"></div>
+          <div class="color-swatch color-swatch-5" data-idx="5" onclick="selectColor(5)"></div>
+          <div class="color-swatch color-swatch-6" data-idx="6" onclick="selectColor(6)"></div>
+          <div class="color-swatch color-swatch-7" data-idx="7" onclick="selectColor(7)"></div>
         </div>
         <input type="hidden" id="mc-warna" value="0" />
       </div>
