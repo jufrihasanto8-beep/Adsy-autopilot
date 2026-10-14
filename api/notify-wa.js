@@ -714,6 +714,7 @@ Field tidak ditemukan = null.` }
               `Mohon maaf, request top up kamu sebesar *Rp ${fmtNum(req_data.nominal_request)}* belum bisa kami setujui saat ini.`,
               catatan ? `\n📝 *Keterangan:*\n${catatan}` : null,
               ``,
+              ``,
               `Silakan hubungi admin jika ada pertanyaan lebih lanjut. 🙏`,
               ``,
               `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
