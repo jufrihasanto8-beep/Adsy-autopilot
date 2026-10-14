@@ -554,7 +554,8 @@
       // Aktifkan panel summary sebagai default
       document.getElementById('panel-request').style.display = 'none';
       document.getElementById('panel-summary').style.display = 'block';
-      await loadSummary();
+      // Load products & accounts supaya dropdown Edit Akun Iklan tidak kosong
+      await Promise.all([loadProducts(), loadAdAccounts(), loadSummary()]);
     } else {
       await loadProducts();
       await loadAdAccounts();
