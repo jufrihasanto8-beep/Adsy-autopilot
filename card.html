@@ -3,17 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kartu Line Bank — Adsy Autopilot</title>
+  <title>Kartu Iklan Adsy — Adsy Autopilot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/components.css" />
   <style>
-    /* ── Card Grid ── */
     .cc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; }
 
-    /* ── Credit Card Visual ── */
     .cc-card {
       border-radius:18px; padding:20px 22px; position:relative; overflow:hidden;
       cursor:pointer; transition:transform .2s, box-shadow .2s;
@@ -22,7 +20,6 @@
     }
     .cc-card:hover { transform:translateY(-3px); box-shadow:0 10px 28px rgba(0,0,0,.15); }
     .cc-card.selected { box-shadow:0 0 0 3px var(--primary), 0 10px 28px rgba(0,0,0,.15); }
-    /* Diagonal shine */
     .cc-card::before {
       content:''; position:absolute; top:-30%; right:-15%; width:55%; height:160%;
       background:rgba(255,255,255,.18); transform:rotate(-18deg); pointer-events:none;
@@ -34,20 +31,18 @@
 
     .cc-top { display:flex; justify-content:space-between; align-items:flex-start; position:relative; z-index:1; }
     .cc-name { font-size:14px; font-weight:700; line-height:1.3; }
-    .cc-bank { font-size:12px; font-weight:800; letter-spacing:.5px; opacity:.85; font-style:italic; }
+    .cc-bank { font-size:11px; font-weight:800; letter-spacing:.5px; opacity:.8; font-style:italic; }
     .cc-number { font-size:13px; font-weight:500; letter-spacing:1.5px; margin-top:10px; position:relative; z-index:1; opacity:.85; }
     .cc-bottom { display:flex; justify-content:space-between; align-items:flex-end; position:relative; z-index:1; }
     .cc-saldo { font-size:17px; font-weight:800; line-height:1; }
     .cc-status { display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600; margin-top:4px; }
-    .cc-status-dot { width:7px; height:7px; border-radius:50%; background:currentColor; flex-shrink:0; }
+    .cc-status-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
 
-    /* Mastercard circles */
     .mc-logo { position:relative; width:42px; height:26px; flex-shrink:0; }
     .mc-circle { position:absolute; width:26px; height:26px; border-radius:50%; top:0; opacity:.95; }
     .mc-left  { left:0;  background:#eb001b; }
     .mc-right { right:0; background:#f79e1b; }
 
-    /* Card color palettes */
     .cc-0 { background:linear-gradient(135deg,#fef9c3,#fde68a); color:#713f12; }
     .cc-1 { background:linear-gradient(135deg,#ede9fe,#c4b5fd); color:#5b21b6; }
     .cc-2 { background:linear-gradient(135deg,#e0f2fe,#7dd3fc); color:#075985; }
@@ -57,12 +52,8 @@
     .cc-6 { background:linear-gradient(135deg,#fce7f3,#f9a8d4); color:#831843; }
     .cc-7 { background:linear-gradient(135deg,#ecfdf5,#6ee7b7); color:#064e3b; }
 
-    /* ── Detail Panel ── */
-    #detail-panel {
-      display:none; margin-top:24px;
-      animation: slideDown .25s ease;
-    }
-    @keyframes slideDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+    #detail-panel { display:none; margin-top:24px; animation:slideDown .25s ease; }
+    @keyframes slideDown { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
 
     .detail-wrap {
       display:flex; gap:28px; align-items:flex-start;
@@ -71,8 +62,7 @@
     .detail-card-preview { flex-shrink:0; width:260px; }
     .detail-card-preview .cc-card { aspect-ratio:1.586; cursor:default; }
     .detail-card-preview .cc-card:hover { transform:none; }
-
-    .detail-info { flex:1; }
+    .detail-info { flex:1; min-width:0; }
     .detail-title { font-size:15px; font-weight:700; color:var(--text); margin-bottom:16px; }
     .detail-table { width:100%; border-collapse:collapse; }
     .detail-table tr { border-bottom:1px solid var(--gray-1); }
@@ -81,7 +71,7 @@
     .detail-table td:first-child { color:var(--text-sub); width:140px; font-weight:500; }
     .detail-table td:last-child { font-weight:600; color:var(--text); text-align:right; }
 
-    .reveal-btn { border:none; background:var(--gray-1); border-radius:6px; padding:3px 8px; font-size:11px; font-weight:600; cursor:pointer; color:var(--text-sub); margin-left:8px; transition:background .15s; }
+    .reveal-btn { border:none; background:var(--gray-1); border-radius:6px; padding:3px 8px; font-size:11px; font-weight:600; cursor:pointer; color:var(--text-sub); margin-left:6px; transition:background .15s; }
     .reveal-btn:hover { background:var(--gray-2); }
 
     .badge-active   { background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:700; }
@@ -89,13 +79,12 @@
 
     .detail-actions { display:flex; gap:8px; margin-top:20px; }
 
-    /* ── Modal Add/Edit ── */
     .modal-field { margin-bottom:14px; }
     .modal-field label { display:block; font-size:12px; font-weight:600; color:var(--text-sub); margin-bottom:6px; }
 
-    .color-picker { display:flex; gap:8px; flex-wrap:wrap; }
+    .color-picker { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
     .color-swatch { width:28px; height:28px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:all .15s; }
-    .color-swatch.selected { border-color:#6366f1; transform:scale(1.2); }
+    .color-swatch.selected { border-color:#6366f1; transform:scale(1.25); }
     .color-swatch-0 { background:linear-gradient(135deg,#fef9c3,#fde68a); }
     .color-swatch-1 { background:linear-gradient(135deg,#ede9fe,#c4b5fd); }
     .color-swatch-2 { background:linear-gradient(135deg,#e0f2fe,#7dd3fc); }
@@ -105,9 +94,9 @@
     .color-swatch-6 { background:linear-gradient(135deg,#fce7f3,#f9a8d4); }
     .color-swatch-7 { background:linear-gradient(135deg,#ecfdf5,#6ee7b7); }
 
-    .empty-state { text-align:center; padding:72px 24px; color:var(--text-sub); }
+    .empty-state { text-align:center; padding:72px 24px; color:var(--text-sub); grid-column:1/-1; }
     .empty-state .icon { font-size:48px; margin-bottom:12px; }
-    .loading-state { text-align:center; padding:48px; color:var(--text-sub); }
+    .loading-state { text-align:center; padding:48px; color:var(--text-sub); grid-column:1/-1; }
   </style>
 </head>
 <body>
@@ -130,7 +119,7 @@
       <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
       <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
       <div class="nav-item" data-page="topup.html"><span class="nav-icon">💳</span> Top Up Budget</div>
-      <div class="nav-item active" data-page="card.html"><span class="nav-icon">🏦</span> Kartu Line Bank</div>
+      <div class="nav-item active" data-page="card.html"><span class="nav-icon">🏦</span> Kartu Iklan Adsy</div>
       <div class="nav-item" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
       <div class="nav-item" data-page="products.html"><span class="nav-icon">📦</span> Produk</div>
     </nav>
@@ -157,8 +146,8 @@
   <main class="main-content">
     <header class="topbar">
       <div class="topbar-left">
-        <h2>🏦 Kartu Line Bank</h2>
-        <p>Manajemen kartu kredit Line Bank untuk Meta Ads</p>
+        <h2>🏦 Kartu Iklan Adsy</h2>
+        <p>Manajemen kartu iklan untuk Meta Ads</p>
       </div>
       <div class="topbar-right">
         <button class="btn btn-primary" id="btn-add-card" onclick="openAddModal()" style="display:none;">+ Tambah Kartu</button>
@@ -170,13 +159,9 @@
     </header>
 
     <div class="page-content">
-
-      <!-- Card Grid -->
       <div id="card-grid" class="cc-grid">
         <div class="loading-state"><div class="spinner"></div></div>
       </div>
-
-      <!-- Detail Panel -->
       <div id="detail-panel">
         <div class="detail-wrap">
           <div class="detail-card-preview">
@@ -189,12 +174,11 @@
           </div>
         </div>
       </div>
-
     </div>
   </main>
 </div>
 
-<!-- ── Modal: Tambah / Edit Kartu ── -->
+<!-- Modal: Tambah / Edit -->
 <div class="modal-overlay hidden" id="modal-card">
   <div class="modal" style="max-width:460px;">
     <div class="modal-header">
@@ -212,30 +196,26 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="modal-field" style="margin-bottom:0;">
           <label>Nama di Kartu</label>
-          <input type="text" class="form-input" id="mc-nama" placeholder="JOHN DOE" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()" />
+          <input type="text" class="form-input" id="mc-nama" placeholder="JOHN DOE" oninput="this.value=this.value.toUpperCase()" />
         </div>
         <div class="modal-field" style="margin-bottom:0;">
           <label>Nomor Kartu (16 digit)</label>
-          <input type="text" class="form-input" id="mc-nomor" placeholder="1234 5678 9012 3456" maxlength="19"
-            oninput="formatCardNumber(this)" inputmode="numeric" />
+          <input type="text" class="form-input" id="mc-nomor" placeholder="1234 5678 9012 3456" maxlength="19" oninput="formatCardNumber(this)" inputmode="numeric" />
         </div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px;">
         <div class="modal-field" style="margin-bottom:0;">
           <label>Kedaluwarsa</label>
-          <input type="text" class="form-input" id="mc-exp" placeholder="MM/YY" maxlength="5"
-            oninput="formatExpiry(this)" inputmode="numeric" />
+          <input type="text" class="form-input" id="mc-exp" placeholder="MM/YY" maxlength="5" oninput="formatExpiry(this)" inputmode="numeric" />
         </div>
         <div class="modal-field" style="margin-bottom:0;">
           <label>CVV</label>
-          <input type="text" class="form-input" id="mc-cvv" placeholder="123" maxlength="4" inputmode="numeric"
-            oninput="this.value=this.value.replace(/\D/g,'')" />
+          <input type="text" class="form-input" id="mc-cvv" placeholder="123" maxlength="4" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')" />
         </div>
         <div class="modal-field" style="margin-bottom:0;">
           <label>Saldo (Rp)</label>
-          <input type="text" class="form-input" id="mc-saldo" placeholder="0" inputmode="numeric"
-            oninput="formatNominalInput(this)" />
+          <input type="text" class="form-input" id="mc-saldo" placeholder="0" inputmode="numeric" oninput="formatNominalInput(this)" />
         </div>
       </div>
 
@@ -249,7 +229,7 @@
 
       <div class="modal-field">
         <label>Warna Kartu</label>
-        <div class="color-picker" id="mc-color-picker">
+        <div class="color-picker">
           <div class="color-swatch color-swatch-0 selected" data-idx="0" onclick="selectColor(0)"></div>
           <div class="color-swatch color-swatch-1" data-idx="1" onclick="selectColor(1)"></div>
           <div class="color-swatch color-swatch-2" data-idx="2" onclick="selectColor(2)"></div>
@@ -277,7 +257,7 @@
   </div>
 </div>
 
-<!-- ── Modal: Konfirmasi Hapus ── -->
+<!-- Modal: Konfirmasi Hapus -->
 <div class="modal-overlay hidden" id="modal-delete">
   <div class="modal" style="max-width:380px;">
     <div class="modal-header">
@@ -297,7 +277,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
   import { requireAuth, renderUserInfo } from './js/auth.js';
-  import { initSidebar, showToast, formatRupiah, openModal, closeModal } from './js/sidebar.js';
+  import { initSidebar, showToast, openModal, closeModal } from './js/sidebar.js';
   import { getSupabase } from './js/supabase.js';
 
   window.openModal = openModal;
@@ -306,17 +286,6 @@
   let sb, currentProfile, cards = [];
   let selectedCardId = null;
   let deleteTargetId = null;
-
-  const COLORS = [
-    { bg: 'linear-gradient(135deg,#fef9c3,#fde68a)', text: '#713f12' },
-    { bg: 'linear-gradient(135deg,#ede9fe,#c4b5fd)', text: '#5b21b6' },
-    { bg: 'linear-gradient(135deg,#e0f2fe,#7dd3fc)', text: '#075985' },
-    { bg: 'linear-gradient(135deg,#dcfce7,#86efac)', text: '#14532d' },
-    { bg: 'linear-gradient(135deg,#dbeafe,#93c5fd)', text: '#1e3a8a' },
-    { bg: 'linear-gradient(135deg,#fee2e2,#fca5a5)', text: '#7f1d1d' },
-    { bg: 'linear-gradient(135deg,#fce7f3,#f9a8d4)', text: '#831843' },
-    { bg: 'linear-gradient(135deg,#ecfdf5,#6ee7b7)', text: '#064e3b' },
-  ];
 
   // ── Init ──
   (async () => {
@@ -327,67 +296,64 @@
     initSidebar();
 
     const isAdmin = ['admin','superadmin'].includes(currentProfile?.role);
-    if (isAdmin) {
-      document.getElementById('btn-add-card').style.display = 'block';
-    }
+    if (isAdmin) document.getElementById('btn-add-card').style.display = 'block';
 
     await loadCards();
   })();
 
-  // ── Load cards ──
+  // ── Load ──
   async function loadCards() {
     const grid = document.getElementById('card-grid');
     grid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
 
     const { data, error } = await sb.from('linebank_cards').select('*').order('created_at', { ascending: true });
-    if (error) { grid.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div>${error.message}</div></div>`; return; }
-
+    if (error) {
+      grid.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div>${error.message}</div></div>`;
+      return;
+    }
     cards = data || [];
     renderGrid();
+  }
+
+  function cardHTML(c, isSelected) {
+    const ci = c.warna_index ?? 0;
+    const last4 = c.nomor_kartu ? c.nomor_kartu.replace(/\s/g,'').slice(-4) : '----';
+    const saldoFmt = c.saldo != null ? 'IDR ' + Number(c.saldo).toLocaleString('id-ID') + ',00' : '—';
+    return `<div class="cc-card cc-${ci}${isSelected ? ' selected' : ''}" onclick="selectCard('${c.id}')">
+      <div class="cc-top">
+        <div class="cc-name">${c.label}</div>
+        <div class="cc-bank">Adsy Autopilot</div>
+      </div>
+      <div class="cc-number">**** **** **** ${last4}</div>
+      <div class="cc-bottom">
+        <div>
+          <div class="cc-saldo">${saldoFmt}</div>
+          <div class="cc-status">
+            <span class="cc-status-dot" style="background:${c.status === 'active' ? '#22c55e' : '#ef4444'};"></span>
+            ${c.status === 'active' ? 'Active' : 'Inactive'}
+          </div>
+        </div>
+        <div class="mc-logo">
+          <div class="mc-circle mc-left"></div>
+          <div class="mc-circle mc-right"></div>
+        </div>
+      </div>
+    </div>`;
   }
 
   function renderGrid() {
     const grid = document.getElementById('card-grid');
     const isAdmin = ['admin','superadmin'].includes(currentProfile?.role);
-
     if (!cards.length) {
-      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="icon">💳</div><div>Belum ada kartu. ' + (isAdmin ? 'Tambah kartu pertama!' : 'Admin belum menambahkan kartu.') + '</div></div>';
+      grid.innerHTML = `<div class="empty-state"><div class="icon">💳</div><div>Belum ada kartu.${isAdmin ? ' Klik "+ Tambah Kartu" untuk mulai.' : ''}</div></div>`;
       return;
     }
-
-    grid.innerHTML = cards.map(c => {
-      const ci = c.warna_index ?? 0;
-      const last4 = c.nomor_kartu ? c.nomor_kartu.replace(/\s/g,'').slice(-4) : '----';
-      const saldoFmt = c.saldo != null ? 'IDR ' + Number(c.saldo).toLocaleString('id-ID') + ',00' : '—';
-      const isSelected = c.id === selectedCardId;
-
-      return `<div class="cc-card cc-${ci} ${isSelected ? 'selected' : ''}" onclick="selectCard('${c.id}')">
-        <div class="cc-top">
-          <div class="cc-name">${c.label}</div>
-          <div class="cc-bank">Line Bank</div>
-        </div>
-        <div class="cc-number">**** **** **** ${last4}</div>
-        <div class="cc-bottom">
-          <div>
-            <div class="cc-saldo">${saldoFmt}</div>
-            <div class="cc-status">
-              <span class="cc-status-dot" style="color:${c.status === 'active' ? '#22c55e' : '#ef4444'}"></span>
-              ${c.status === 'active' ? 'Active' : 'Inactive'}
-            </div>
-          </div>
-          <div class="mc-logo">
-            <div class="mc-circle mc-left"></div>
-            <div class="mc-circle mc-right"></div>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
+    grid.innerHTML = cards.map(c => cardHTML(c, c.id === selectedCardId)).join('');
   }
 
-  // ── Select card → show detail ──
+  // ── Select ──
   window.selectCard = function(id) {
     if (selectedCardId === id) {
-      // Toggle off
       selectedCardId = null;
       document.getElementById('detail-panel').style.display = 'none';
       renderGrid();
@@ -406,20 +372,20 @@
     const last4 = c.nomor_kartu ? c.nomor_kartu.replace(/\s/g,'').slice(-4) : '----';
     const saldoFmt = c.saldo != null ? 'IDR ' + Number(c.saldo).toLocaleString('id-ID') + ',00' : '—';
 
-    // Card visual preview
+    // Card preview
     const visual = document.getElementById('detail-card-visual');
     visual.className = `cc-card cc-${ci}`;
     visual.innerHTML = `
       <div class="cc-top">
         <div class="cc-name">${c.label}</div>
-        <div class="cc-bank">Line Bank</div>
+        <div class="cc-bank">Adsy Autopilot</div>
       </div>
       <div class="cc-number">**** **** **** ${last4}</div>
       <div class="cc-bottom">
         <div>
           <div class="cc-saldo">${saldoFmt}</div>
           <div class="cc-status">
-            <span class="cc-status-dot" style="color:${c.status === 'active' ? '#22c55e' : '#ef4444'}"></span>
+            <span class="cc-status-dot" style="background:${c.status === 'active' ? '#22c55e' : '#ef4444'};"></span>
             ${c.status === 'active' ? 'Active' : 'Inactive'}
           </div>
         </div>
@@ -430,21 +396,23 @@
       </div>`;
 
     // Detail table
-    const nomorMasked = c.nomor_kartu
-      ? '**** **** **** ' + c.nomor_kartu.replace(/\s/g,'').slice(-4)
-      : '—';
-    const nomorFull = c.nomor_kartu || '—';
-    const cvvMasked = c.cvv ? '***' : '—';
+    const nomorFull  = c.nomor_kartu || '';
+    const nomorMasked = nomorFull ? '**** **** **** ' + nomorFull.replace(/\s/g,'').slice(-4) : '—';
+    const cvvFull    = c.cvv || '';
 
     const rows = [
       ['Label', c.label || '—'],
       ['Nama Kartu', c.nama_kartu || '—'],
-      ['Nomor Kartu', `<span id="nomor-display">${nomorMasked}</span>
-        <button class="reveal-btn" id="nomor-reveal-btn" onclick="toggleReveal('nomor','${nomorFull}','${nomorMasked}')">👁 Lihat</button>
-        <button class="reveal-btn" onclick="copyText('${nomorFull}')" style="margin-left:4px;">📋</button>`],
+      ['Nomor Kartu', nomorFull
+        ? `<span id="nomor-display">${nomorMasked}</span>
+           <button class="reveal-btn" id="nomor-btn" onclick="toggleReveal('nomor','${nomorFull}','${nomorMasked}')">👁 Lihat</button>
+           <button class="reveal-btn" onclick="copyText('${nomorFull.replace(/\s/g,'')}')">📋</button>`
+        : '—'],
       ['Kedaluwarsa', c.kedaluwarsa || '—'],
-      ['CVV', `<span id="cvv-display">${cvvMasked}</span>
-        ${c.cvv ? `<button class="reveal-btn" id="cvv-reveal-btn" onclick="toggleReveal('cvv','${c.cvv}','***')">👁 Lihat</button>` : ''}`],
+      ['CVV', cvvFull
+        ? `<span id="cvv-display">***</span>
+           <button class="reveal-btn" id="cvv-btn" onclick="toggleReveal('cvv','${cvvFull}','***')">👁 Lihat</button>`
+        : '—'],
       ['Saldo', saldoFmt],
       ['Status', `<span class="${c.status === 'active' ? 'badge-active' : 'badge-inactive'}">${c.status === 'active' ? '● Active' : '● Inactive'}</span>`],
       c.catatan ? ['Catatan', c.catatan] : null,
@@ -454,28 +422,22 @@
       `<tr><td>${k}</td><td>${v}</td></tr>`
     ).join('');
 
-    // Actions (admin only)
-    const actionsEl = document.getElementById('detail-actions');
-    if (isAdmin) {
-      actionsEl.innerHTML = `
-        <button class="btn btn-outline btn-sm" onclick="openEditModal('${c.id}')">✏️ Edit</button>
-        <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:1.5px solid #fca5a5;" onclick="openDeleteModal('${c.id}','${c.label.replace(/'/g,"\\'")}')">🗑️ Hapus</button>`;
-    } else {
-      actionsEl.innerHTML = '';
-    }
+    document.getElementById('detail-actions').innerHTML = isAdmin
+      ? `<button class="btn btn-outline btn-sm" onclick="openEditModal('${c.id}')">✏️ Edit</button>
+         <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:1.5px solid #fca5a5;" onclick="openDeleteModal('${c.id}','${c.label.replace(/'/g,"\\'")}')">🗑️ Hapus</button>`
+      : '';
 
-    // Show panel & scroll
     const panel = document.getElementById('detail-panel');
     panel.style.display = 'block';
-    setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+    setTimeout(() => panel.scrollIntoView({ behavior:'smooth', block:'nearest' }), 50);
   }
 
-  // ── Toggle reveal ──
+  // ── Reveal toggle ──
   window.toggleReveal = function(field, full, masked) {
     const display = document.getElementById(field + '-display');
-    const btn = document.getElementById(field + '-reveal-btn');
+    const btn = document.getElementById(field + '-btn');
     if (!display || !btn) return;
-    const isHidden = display.textContent === masked || display.textContent === '***';
+    const isHidden = display.textContent.includes('*');
     display.textContent = isHidden ? full : masked;
     btn.textContent = isHidden ? '🙈 Sembunyikan' : '👁 Lihat';
   };
@@ -496,8 +458,8 @@
     document.getElementById('mc-catatan').value = '';
     document.getElementById('mc-status').value = 'active';
     document.getElementById('mc-warna').value = '0';
-    selectColor(0);
     document.getElementById('mc-err').style.display = 'none';
+    selectColor(0);
     document.getElementById('modal-card-title').textContent = 'Tambah Kartu';
     openModal('modal-card');
   };
@@ -515,36 +477,34 @@
     document.getElementById('mc-catatan').value = c.catatan || '';
     document.getElementById('mc-status').value = c.status || 'active';
     document.getElementById('mc-warna').value = String(c.warna_index ?? 0);
-    selectColor(c.warna_index ?? 0);
     document.getElementById('mc-err').style.display = 'none';
+    selectColor(c.warna_index ?? 0);
     document.getElementById('modal-card-title').textContent = 'Edit Kartu';
     openModal('modal-card');
   };
 
   window.saveCard = async function() {
     const editId = document.getElementById('mc-edit-id').value;
-    const label = document.getElementById('mc-label').value.trim();
-    const errEl = document.getElementById('mc-err');
+    const label  = document.getElementById('mc-label').value.trim();
+    const errEl  = document.getElementById('mc-err');
     errEl.style.display = 'none';
-
     if (!label) { errEl.textContent = 'Label wajib diisi.'; errEl.style.display = 'block'; return; }
 
     const payload = {
       label,
-      nama_kartu: document.getElementById('mc-nama').value.trim().toUpperCase() || null,
+      nama_kartu:  document.getElementById('mc-nama').value.trim().toUpperCase() || null,
       nomor_kartu: document.getElementById('mc-nomor').value.trim() || null,
       kedaluwarsa: document.getElementById('mc-exp').value.trim() || null,
-      cvv: document.getElementById('mc-cvv').value.trim() || null,
-      saldo: parseInt(document.getElementById('mc-saldo').value.replace(/\D/g,'')) || 0,
-      catatan: document.getElementById('mc-catatan').value.trim() || null,
-      status: document.getElementById('mc-status').value,
+      cvv:         document.getElementById('mc-cvv').value.trim() || null,
+      saldo:       parseInt(document.getElementById('mc-saldo').value.replace(/\D/g,'')) || 0,
+      catatan:     document.getElementById('mc-catatan').value.trim() || null,
+      status:      document.getElementById('mc-status').value,
       warna_index: parseInt(document.getElementById('mc-warna').value) || 0,
-      updated_at: new Date().toISOString(),
+      updated_at:  new Date().toISOString(),
     };
 
     const btn = document.getElementById('mc-save-btn');
     btn.disabled = true; btn.textContent = 'Menyimpan...';
-
     try {
       let error;
       if (editId) {
@@ -554,7 +514,6 @@
         ({ error } = await sb.from('linebank_cards').insert({ ...payload, created_by: user.id }));
       }
       if (error) throw new Error(error.message);
-
       showToast(editId ? 'Kartu diperbarui!' : 'Kartu ditambahkan!', 'success');
       closeModal('modal-card');
       await loadCards();
@@ -602,9 +561,9 @@
     });
   };
 
-  // ── Input formatters ──
+  // ── Formatters ──
   window.formatCardNumber = function(el) {
-    let v = el.value.replace(/\D/g,'').slice(0,16);
+    const v = el.value.replace(/\D/g,'').slice(0,16);
     el.value = v.replace(/(.{4})/g,'$1 ').trim();
   };
 
