@@ -1686,6 +1686,10 @@
         </div>
         ${rec.recommendation_pct && rec.recommendation_pct < 100 ? `<div class="form-hint" style="margin-top:4px;">💡 Pre-filled dari rekomendasi ${rec.recommendation_pct}% · ubah jika perlu</div>` : ''}
       </div>
+      <div class="modal-field">
+        <label>Catatan untuk Advertiser <span style="color:var(--text-sub);font-weight:400;">(opsional)</span></label>
+        <input type="text" class="form-input" id="modal-catatan" placeholder="Contoh: Nominal disesuaikan karena CPR masih tinggi..." />
+      </div>
       <div style="display:flex;gap:10px;margin-top:4px;">
         <button class="btn btn-danger" style="flex:1;" onclick="openRejectModal()">❌ Tolak</button>
         <button class="btn btn-success" style="flex:2;" onclick="doApprove()">✅ Approve</button>
