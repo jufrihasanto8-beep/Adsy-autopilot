@@ -592,8 +592,9 @@ Field tidak ditemukan = null.` }
       try {
         let spendToRecord = spend;
 
-        // Untuk request SORE: hitung delta dari request sore terakhir hari ini
-        // supaya tidak double-count (SS sore itu cumulative dari jam 00:00)
+        // Hitung delta untuk cegah double-count:
+        // - SORE: SS cumulative dari 00:00, cek request sore sebelumnya hari ini
+        // - PAGI: SS full day kemarin, cek apakah kemarin ada request sore (sudah sebagian tercatat)
         if (topupTime === 'sore') {
           const today = new Date().toISOString().split('T')[0];
           const { data: lastSore } = await sb
@@ -609,7 +610,37 @@ Field tidak ditemukan = null.` }
 
           const lastSpend = Number(lastSore?.extracted_data?.spend) || 0;
           spendToRecord = Math.max(0, spend - lastSpend);
+        } else if (topupTime === 'pagi') {
+          // Cek apakah kemarin ada request SORE untuk akun ini
+          // Kalau ada → sebagian spend kemarin sudah tercatat, ambil delta saja
+          const now = new Date();
+          const yesterdayStart = new Date(now);
+          yesterdayStart.setDate(now.getDate() - 1);
+          yesterdayStart.setHours(0, 0, 0, 0);
+          const yesterdayEnd = new Date(now);
+          yesterdayEnd.setDate(now.getDate() - 1);
+          yesterdayEnd.setHours(23, 59, 59, 999);
+
+          const { data: lastSoreYesterday } = await sb
+            .from('topup_requests')
+            .select('extracted_data')
+            .eq('topup_ad_account_id', adAccountId)
+            .eq('topup_time', 'sore')
+            .gte('created_at', yesterdayStart.toISOString())
+            .lte('created_at', yesterdayEnd.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const alreadyRecorded = Number(lastSoreYesterday?.extracted_data?.spend) || 0;
+          spendToRecord = Math.max(0, spend - alreadyRecorded);
         }
+
+        const catatanLog = topupTime === 'sore'
+          ? `Spend sore (Rp ${spend.toLocaleString('id-ID')} total, delta +Rp ${spendToRecord.toLocaleString('id-ID')})`
+          : spendToRecord < spend
+            ? `Spend pagi kemarin (Rp ${spend.toLocaleString('id-ID')} full day, delta +Rp ${spendToRecord.toLocaleString('id-ID')} setelah dikurangi sore kemarin)`
+            : `Spend ${extracted?.date_range || 'kemarin'}`;
 
         if (spendToRecord > 0) {
           const { data: acct } = await sb.from('topup_ad_accounts').select('saldo_saat_ini').eq('id', adAccountId).single();
@@ -620,9 +651,7 @@ Field tidak ditemukan = null.` }
             type: 'spend',
             amount: spendToRecord,
             request_id: body.request_id,
-            catatan: topupTime === 'sore'
-              ? `Spend sore (Rp ${spend.toLocaleString('id-ID')} total, delta +Rp ${spendToRecord.toLocaleString('id-ID')})`
-              : `Spend ${extracted?.date_range || 'kemarin'}`,
+            catatan: catatanLog,
             tanggal: new Date().toISOString().split('T')[0]
           });
         }
