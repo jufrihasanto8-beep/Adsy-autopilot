@@ -394,30 +394,25 @@ async function doConfirm() {
               },
               {
                 type: 'text',
-                text: `Kamu adalah data extractor screenshot Meta Ads Manager (Bahasa Indonesia).
+                text: `Ekstrak data dari screenshot Meta Ads Manager.
 
-Lihat BARIS PALING BAWAH berlabel "Hasil dari X kampanye". Baris ini adalah baris total/summary.
+Cari baris paling bawah bertulisan "Hasil dari X kampanye".
 
-LANGKAH 1 — identifikasi posisi kolom dari baris HEADER di atas tabel.
-LANGKAH 2 — baca nilai di baris total untuk kolom-kolom ini:
+Urutan kolom di tabel Meta Ads dari kiri ke kanan adalah:
+No. | Kampanye | Hasil | Jangkauan | Frekuensi | Biaya per hasil | Anggaran | Jumlah yang dibelanjakan | Omset | CAQ
 
-A. Kolom "Hasil" → results.
-   PENTING: Kolom ini sering menampilkan DUA baris teks — baris pertama adalah ANGKA atau "—", baris kedua adalah nama event (contoh: "Pembelian di Situs Web", "Prospek", dll).
-   Baca HANYA baris pertama (angka atau "—"). Jika "—" → null.
-   JANGAN membaca angka dari kolom lain seperti "Jangkauan" (Reach) meski posisinya berdekatan.
+Dari baris "Hasil dari X kampanye", baca:
+1. Kolom ke-3 = "Hasil" → results. Tiap sel di kolom ini menampilkan 2 baris: baris atas = angka atau "—", baris bawah = nama event (abaikan). Jika baris atas "—" → null.
+2. Kolom ke-6 = "${isCtwa ? 'Biaya per klik (semua)' : 'Biaya per hasil'}" → ${isCtwa ? 'cpc' : 'cpr'}. Jika "—" → null.
+3. Kolom ke-8 = "Jumlah yang dibelanjakan" → spend. Jika "—" → null.
+4. Tanggal di pojok kanan atas → date_range.
 
-B. Kolom "${isCtwa ? 'Biaya per klik (semua)' : 'Biaya per hasil'}" → ${isCtwa ? 'cpc' : 'cpr'}. Jika "—" → null.
+INGAT: kolom ke-4 "Jangkauan" adalah reach/jangkauan audiens — BUKAN hasil konversi, jangan masukkan ke results.
 
-C. Kolom "Jumlah yang dibelanjakan" → spend. Jika "—" → null.
+Angka format Indonesia: "Rp 49.947" = 49947 (integer, tanpa titik).
 
-D. Tanggal periode di pojok kanan atas → date_range (contoh: "11 Okt 2026").
-
-Format angka Indonesia: titik = pemisah ribuan. "Rp 49.947" = 49947. Kembalikan angka INTEGER murni.
-
-Return HANYA JSON ini tanpa teks lain:
-${isCtwa ? '{"date_range":"...","spend":...,"results":...,"cpc":...}' : '{"date_range":"...","spend":...,"results":...,"cpr":...}'}
-
-"—" atau tidak ditemukan = null.`
+Return JSON saja:
+${isCtwa ? '{"date_range":"...","spend":...,"results":...,"cpc":...}' : '{"date_range":"...","spend":...,"results":...,"cpr":...}'}`
               }
             ]
           }]
@@ -713,11 +708,13 @@ Field tidak ditemukan = null.` }
 
         const pesan = reject
           ? [
-              `❌ *Top Up Ditolak*`,
+              `⚠️ *Top Up Tidak Disetujui*`,
               ``,
               `Halo *${req_data.user_name}*,`,
-              `Request top up kamu sebesar *Rp ${fmtNum(req_data.nominal_request)}* ditolak.`,
-              catatan ? `Alasan: ${catatan}` : null,
+              `Mohon maaf, request top up kamu sebesar *Rp ${fmtNum(req_data.nominal_request)}* belum bisa kami setujui saat ini.`,
+              catatan ? `\n📝 *Keterangan:*\n${catatan}` : null,
+              ``,
+              `Silakan hubungi admin jika ada pertanyaan lebih lanjut. 🙏`,
               ``,
               `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
             ].filter(Boolean).join('\n')
