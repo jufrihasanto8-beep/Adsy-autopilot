@@ -886,5 +886,86 @@ Field tidak ditemukan = null.` }
     return res.json({ ok: true });
   }
 
-  return res.status(400).json({ error: 'Invalid action. Use: send | extract_topup | notify_topup | approve_topup | notify_selow_transfer | confirm_selow' });
+  // ── notify_kartu_request: notif WA ke admin saat advertiser request kartu baru ──
+  if (action === 'notify_kartu_request') {
+    const { user_name, nama, kebutuhan, jumlah } = body;
+
+    const { data: cfgWithToken } = await sb.from('app_config')
+      .select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle();
+    const fonnteToken = cfgWithToken?.fonnte_token || process.env.FONNTE_TOKEN;
+    if (!fonnteToken) return res.json({ ok: false, warn: 'Fonnte token belum dikonfigurasi' });
+
+    const { data: gs } = await sb.from('global_settings')
+      .select('topup_wa_targets').eq('id', '00000000-0000-0000-0000-000000000001').single();
+    const waTargets = gs?.topup_wa_targets || [];
+    if (!waTargets.length) return res.json({ ok: false, warn: 'Belum ada nomor penerima notif di Settings' });
+
+    const pesan = [
+      `💳 *Request Kartu Baru — Adsy Autopilot*`,
+      ``,
+      `👤 *${user_name}* mengajukan request kartu:`,
+      `📛 Nama: ${nama}`,
+      `🔢 Jumlah: ${jumlah} kartu`,
+      `📝 Kebutuhan: ${kebutuhan}`,
+      ``,
+      `Silakan cek di menu Top Up → Manajemen Kartu untuk merespons.`,
+      ``,
+      `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+    ].join('\n');
+
+    const results = await Promise.all(waTargets.map(async no => {
+      const target = formatWaTarget(no);
+      try {
+        const r2 = await fetch('https://api.fonnte.com/send', {
+          method: 'POST',
+          headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target, message: pesan })
+        });
+        const d = await r2.json();
+        return { no: target, ok: d.status !== false };
+      } catch (e) { return { no: target, ok: false }; }
+    }));
+
+    return res.json({ ok: results.some(r => r.ok) });
+  }
+
+  // ── notify_kartu_info: notif WA ke advertiser saat admin isi info kartu ──
+  if (action === 'notify_kartu_info') {
+    const { user_id, user_name, nama, jumlah, info_admin } = body;
+
+    const { data: userCfg } = await sb.from('app_config').select('wa_target').eq('user_id', user_id).single();
+    const { data: adminCfg } = await sb.from('app_config').select('fonnte_token').not('fonnte_token', 'is', null).limit(1).maybeSingle();
+    const fonnteToken = adminCfg?.fonnte_token || process.env.FONNTE_TOKEN;
+    const noWa = userCfg?.wa_target;
+    if (!fonnteToken || !noWa) return res.json({ ok: false, warn: 'Fonnte token atau nomor WA advertiser tidak ditemukan' });
+
+    const target = formatWaTarget(noWa);
+    const pesan = [
+      `💳 *Info Kartu Sudah Siap!*`,
+      ``,
+      `Halo *${user_name}*,`,
+      `Request kartu kamu sudah diproses oleh admin.`,
+      `📛 Nama: ${nama}`,
+      `🔢 Jumlah: ${jumlah} kartu`,
+      ``,
+      `ℹ️ *Info dari Admin:*`,
+      info_admin,
+      ``,
+      `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+    ].join('\n');
+
+    try {
+      const r2 = await fetch('https://api.fonnte.com/send', {
+        method: 'POST',
+        headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target, message: pesan, countryCode: '62' })
+      });
+      const d = await r2.json();
+      return res.json({ ok: d.status !== false });
+    } catch (e) {
+      return res.json({ ok: false, warn: e.message });
+    }
+  }
+
+  return res.status(400).json({ error: 'Invalid action. Use: send | extract_topup | notify_topup | approve_topup | notify_selow_transfer | confirm_selow | notify_kartu_request | notify_kartu_info' });
 }
