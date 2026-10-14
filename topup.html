@@ -581,25 +581,37 @@
   </div>
 </div>
 
-<!-- ── Modal: Isi Info Kartu (admin) ── -->
+<!-- ── Modal: Kelola Request Kartu (admin) ── -->
 <div class="modal-overlay hidden" id="modal-kartu-info">
   <div class="modal" style="max-width:420px;">
     <div class="modal-header">
-      <h3>💳 Isi Info Kartu</h3>
+      <h3>💳 Request Kartu</h3>
       <div class="modal-close" onclick="closeModal('modal-kartu-info')">✕</div>
     </div>
     <div class="modal-body">
       <input type="hidden" id="ki-request-id" />
       <div id="ki-detail" style="background:var(--gray-1);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;"></div>
-      <div class="modal-field">
-        <label>Info Kartu untuk Advertiser <span style="color:var(--danger)">*</span></label>
-        <textarea id="ki-info" class="form-input" rows="4" placeholder="Contoh: Kartu sudah dibuat. Nama: John Doe, 4 digit terakhir: 1234, berlaku s/d 12/27..." style="resize:vertical;"></textarea>
-      </div>
-      <div id="ki-err" style="font-size:12px;color:var(--danger);display:none;margin-bottom:8px;"></div>
-      <div style="display:flex;gap:10px;margin-top:8px;">
+
+      <!-- Tombol aksi utama -->
+      <div id="ki-actions" style="display:flex;gap:10px;">
         <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-kartu-info')">Batal</button>
-        <button class="btn btn-primary" style="flex:2;" id="ki-save-btn" onclick="saveKartuInfo()">Kirim Info</button>
+        <button class="btn" style="flex:1;background:#fee2e2;color:#991b1b;border:1.5px solid #fca5a5;" onclick="showKartuRejectForm()">❌ Tolak</button>
+        <button class="btn btn-success" style="flex:2;" id="ki-approve-btn" onclick="approveKartu()">✅ Sudah Dibuat</button>
       </div>
+
+      <!-- Form tolak (hidden by default) -->
+      <div id="ki-reject-wrap" style="display:none;margin-top:14px;">
+        <div class="modal-field">
+          <label>Catatan Penolakan <span style="color:var(--danger)">*</span></label>
+          <textarea id="ki-catatan" class="form-input" rows="3" placeholder="Contoh: Tidak memenuhi syarat, coba hubungi admin..." style="resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="hideKartuRejectForm()">Kembali</button>
+          <button class="btn btn-danger" style="flex:2;" id="ki-reject-btn" onclick="rejectKartu()">❌ Konfirmasi Tolak</button>
+        </div>
+      </div>
+
+      <div id="ki-err" style="font-size:12px;color:var(--danger);display:none;margin-top:8px;"></div>
     </div>
   </div>
 </div>
@@ -1972,7 +1984,7 @@
     }
 
     el.innerHTML = data.map(r => {
-      const statusMap = { pending: ['badge-pending', '⏳ Pending'], selesai: ['badge-approved', '✅ Selesai'] };
+      const statusMap = { pending: ['badge-pending', '⏳ Pending'], selesai: ['badge-approved', '✅ Selesai'], ditolak: ['badge-rejected', '❌ Ditolak'] };
       const [badgeClass, badgeLabel] = statusMap[r.status] || ['badge-pending', r.status];
       const tgl = new Date(r.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
       const kebutuhanSafe = (r.kebutuhan || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
@@ -1994,8 +2006,11 @@
           <span class="chip">💳 ${r.jumlah} kartu</span>
         </div>
         <div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.5;">📝 ${r.kebutuhan}</div>
-        ${r.info_admin ? `<div style="margin-top:10px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:12px;line-height:1.6;color:var(--text);">
-          <strong>ℹ️ Info dari Admin:</strong><br>${r.info_admin}
+        ${r.info_admin && r.status === 'selesai' ? `<div style="margin-top:10px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:12px;line-height:1.6;color:var(--text);">
+          <strong>✅ Kartu sudah dibuat</strong>
+        </div>` : ''}
+        ${r.info_admin && r.status === 'ditolak' ? `<div style="margin-top:10px;padding:10px 12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;font-size:12px;line-height:1.6;color:var(--text);">
+          <strong>📝 Catatan:</strong> ${r.info_admin}
         </div>` : ''}
       </div>`;
     }).join('');
@@ -2045,8 +2060,10 @@
 
   window.openKartuInfoModal = function(id, userName, jumlah, kebutuhan) {
     document.getElementById('ki-request-id').value = id;
-    document.getElementById('ki-info').value = '';
+    document.getElementById('ki-catatan').value = '';
     document.getElementById('ki-err').style.display = 'none';
+    document.getElementById('ki-reject-wrap').style.display = 'none';
+    document.getElementById('ki-actions').style.display = 'flex';
     document.getElementById('ki-detail').innerHTML = `
       <div style="font-weight:700;margin-bottom:4px;">${userName}</div>
       <div>Jumlah: <strong>${jumlah} kartu</strong></div>
@@ -2055,40 +2072,79 @@
     openModal('modal-kartu-info');
   };
 
-  window.saveKartuInfo = async function() {
+  window.showKartuRejectForm = function() {
+    document.getElementById('ki-actions').style.display = 'none';
+    document.getElementById('ki-reject-wrap').style.display = 'block';
+  };
+
+  window.hideKartuRejectForm = function() {
+    document.getElementById('ki-reject-wrap').style.display = 'none';
+    document.getElementById('ki-actions').style.display = 'flex';
+    document.getElementById('ki-err').style.display = 'none';
+  };
+
+  window.approveKartu = async function() {
     const id = document.getElementById('ki-request-id').value;
-    const info = document.getElementById('ki-info').value.trim();
-    const errEl = document.getElementById('ki-err');
-    errEl.style.display = 'none';
-
-    if (!info) { errEl.textContent = 'Info kartu wajib diisi.'; errEl.style.display = 'block'; return; }
-
-    const btn = document.getElementById('ki-save-btn');
-    btn.disabled = true; btn.textContent = 'Menyimpan...';
-
+    const btn = document.getElementById('ki-approve-btn');
+    btn.disabled = true; btn.textContent = 'Memproses...';
     try {
       const { data: req, error: fetchErr } = await sb.from('kartu_requests').select('*').eq('id', id).single();
       if (fetchErr) throw new Error(fetchErr.message);
 
       const { error } = await sb.from('kartu_requests')
-        .update({ info_admin: info, status: 'selesai', updated_at: new Date().toISOString() })
+        .update({ status: 'selesai', updated_at: new Date().toISOString() })
         .eq('id', id);
       if (error) throw new Error(error.message);
 
       await fetch('/api/notify-wa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'notify_kartu_info', request_id: id, user_id: req.user_id, user_name: req.user_name, nama: req.nama, jumlah: req.jumlah, info_admin: info })
+        body: JSON.stringify({ action: 'notify_kartu_info', user_id: req.user_id, user_name: req.user_name, nama: req.nama, jumlah: req.jumlah, status: 'selesai' })
       }).catch(() => {});
 
-      showToast('Info kartu berhasil dikirim ke advertiser!', 'success');
+      showToast('Kartu ditandai sudah dibuat!', 'success');
+      closeModal('modal-kartu-info');
+      loadKartuList();
+    } catch (e) {
+      document.getElementById('ki-err').textContent = 'Error: ' + e.message;
+      document.getElementById('ki-err').style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = '✅ Sudah Dibuat';
+    }
+  };
+
+  window.rejectKartu = async function() {
+    const id = document.getElementById('ki-request-id').value;
+    const catatan = document.getElementById('ki-catatan').value.trim();
+    const errEl = document.getElementById('ki-err');
+    errEl.style.display = 'none';
+    if (!catatan) { errEl.textContent = 'Catatan penolakan wajib diisi.'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('ki-reject-btn');
+    btn.disabled = true; btn.textContent = 'Memproses...';
+    try {
+      const { data: req, error: fetchErr } = await sb.from('kartu_requests').select('*').eq('id', id).single();
+      if (fetchErr) throw new Error(fetchErr.message);
+
+      const { error } = await sb.from('kartu_requests')
+        .update({ status: 'ditolak', info_admin: catatan, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+
+      await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'notify_kartu_info', user_id: req.user_id, user_name: req.user_name, nama: req.nama, jumlah: req.jumlah, status: 'ditolak', catatan })
+      }).catch(() => {});
+
+      showToast('Request kartu ditolak.', 'error');
       closeModal('modal-kartu-info');
       loadKartuList();
     } catch (e) {
       errEl.textContent = 'Error: ' + e.message;
       errEl.style.display = 'block';
     } finally {
-      btn.disabled = false; btn.textContent = 'Kirim Info';
+      btn.disabled = false; btn.textContent = '❌ Konfirmasi Tolak';
     }
   };
 </script>
