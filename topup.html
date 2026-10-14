@@ -554,12 +554,19 @@
         </div>
       </div>
 
-      <!-- Kartu Iklan Adsy -->
+      <!-- Kartu Iklan Adsy (Line Bank) -->
       <div id="aa-section-kartu" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-2);">
         <div style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:10px;">🏦 Kartu Iklan Adsy (opsional)</div>
         <select class="form-input" id="aa-linebank-card" style="width:100%;">
           <option value="">— Tidak pakai kartu —</option>
         </select>
+      </div>
+
+      <!-- 4 Digit Terakhir (Selow) -->
+      <div id="aa-section-selow" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-2);display:none;">
+        <div style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:10px;">💳 Info Kartu Selow (opsional)</div>
+        <input type="text" class="form-input" id="aa-cc-nomor" placeholder="4 digit terakhir kartu"
+          maxlength="4" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')" />
       </div>
 
       <div class="modal-field" style="margin-top:4px;">
@@ -982,9 +989,11 @@
     const val = document.querySelector('input[name="aa_payment_method"]:checked')?.value || 'line_bank';
     document.getElementById('aa-card-linebank').classList.toggle('active', val === 'line_bank');
     document.getElementById('aa-card-selow').classList.toggle('active', val === 'selow');
-    // Tampilkan dropdown kartu hanya untuk Line Bank
+    // Tampilkan section sesuai metode
     const kartuSection = document.getElementById('aa-section-kartu');
+    const selowSection = document.getElementById('aa-section-selow');
     if (kartuSection) kartuSection.style.display = val === 'line_bank' ? '' : 'none';
+    if (selowSection) selowSection.style.display = val === 'selow' ? '' : 'none';
   };
 
   // ── Add/Edit Account Modal ──
@@ -1017,7 +1026,6 @@
         if (existing.saldo_saat_ini) document.getElementById('aa-saldo').value = Number(existing.saldo_saat_ini).toLocaleString('id-ID');
         if (existing.jangkauan_saldo) document.getElementById('aa-jangkauan').value = Number(existing.jangkauan_saldo).toLocaleString('id-ID');
         document.getElementById('aa-cc-nomor').value = existing.kartu_kredit_nomor || '';
-        document.getElementById('aa-cc-nama').value = existing.kartu_kredit_nama || '';
         const adType = existing.ad_type || 'form';
         document.querySelectorAll('input[name="aa_ad_type"]').forEach(r => r.checked = r.value === adType);
         onAdTypeChange();
@@ -1112,7 +1120,8 @@
     const paymentMethod = document.querySelector('input[name="aa_payment_method"]:checked')?.value || 'line_bank';
     const saldo = parseInt(document.getElementById('aa-saldo').value.replace(/\D/g, '')) || null;
     const jangkauan = parseInt(document.getElementById('aa-jangkauan').value.replace(/\D/g, '')) || null;
-    const linebankCardId = document.getElementById('aa-linebank-card').value || null;
+    const linebankCardId = paymentMethod === 'line_bank' ? (document.getElementById('aa-linebank-card').value || null) : null;
+    const ccNomor = paymentMethod === 'selow' ? (document.getElementById('aa-cc-nomor').value.trim() || null) : null;
 
     const errEl = document.getElementById('aa-err');
     errEl.style.display = 'none';
@@ -1133,6 +1142,7 @@
         saldo_saat_ini: saldo,
         jangkauan_saldo: jangkauan,
         linebank_card_id: linebankCardId,
+        kartu_kredit_nomor: ccNomor,
         updated_at: new Date().toISOString()
       };
 
@@ -1476,8 +1486,7 @@
     if (tab === 'riwayat') { historyPage = 0; loadHistory(); }
     if (tab === 'summary') { summaryPage = 0; loadSummary(); }
     if (tab === 'akun-iklan') {
-      document.getElementById('akun-list').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
-      loadAdAccounts().then(() => renderAdAccounts());
+      renderAdAccounts();
     }
     if (tab === 'kartu') loadKartuList();
   };
