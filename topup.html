@@ -821,6 +821,7 @@
 
   // ── Ad Accounts ──
   async function loadAdAccounts() {
+    if (!sb) return;
     const { data: { user } } = await sb.auth.getUser();
     const isAdmin = ['admin', 'superadmin'].includes(currentProfile?.role);
     let q = sb.from('topup_ad_accounts').select('*, products(name)').order('created_at', { ascending: false });
@@ -838,9 +839,9 @@
         return d.toISOString().split('T')[0];
       })();
       const { data: logs } = await sb.from('topup_ad_account_logs')
-        .select('*').in('ad_account_id', ids)
+        .select('ad_account_id, type, amount, created_at, tanggal').in('ad_account_id', ids)
         .gte('created_at', firstDayLastMonth + 'T00:00:00Z')
-        .order('created_at', { ascending: false }).limit(500);
+        .order('created_at', { ascending: false }).limit(200);
       adAccountLogs = logs || [];
     }
   }
@@ -1486,12 +1487,8 @@
     if (tab === 'riwayat') { historyPage = 0; loadHistory(); }
     if (tab === 'summary') { summaryPage = 0; loadSummary(); }
     if (tab === 'akun-iklan') {
-      if (adAccounts.length) {
-        renderAdAccounts();
-      } else {
-        document.getElementById('akun-list').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
-        loadAdAccounts().then(() => renderAdAccounts());
-      }
+      renderAdAccounts();
+      if (sb) loadAdAccounts().then(() => renderAdAccounts());
     }
     if (tab === 'kartu') loadKartuList();
   };
