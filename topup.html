@@ -301,10 +301,14 @@
 
       <!-- ── Panel: Summary (admin only) ── -->
       <div id="panel-summary" class="topup-panel" style="display:none; max-width:680px; margin:0 auto;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px;" id="summary-cards">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;" id="summary-cards">
           <div class="card" style="text-align:center;padding:20px 16px;">
             <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;">📅 Hari Ini</div>
             <div style="font-size:22px;font-weight:800;color:var(--primary);" id="sum-today">—</div>
+          </div>
+          <div class="card" style="text-align:center;padding:20px 16px;">
+            <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;">🕐 Kemarin</div>
+            <div style="font-size:22px;font-weight:800;color:var(--primary);" id="sum-yesterday">—</div>
           </div>
           <div class="card" style="text-align:center;padding:20px 16px;">
             <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;">🗓️ Bulan Ini</div>
@@ -314,7 +318,7 @@
             <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;">⏮️ Bulan Lalu</div>
             <div style="font-size:22px;font-weight:800;color:var(--text);" id="sum-lastmonth">—</div>
           </div>
-          <div class="card" style="text-align:center;padding:20px 16px;">
+          <div class="card" style="text-align:center;padding:20px 16px;grid-column:span 2;">
             <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;">💰 Total All-Time</div>
             <div style="font-size:22px;font-weight:800;color:var(--text);" id="sum-total">—</div>
           </div>
@@ -1734,6 +1738,7 @@
     const nowWIB = new Date(now.getTime() + WIB);
     const y = nowWIB.getUTCFullYear(), m = nowWIB.getUTCMonth(), d = nowWIB.getUTCDate();
     const startToday     = Date.UTC(y, m, d)     - WIB; // 00:00 WIB hari ini → UTC
+    const startYesterday = startToday - 86400000;
     const startTomorrow  = startToday + 86400000;
     const startThisMonth = Date.UTC(y, m, 1)     - WIB;
     const startLastMonth = Date.UTC(y, m - 1, 1) - WIB;
@@ -1745,20 +1750,22 @@
       .not('nominal_disetujui', 'is', null)
       .limit(10000);
 
-    let today = 0, thisMonth = 0, lastMonth = 0, total = 0;
+    let today = 0, yesterday = 0, thisMonth = 0, lastMonth = 0, total = 0;
     (data || []).forEach(r => {
       const ts = new Date(r.updated_at).getTime();
       const n = Number(r.nominal_disetujui) || 0;
       total += n;
       if (ts >= startToday     && ts < startTomorrow)  today += n;
+      if (ts >= startYesterday && ts < startToday)      yesterday += n;
       if (ts >= startThisMonth)                         thisMonth += n;
       if (ts >= startLastMonth && ts < startThisMonth)  lastMonth += n;
     });
 
-    document.getElementById('sum-today').textContent = fmtRp(today);
-    document.getElementById('sum-month').textContent = fmtRp(thisMonth);
+    document.getElementById('sum-today').textContent     = fmtRp(today);
+    document.getElementById('sum-yesterday').textContent = fmtRp(yesterday);
+    document.getElementById('sum-month').textContent     = fmtRp(thisMonth);
     document.getElementById('sum-lastmonth').textContent = fmtRp(lastMonth);
-    document.getElementById('sum-total').textContent = fmtRp(total);
+    document.getElementById('sum-total').textContent     = fmtRp(total);
 
     // Transaksi berhasil (approved) dengan pagination
     const from = summaryPage * SUMMARY_PAGE_SIZE;
