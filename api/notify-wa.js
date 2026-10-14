@@ -929,9 +929,9 @@ Field tidak ditemukan = null.` }
     return res.json({ ok: results.some(r => r.ok) });
   }
 
-  // ── notify_kartu_info: notif WA ke advertiser saat admin isi info kartu ──
+  // ── notify_kartu_info: notif WA ke advertiser saat admin approve/tolak request kartu ──
   if (action === 'notify_kartu_info') {
-    const { user_id, user_name, nama, jumlah, info_admin } = body;
+    const { user_id, user_name, nama, jumlah, status, catatan } = body;
 
     const { data: userCfg } = await sb.from('app_config').select('wa_target').eq('user_id', user_id).single();
     const { data: adminCfg } = await sb.from('app_config').select('fonnte_token').not('fonnte_token', 'is', null).limit(1).maybeSingle();
@@ -940,19 +940,28 @@ Field tidak ditemukan = null.` }
     if (!fonnteToken || !noWa) return res.json({ ok: false, warn: 'Fonnte token atau nomor WA advertiser tidak ditemukan' });
 
     const target = formatWaTarget(noWa);
-    const pesan = [
-      `💳 *Info Kartu Sudah Siap!*`,
-      ``,
-      `Halo *${user_name}*,`,
-      `Request kartu kamu sudah diproses oleh admin.`,
-      `📛 Nama: ${nama}`,
-      `🔢 Jumlah: ${jumlah} kartu`,
-      ``,
-      `ℹ️ *Info dari Admin:*`,
-      info_admin,
-      ``,
-      `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
-    ].join('\n');
+    const pesan = status === 'ditolak'
+      ? [
+          `⚠️ *Request Kartu Tidak Disetujui*`,
+          ``,
+          `Halo *${user_name}*,`,
+          `Mohon maaf, request kartu kamu belum bisa kami proses saat ini.`,
+          `📛 Nama: ${nama} · 🔢 ${jumlah} kartu`,
+          catatan ? `\n📝 *Keterangan:*\n${catatan}` : null,
+          ``,
+          `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+        ].filter(Boolean).join('\n')
+      : [
+          `✅ *Kartu Sudah Dibuat!*`,
+          ``,
+          `Halo *${user_name}*,`,
+          `Request kartu kamu sudah diproses oleh admin.`,
+          `📛 Nama: ${nama} · 🔢 ${jumlah} kartu`,
+          ``,
+          `Silakan hubungi admin untuk info lebih lanjut.`,
+          ``,
+          `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+        ].join('\n');
 
     try {
       const r2 = await fetch('https://api.fonnte.com/send', {
