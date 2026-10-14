@@ -993,7 +993,6 @@
     try {
       const { data: { user } } = await sb.auth.getUser();
       const payload = {
-        user_id: user.id,
         product_id: productId,
         nama_akun: nama,
         ad_type: adType,
@@ -1004,9 +1003,16 @@
         kartu_kredit_nama: ccNama,
         updated_at: new Date().toISOString()
       };
-      if (editId) payload.id = editId;
 
-      const { error } = await sb.from('topup_ad_accounts').upsert(payload, { onConflict: editId ? 'id' : undefined });
+      let error;
+      if (editId) {
+        // Edit: update row langsung, tidak overwrite user_id
+        ({ error } = await sb.from('topup_ad_accounts').update(payload).eq('id', editId));
+      } else {
+        // Tambah baru: set user_id
+        payload.user_id = user.id;
+        ({ error } = await sb.from('topup_ad_accounts').insert(payload));
+      }
       if (error) throw new Error(error.message);
 
       showToast(editId ? 'Akun iklan diperbarui!' : 'Akun iklan disimpan!', 'success');
