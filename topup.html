@@ -1655,6 +1655,13 @@
       caqModalHtml = '<div><strong>CAQ:</strong> <span style="color:' + caqColor + ';font-weight:700;">' + caq.toFixed(1) + '% — ' + caqLbl + '</span></div>';
     }
 
+    const bd = req?.billing_data || {};
+    const bdSaldo = bd.saldo_saat_ini != null ? bd.saldo_saat_ini : null;
+    const bdLimit = bd.jangkauan_saldo != null ? bd.jangkauan_saldo : null;
+    const bdSisa = (bdSaldo != null && bdLimit != null) ? Math.max(0, bdLimit - bdSaldo) : null;
+    const sisaPct = (bdSaldo != null && bdLimit > 0) ? ((bdSaldo / bdLimit) * 100).toFixed(0) : null;
+    const sisaColor = sisaPct >= 80 ? '#991b1b' : sisaPct >= 60 ? '#92400e' : '#065f46';
+
     document.getElementById('modal-approve-body').innerHTML = `
       <div style="background:var(--gray-1);border-radius:10px;padding:14px;margin-bottom:12px;font-size:13px;line-height:2;">
         <div><strong>Produk:</strong> ${productName}</div>
@@ -1663,6 +1670,14 @@
         ${req?.extracted_data?.omset != null ? `<div><strong>Omset:</strong> Rp ${fmtNum(req.extracted_data.omset)}</div>` : ''}
         ${caqModalHtml}
       </div>
+      ${bdSaldo != null ? `
+      <div style="background:var(--gray-1);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:12px;line-height:1.9;">
+        <div style="font-weight:700;font-size:11px;color:var(--text-sub);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Info Akun Iklan</div>
+        <div style="display:flex;justify-content:space-between;"><span>💸 Sudah Dibelanjakan</span><span style="font-weight:700;">Rp ${fmtNum(bdSaldo)}</span></div>
+        ${bdLimit != null ? `<div style="display:flex;justify-content:space-between;"><span>📊 Limit Tagihan</span><span style="font-weight:700;">Rp ${fmtNum(bdLimit)}</span></div>` : ''}
+        ${bdSisa != null ? `<div style="display:flex;justify-content:space-between;"><span>✅ Sisa Sebelum Tagih</span><span style="font-weight:700;color:${sisaColor};">Rp ${fmtNum(bdSisa)} (${100 - Number(sisaPct)}%)</span></div>` : ''}
+        ${bd.kartu_kredit_nomor ? `<div style="display:flex;justify-content:space-between;"><span>💳 Kartu</span><span style="font-weight:700;">••••${bd.kartu_kredit_nomor}</span></div>` : ''}
+      </div>` : ''}
       ${req?.ss_url ? `
       <div style="margin-bottom:12px;">
         <div style="font-size:11px;color:var(--text-sub);margin-bottom:6px;">📸 Screenshot</div>
