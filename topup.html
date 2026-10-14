@@ -1376,12 +1376,8 @@
     if (tab === 'riwayat') { historyPage = 0; loadHistory(); }
     if (tab === 'summary') { summaryPage = 0; loadSummary(); }
     if (tab === 'akun-iklan') {
-      if (adAccounts.length) {
-        renderAdAccounts();
-      } else {
-        document.getElementById('akun-list').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
-        loadAdAccounts().then(() => renderAdAccounts());
-      }
+      document.getElementById('akun-list').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+      loadAdAccounts().then(() => renderAdAccounts());
     }
   };
 
