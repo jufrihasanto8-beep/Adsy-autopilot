@@ -289,6 +289,12 @@
             </div>
           </div>
 
+          <!-- Catatan -->
+          <div class="form-group" style="margin-top:4px;">
+            <label class="form-label">Catatan <span style="color:var(--text-sub);font-weight:400;">(opsional)</span></label>
+            <input type="text" id="tp-catatan" class="form-input" placeholder="Contoh: Kesalahan akun, mohon dicek..." />
+          </div>
+
           <div class="form-hint" id="tp-err" style="color:var(--danger); display:none;"></div>
 
           <button class="btn btn-primary" id="tp-submit" onclick="submitTopup()" style="width:100%;margin-top:4px;" disabled>
@@ -1255,6 +1261,8 @@
         }
       }
 
+      const catatanAdv = document.getElementById('tp-catatan')?.value.trim() || null;
+
       const { data: saved, error: dbErr } = await sb.from('topup_requests').insert({
         user_id: user.id,
         user_name: currentProfile?.name || user.email,
@@ -1268,7 +1276,8 @@
         topup_ad_account_id: adAccountId,
         ad_account_name: adAccountName,
         billing_data: billingData,
-        ss_url: ssUrl
+        ss_url: ssUrl,
+        catatan_advertiser: catatanAdv
       }).select().single();
 
       if (dbErr) throw new Error(dbErr.message);
@@ -1336,6 +1345,7 @@
     document.getElementById('tp-product-kpi').style.display = 'none';
     document.getElementById('tp-nominal').value = '';
     document.getElementById('tp-omset').value = '';
+    document.getElementById('tp-catatan').value = '';
     document.getElementById('caq-display').style.display = 'none';
     selectedFile = null; extractedData = null; recommendationData = null; selectedAccountId = null; selectedAccount = null;
     document.getElementById('ss-input').value = '';
@@ -1572,6 +1582,7 @@
         ${caqChipHtml}
         ${recChipHtml}
       </div>
+      ${r.catatan_advertiser ? `<div style="margin-top:8px;font-size:12px;background:var(--gray-1);padding:8px 10px;border-radius:8px;">💬 <span style="font-weight:600;">Catatan Advertiser:</span> ${r.catatan_advertiser}</div>` : ''}
       ${isAdmin && rec.reason ? `<div style="margin-top:8px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;line-height:1.6;">💡 ${rec.reason}</div>` : ''}
       ${isAdmin && bd.saldo_saat_ini ? `<div style="margin-top:6px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">💸 Terpakai: Rp ${fmtNum(bd.saldo_saat_ini)}  ·  📊 Limit: Rp ${fmtNum(bd.jangkauan_saldo)}${bd.kartu_kredit_nomor ? `  ·  💳 ••••${bd.kartu_kredit_nomor}` : ''}</div>` : ''}
       ${r.catatan ? `<div style="margin-top:8px;font-size:12px;color:var(--text-sub);background:var(--gray-1);padding:8px 10px;border-radius:8px;">📝 ${r.catatan}</div>` : ''}
