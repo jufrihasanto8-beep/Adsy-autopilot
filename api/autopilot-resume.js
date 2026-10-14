@@ -93,6 +93,55 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── Auto-expire: hapus request pending yang tidak direview >1 hari ──
+    try {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+      // Ambil dulu untuk reverse saldo jika ada spend yang terecord
+      const { data: expiredReqs } = await sb.from('topup_requests')
+        .select('id, topup_ad_account_id')
+        .eq('status', 'pending')
+        .lt('created_at', oneDayAgo);
+
+      if (expiredReqs?.length) {
+        for (const req of expiredReqs) {
+          // Reverse saldo jika ada log spend
+          if (req.topup_ad_account_id) {
+            const { data: spendLog } = await sb.from('topup_ad_account_logs')
+              .select('amount')
+              .eq('request_id', req.id)
+              .eq('type', 'spend')
+              .maybeSingle();
+
+            if (spendLog?.amount > 0) {
+              const { data: acct } = await sb.from('topup_ad_accounts')
+                .select('saldo_saat_ini').eq('id', req.topup_ad_account_id).single();
+              const newSaldo = Math.max(0, (Number(acct?.saldo_saat_ini) || 0) - spendLog.amount);
+              await sb.from('topup_ad_accounts')
+                .update({ saldo_saat_ini: newSaldo, updated_at: new Date().toISOString() })
+                .eq('id', req.topup_ad_account_id);
+              await sb.from('topup_ad_account_logs').insert({
+                ad_account_id: req.topup_ad_account_id,
+                type: 'spend_reversed',
+                amount: -spendLog.amount,
+                request_id: req.id,
+                catatan: 'Auto-expire — tidak direview >1 hari',
+                tanggal: new Date().toISOString().split('T')[0]
+              });
+            }
+          }
+        }
+
+        // Hapus semua request expired
+        await sb.from('topup_requests')
+          .delete()
+          .eq('status', 'pending')
+          .lt('created_at', oneDayAgo);
+      }
+    } catch (expireErr) {
+      console.error('topup expire cleanup error:', expireErr.message);
+    }
+
     // ── Cleanup topup-ss storage: hapus SS yang sudah direview atau >1 hari ──
     try {
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
