@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kartu Line Bank — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <style>
+    /* ── Card Grid ── */
+    .cc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; }
+
+    /* ── Credit Card Visual ── */
+    .cc-card {
+      border-radius:18px; padding:20px 22px; position:relative; overflow:hidden;
+      cursor:pointer; transition:transform .2s, box-shadow .2s;
+      aspect-ratio:1.586; display:flex; flex-direction:column; justify-content:space-between;
+      user-select:none;
+    }
+    .cc-card:hover { transform:translateY(-3px); box-shadow:0 10px 28px rgba(0,0,0,.15); }
+    .cc-card.selected { box-shadow:0 0 0 3px var(--primary), 0 10px 28px rgba(0,0,0,.15); }
+    /* Diagonal shine */
+    .cc-card::before {
+      content:''; position:absolute; top:-30%; right:-15%; width:55%; height:160%;
+      background:rgba(255,255,255,.18); transform:rotate(-18deg); pointer-events:none;
+    }
+    .cc-card::after {
+      content:''; position:absolute; top:-30%; right:10%; width:30%; height:160%;
+      background:rgba(255,255,255,.08); transform:rotate(-18deg); pointer-events:none;
+    }
+
+    .cc-top { display:flex; justify-content:space-between; align-items:flex-start; position:relative; z-index:1; }
+    .cc-name { font-size:14px; font-weight:700; line-height:1.3; }
+    .cc-bank { font-size:12px; font-weight:800; letter-spacing:.5px; opacity:.85; font-style:italic; }
+    .cc-number { font-size:13px; font-weight:500; letter-spacing:1.5px; margin-top:10px; position:relative; z-index:1; opacity:.85; }
+    .cc-bottom { display:flex; justify-content:space-between; align-items:flex-end; position:relative; z-index:1; }
+    .cc-saldo { font-size:17px; font-weight:800; line-height:1; }
+    .cc-status { display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600; margin-top:4px; }
+    .cc-status-dot { width:7px; height:7px; border-radius:50%; background:currentColor; flex-shrink:0; }
+
+    /* Mastercard circles */
+    .mc-logo { position:relative; width:42px; height:26px; flex-shrink:0; }
+    .mc-circle { position:absolute; width:26px; height:26px; border-radius:50%; top:0; opacity:.95; }
+    .mc-left  { left:0;  background:#eb001b; }
+    .mc-right { right:0; background:#f79e1b; }
+
+    /* Card color palettes */
+    .cc-0 { background:linear-gradient(135deg,#fef9c3,#fde68a); color:#713f12; }
+    .cc-1 { background:linear-gradient(135deg,#ede9fe,#c4b5fd); color:#5b21b6; }
+    .cc-2 { background:linear-gradient(135deg,#e0f2fe,#7dd3fc); color:#075985; }
+    .cc-3 { background:linear-gradient(135deg,#dcfce7,#86efac); color:#14532d; }
+    .cc-4 { background:linear-gradient(135deg,#dbeafe,#93c5fd); color:#1e3a8a; }
+    .cc-5 { background:linear-gradient(135deg,#fee2e2,#fca5a5); color:#7f1d1d; }
+    .cc-6 { background:linear-gradient(135deg,#fce7f3,#f9a8d4); color:#831843; }
+    .cc-7 { background:linear-gradient(135deg,#ecfdf5,#6ee7b7); color:#064e3b; }
+
+    /* ── Detail Panel ── */
+    #detail-panel {
+      display:none; margin-top:24px;
+      animation: slideDown .25s ease;
+    }
+    @keyframes slideDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+
+    .detail-wrap {
+      display:flex; gap:28px; align-items:flex-start;
+      background:#fff; border:1.5px solid var(--gray-2); border-radius:18px; padding:28px;
+    }
+    .detail-card-preview { flex-shrink:0; width:260px; }
+    .detail-card-preview .cc-card { aspect-ratio:1.586; cursor:default; }
+    .detail-card-preview .cc-card:hover { transform:none; }
+
+    .detail-info { flex:1; }
+    .detail-title { font-size:15px; font-weight:700; color:var(--text); margin-bottom:16px; }
+    .detail-table { width:100%; border-collapse:collapse; }
+    .detail-table tr { border-bottom:1px solid var(--gray-1); }
+    .detail-table tr:last-child { border-bottom:none; }
+    .detail-table td { padding:10px 4px; font-size:13px; vertical-align:middle; }
+    .detail-table td:first-child { color:var(--text-sub); width:140px; font-weight:500; }
+    .detail-table td:last-child { font-weight:600; color:var(--text); text-align:right; }
+
+    .reveal-btn { border:none; background:var(--gray-1); border-radius:6px; padding:3px 8px; font-size:11px; font-weight:600; cursor:pointer; color:var(--text-sub); margin-left:8px; transition:background .15s; }
+    .reveal-btn:hover { background:var(--gray-2); }
+
+    .badge-active   { background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+    .badge-inactive { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+
+    .detail-actions { display:flex; gap:8px; margin-top:20px; }
+
+    /* ── Modal Add/Edit ── */
+    .modal-field { margin-bottom:14px; }
+    .modal-field label { display:block; font-size:12px; font-weight:600; color:var(--text-sub); margin-bottom:6px; }
+
+    .color-picker { display:flex; gap:8px; flex-wrap:wrap; }
+    .color-swatch { width:28px; height:28px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:all .15s; }
+    .color-swatch.selected { border-color:#6366f1; transform:scale(1.2); }
+    .color-swatch-0 { background:linear-gradient(135deg,#fef9c3,#fde68a); }
+    .color-swatch-1 { background:linear-gradient(135deg,#ede9fe,#c4b5fd); }
+    .color-swatch-2 { background:linear-gradient(135deg,#e0f2fe,#7dd3fc); }
+    .color-swatch-3 { background:linear-gradient(135deg,#dcfce7,#86efac); }
+    .color-swatch-4 { background:linear-gradient(135deg,#dbeafe,#93c5fd); }
+    .color-swatch-5 { background:linear-gradient(135deg,#fee2e2,#fca5a5); }
+    .color-swatch-6 { background:linear-gradient(135deg,#fce7f3,#f9a8d4); }
+    .color-swatch-7 { background:linear-gradient(135deg,#ecfdf5,#6ee7b7); }
+
+    .empty-state { text-align:center; padding:72px 24px; color:var(--text-sub); }
+    .empty-state .icon { font-size:48px; margin-bottom:12px; }
+    .loading-state { text-align:center; padding:48px; color:var(--text-sub); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="/assets/autopilot.png" style="width:36px;height:36px;object-fit:contain;border-radius:8px;" alt="Adsy" />
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
+      <div class="nav-item" data-page="ctwa.html"><span class="nav-icon">💬</span> Buat Iklan CTWA</div>
+      <div class="nav-item" data-page="boost-post.html"><span class="nav-icon">🚀</span> Boost Post</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="generate-image.html"><span class="nav-icon">🎨</span> Generate Gambar</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-item" data-page="topup.html"><span class="nav-icon">💳</span> Top Up Budget</div>
+      <div class="nav-item active" data-page="card.html"><span class="nav-icon">🏦</span> Kartu Line Bank</div>
+      <div class="nav-item" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
+      <div class="nav-item" data-page="products.html"><span class="nav-icon">📦</span> Produk</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>🏦 Kartu Line Bank</h2>
+        <p>Manajemen kartu kredit Line Bank untuk Meta Ads</p>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-primary" id="btn-add-card" onclick="openAddModal()" style="display:none;">+ Tambah Kartu</button>
+        <div class="topbar-user">
+          <div class="topbar-avatar" id="user-avatar">?</div>
+          <div class="topbar-user-info"><strong id="user-email">-</strong></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- Card Grid -->
+      <div id="card-grid" class="cc-grid">
+        <div class="loading-state"><div class="spinner"></div></div>
+      </div>
+
+      <!-- Detail Panel -->
+      <div id="detail-panel">
+        <div class="detail-wrap">
+          <div class="detail-card-preview">
+            <div class="cc-card" id="detail-card-visual"></div>
+          </div>
+          <div class="detail-info">
+            <div class="detail-title">Detail Kartu</div>
+            <table class="detail-table" id="detail-table"></table>
+            <div class="detail-actions" id="detail-actions"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- ── Modal: Tambah / Edit Kartu ── -->
+<div class="modal-overlay hidden" id="modal-card">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <h3 id="modal-card-title">Tambah Kartu</h3>
+      <div class="modal-close" onclick="closeModal('modal-card')">✕</div>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="mc-edit-id" />
+
+      <div class="modal-field">
+        <label>Label <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-input" id="mc-label" placeholder="Contoh: Adv Arif, Akun Utama..." />
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="modal-field" style="margin-bottom:0;">
+          <label>Nama di Kartu</label>
+          <input type="text" class="form-input" id="mc-nama" placeholder="JOHN DOE" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()" />
+        </div>
+        <div class="modal-field" style="margin-bottom:0;">
+          <label>Nomor Kartu (16 digit)</label>
+          <input type="text" class="form-input" id="mc-nomor" placeholder="1234 5678 9012 3456" maxlength="19"
+            oninput="formatCardNumber(this)" inputmode="numeric" />
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px;">
+        <div class="modal-field" style="margin-bottom:0;">
+          <label>Kedaluwarsa</label>
+          <input type="text" class="form-input" id="mc-exp" placeholder="MM/YY" maxlength="5"
+            oninput="formatExpiry(this)" inputmode="numeric" />
+        </div>
+        <div class="modal-field" style="margin-bottom:0;">
+          <label>CVV</label>
+          <input type="text" class="form-input" id="mc-cvv" placeholder="123" maxlength="4" inputmode="numeric"
+            oninput="this.value=this.value.replace(/\D/g,'')" />
+        </div>
+        <div class="modal-field" style="margin-bottom:0;">
+          <label>Saldo (Rp)</label>
+          <input type="text" class="form-input" id="mc-saldo" placeholder="0" inputmode="numeric"
+            oninput="formatNominalInput(this)" />
+        </div>
+      </div>
+
+      <div class="modal-field" style="margin-top:14px;">
+        <label>Status</label>
+        <select class="form-input form-select" id="mc-status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+
+      <div class="modal-field">
+        <label>Warna Kartu</label>
+        <div class="color-picker" id="mc-color-picker">
+          ${[0,1,2,3,4,5,6,7].map(i => `<div class="color-swatch color-swatch-${i}${i===0?' selected':''}" data-idx="${i}" onclick="selectColor(${i})"></div>`).join('')}
+        </div>
+        <input type="hidden" id="mc-warna" value="0" />
+      </div>
+
+      <div class="modal-field">
+        <label>Catatan <span style="font-weight:400;color:var(--text-sub);">(opsional)</span></label>
+        <input type="text" class="form-input" id="mc-catatan" placeholder="Contoh: Kartu utama produk X" />
+      </div>
+
+      <div id="mc-err" style="font-size:12px;color:var(--danger);display:none;margin-bottom:8px;"></div>
+
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-card')">Batal</button>
+        <button class="btn btn-primary" style="flex:2;" id="mc-save-btn" onclick="saveCard()">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Konfirmasi Hapus ── -->
+<div class="modal-overlay hidden" id="modal-delete">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <h3>Hapus Kartu</h3>
+      <div class="modal-close" onclick="closeModal('modal-delete')">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;color:var(--text-sub);margin-bottom:20px;">Yakin mau hapus kartu <strong id="delete-label"></strong>? Tindakan ini tidak bisa dibatalkan.</p>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-delete')">Batal</button>
+        <button class="btn btn-danger" style="flex:2;" id="delete-confirm-btn" onclick="confirmDelete()">🗑️ Hapus</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast, formatRupiah } from './js/sidebar.js';
+  import { getSupabase } from './js/supabase.js';
+
+  let sb, currentProfile, cards = [];
+  let selectedCardId = null;
+  let deleteTargetId = null;
+
+  const COLORS = [
+    { bg: 'linear-gradient(135deg,#fef9c3,#fde68a)', text: '#713f12' },
+    { bg: 'linear-gradient(135deg,#ede9fe,#c4b5fd)', text: '#5b21b6' },
+    { bg: 'linear-gradient(135deg,#e0f2fe,#7dd3fc)', text: '#075985' },
+    { bg: 'linear-gradient(135deg,#dcfce7,#86efac)', text: '#14532d' },
+    { bg: 'linear-gradient(135deg,#dbeafe,#93c5fd)', text: '#1e3a8a' },
+    { bg: 'linear-gradient(135deg,#fee2e2,#fca5a5)', text: '#7f1d1d' },
+    { bg: 'linear-gradient(135deg,#fce7f3,#f9a8d4)', text: '#831843' },
+    { bg: 'linear-gradient(135deg,#ecfdf5,#6ee7b7)', text: '#064e3b' },
+  ];
+
+  // ── Init ──
+  (async () => {
+    const session = await requireAuth();
+    if (!session) return;
+    sb = await getSupabase();
+    currentProfile = await renderUserInfo();
+    initSidebar();
+
+    const isAdmin = ['admin','superadmin'].includes(currentProfile?.role);
+    if (isAdmin) {
+      document.getElementById('btn-add-card').style.display = 'block';
+    }
+
+    await loadCards();
+  })();
+
+  // ── Load cards ──
+  async function loadCards() {
+    const grid = document.getElementById('card-grid');
+    grid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+
+    const { data, error } = await sb.from('linebank_cards').select('*').order('created_at', { ascending: true });
+    if (error) { grid.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div>${error.message}</div></div>`; return; }
+
+    cards = data || [];
+    renderGrid();
+  }
+
+  function renderGrid() {
+    const grid = document.getElementById('card-grid');
+    const isAdmin = ['admin','superadmin'].includes(currentProfile?.role);
+
+    if (!cards.length) {
+      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="icon">💳</div><div>Belum ada kartu. ' + (isAdmin ? 'Tambah kartu pertama!' : 'Admin belum menambahkan kartu.') + '</div></div>';
+      return;
+    }
+
+    grid.innerHTML = cards.map(c => {
+      const ci = c.warna_index ?? 0;
+      const last4 = c.nomor_kartu ? c.nomor_kartu.replace(/\s/g,'').slice(-4) : '----';
+      const saldoFmt = c.saldo != null ? 'IDR ' + Number(c.saldo).toLocaleString('id-ID') + ',00' : '—';
+      const isSelected = c.id === selectedCardId;
+
+      return `<div class="cc-card cc-${ci} ${isSelected ? 'selected' : ''}" onclick="selectCard('${c.id}')">
+        <div class="cc-top">
+          <div class="cc-name">${c.label}</div>
+          <div class="cc-bank">Line Bank</div>
+        </div>
+        <div class="cc-number">**** **** **** ${last4}</div>
+        <div class="cc-bottom">
+          <div>
+            <div class="cc-saldo">${saldoFmt}</div>
+            <div class="cc-status">
+              <span class="cc-status-dot" style="color:${c.status === 'active' ? '#22c55e' : '#ef4444'}"></span>
+              ${c.status === 'active' ? 'Active' : 'Inactive'}
+            </div>
+          </div>
+          <div class="mc-logo">
+            <div class="mc-circle mc-left"></div>
+            <div class="mc-circle mc-right"></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Select card → show detail ──
+  window.selectCard = function(id) {
+    if (selectedCardId === id) {
+      // Toggle off
+      selectedCardId = null;
+      document.getElementById('detail-panel').style.display = 'none';
+      renderGrid();
+      return;
+    }
+    selectedCardId = id;
+    renderGrid();
+    showDetail(id);
+  };
+
+  function showDetail(id) {
+    const c = cards.find(x => x.id === id);
+    if (!c) return;
+    const isAdmin = ['admin','superadmin'].includes(currentProfile?.role);
+    const ci = c.warna_index ?? 0;
+    const last4 = c.nomor_kartu ? c.nomor_kartu.replace(/\s/g,'').slice(-4) : '----';
+    const saldoFmt = c.saldo != null ? 'IDR ' + Number(c.saldo).toLocaleString('id-ID') + ',00' : '—';
+
+    // Card visual preview
+    const visual = document.getElementById('detail-card-visual');
+    visual.className = `cc-card cc-${ci}`;
+    visual.innerHTML = `
+      <div class="cc-top">
+        <div class="cc-name">${c.label}</div>
+        <div class="cc-bank">Line Bank</div>
+      </div>
+      <div class="cc-number">**** **** **** ${last4}</div>
+      <div class="cc-bottom">
+        <div>
+          <div class="cc-saldo">${saldoFmt}</div>
+          <div class="cc-status">
+            <span class="cc-status-dot" style="color:${c.status === 'active' ? '#22c55e' : '#ef4444'}"></span>
+            ${c.status === 'active' ? 'Active' : 'Inactive'}
+          </div>
+        </div>
+        <div class="mc-logo">
+          <div class="mc-circle mc-left"></div>
+          <div class="mc-circle mc-right"></div>
+        </div>
+      </div>`;
+
+    // Detail table
+    const nomorMasked = c.nomor_kartu
+      ? '**** **** **** ' + c.nomor_kartu.replace(/\s/g,'').slice(-4)
+      : '—';
+    const nomorFull = c.nomor_kartu || '—';
+    const cvvMasked = c.cvv ? '***' : '—';
+
+    const rows = [
+      ['Label', c.label || '—'],
+      ['Nama Kartu', c.nama_kartu || '—'],
+      ['Nomor Kartu', `<span id="nomor-display">${nomorMasked}</span>
+        <button class="reveal-btn" id="nomor-reveal-btn" onclick="toggleReveal('nomor','${nomorFull}','${nomorMasked}')">👁 Lihat</button>
+        <button class="reveal-btn" onclick="copyText('${nomorFull}')" style="margin-left:4px;">📋</button>`],
+      ['Kedaluwarsa', c.kedaluwarsa || '—'],
+      ['CVV', `<span id="cvv-display">${cvvMasked}</span>
+        ${c.cvv ? `<button class="reveal-btn" id="cvv-reveal-btn" onclick="toggleReveal('cvv','${c.cvv}','***')">👁 Lihat</button>` : ''}`],
+      ['Saldo', saldoFmt],
+      ['Status', `<span class="${c.status === 'active' ? 'badge-active' : 'badge-inactive'}">${c.status === 'active' ? '● Active' : '● Inactive'}</span>`],
+      c.catatan ? ['Catatan', c.catatan] : null,
+    ].filter(Boolean);
+
+    document.getElementById('detail-table').innerHTML = rows.map(([k,v]) =>
+      `<tr><td>${k}</td><td>${v}</td></tr>`
+    ).join('');
+
+    // Actions (admin only)
+    const actionsEl = document.getElementById('detail-actions');
+    if (isAdmin) {
+      actionsEl.innerHTML = `
+        <button class="btn btn-outline btn-sm" onclick="openEditModal('${c.id}')">✏️ Edit</button>
+        <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:1.5px solid #fca5a5;" onclick="openDeleteModal('${c.id}','${c.label.replace(/'/g,"\\'")}')">🗑️ Hapus</button>`;
+    } else {
+      actionsEl.innerHTML = '';
+    }
+
+    // Show panel & scroll
+    const panel = document.getElementById('detail-panel');
+    panel.style.display = 'block';
+    setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  }
+
+  // ── Toggle reveal ──
+  window.toggleReveal = function(field, full, masked) {
+    const display = document.getElementById(field + '-display');
+    const btn = document.getElementById(field + '-reveal-btn');
+    if (!display || !btn) return;
+    const isHidden = display.textContent === masked || display.textContent === '***';
+    display.textContent = isHidden ? full : masked;
+    btn.textContent = isHidden ? '🙈 Sembunyikan' : '👁 Lihat';
+  };
+
+  window.copyText = function(text) {
+    navigator.clipboard.writeText(text).then(() => showToast('Disalin!', 'success'));
+  };
+
+  // ── Add / Edit ──
+  window.openAddModal = function() {
+    document.getElementById('mc-edit-id').value = '';
+    document.getElementById('mc-label').value = '';
+    document.getElementById('mc-nama').value = '';
+    document.getElementById('mc-nomor').value = '';
+    document.getElementById('mc-exp').value = '';
+    document.getElementById('mc-cvv').value = '';
+    document.getElementById('mc-saldo').value = '';
+    document.getElementById('mc-catatan').value = '';
+    document.getElementById('mc-status').value = 'active';
+    document.getElementById('mc-warna').value = '0';
+    selectColor(0);
+    document.getElementById('mc-err').style.display = 'none';
+    document.getElementById('modal-card-title').textContent = 'Tambah Kartu';
+    openModal('modal-card');
+  };
+
+  window.openEditModal = function(id) {
+    const c = cards.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('mc-edit-id').value = c.id;
+    document.getElementById('mc-label').value = c.label || '';
+    document.getElementById('mc-nama').value = c.nama_kartu || '';
+    document.getElementById('mc-nomor').value = c.nomor_kartu || '';
+    document.getElementById('mc-exp').value = c.kedaluwarsa || '';
+    document.getElementById('mc-cvv').value = c.cvv || '';
+    document.getElementById('mc-saldo').value = c.saldo != null ? Number(c.saldo).toLocaleString('id-ID') : '';
+    document.getElementById('mc-catatan').value = c.catatan || '';
+    document.getElementById('mc-status').value = c.status || 'active';
+    document.getElementById('mc-warna').value = String(c.warna_index ?? 0);
+    selectColor(c.warna_index ?? 0);
+    document.getElementById('mc-err').style.display = 'none';
+    document.getElementById('modal-card-title').textContent = 'Edit Kartu';
+    openModal('modal-card');
+  };
+
+  window.saveCard = async function() {
+    const editId = document.getElementById('mc-edit-id').value;
+    const label = document.getElementById('mc-label').value.trim();
+    const errEl = document.getElementById('mc-err');
+    errEl.style.display = 'none';
+
+    if (!label) { errEl.textContent = 'Label wajib diisi.'; errEl.style.display = 'block'; return; }
+
+    const payload = {
+      label,
+      nama_kartu: document.getElementById('mc-nama').value.trim().toUpperCase() || null,
+      nomor_kartu: document.getElementById('mc-nomor').value.trim() || null,
+      kedaluwarsa: document.getElementById('mc-exp').value.trim() || null,
+      cvv: document.getElementById('mc-cvv').value.trim() || null,
+      saldo: parseInt(document.getElementById('mc-saldo').value.replace(/\D/g,'')) || 0,
+      catatan: document.getElementById('mc-catatan').value.trim() || null,
+      status: document.getElementById('mc-status').value,
+      warna_index: parseInt(document.getElementById('mc-warna').value) || 0,
+      updated_at: new Date().toISOString(),
+    };
+
+    const btn = document.getElementById('mc-save-btn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    try {
+      let error;
+      if (editId) {
+        ({ error } = await sb.from('linebank_cards').update(payload).eq('id', editId));
+      } else {
+        const { data: { user } } = await sb.auth.getUser();
+        ({ error } = await sb.from('linebank_cards').insert({ ...payload, created_by: user.id }));
+      }
+      if (error) throw new Error(error.message);
+
+      showToast(editId ? 'Kartu diperbarui!' : 'Kartu ditambahkan!', 'success');
+      closeModal('modal-card');
+      await loadCards();
+      if (editId && selectedCardId === editId) showDetail(editId);
+    } catch (e) {
+      errEl.textContent = 'Error: ' + e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Simpan';
+    }
+  };
+
+  // ── Delete ──
+  window.openDeleteModal = function(id, label) {
+    deleteTargetId = id;
+    document.getElementById('delete-label').textContent = label;
+    openModal('modal-delete');
+  };
+
+  window.confirmDelete = async function() {
+    const btn = document.getElementById('delete-confirm-btn');
+    btn.disabled = true; btn.textContent = 'Menghapus...';
+    try {
+      const { error } = await sb.from('linebank_cards').delete().eq('id', deleteTargetId);
+      if (error) throw new Error(error.message);
+      showToast('Kartu dihapus.', 'success');
+      closeModal('modal-delete');
+      if (selectedCardId === deleteTargetId) {
+        selectedCardId = null;
+        document.getElementById('detail-panel').style.display = 'none';
+      }
+      await loadCards();
+    } catch (e) {
+      showToast('Error: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '🗑️ Hapus';
+    }
+  };
+
+  // ── Color picker ──
+  window.selectColor = function(idx) {
+    document.getElementById('mc-warna').value = String(idx);
+    document.querySelectorAll('.color-swatch').forEach(s => {
+      s.classList.toggle('selected', parseInt(s.dataset.idx) === idx);
+    });
+  };
+
+  // ── Input formatters ──
+  window.formatCardNumber = function(el) {
+    let v = el.value.replace(/\D/g,'').slice(0,16);
+    el.value = v.replace(/(.{4})/g,'$1 ').trim();
+  };
+
+  window.formatExpiry = function(el) {
+    let v = el.value.replace(/\D/g,'').slice(0,4);
+    if (v.length >= 3) v = v.slice(0,2) + '/' + v.slice(2);
+    el.value = v;
+  };
+
+  window.formatNominalInput = function(el) {
+    const raw = el.value.replace(/\D/g,'');
+    el.value = raw ? Number(raw).toLocaleString('id-ID') : '';
+  };
+</script>
+</body>
+</html>
