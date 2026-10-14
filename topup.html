@@ -1699,7 +1699,7 @@
 
   window.doApprove = async function() {
     const nominal = parseInt(document.getElementById('modal-nominal').value.replace(/\D/g, '')) || 0;
-    const catatan = document.getElementById('modal-catatan').value.trim();
+    const catatan = document.getElementById('modal-catatan')?.value.trim() || '';
     if (!nominal) { showToast('Masukkan nominal yang disetujui', 'warning'); return; }
 
     try {
