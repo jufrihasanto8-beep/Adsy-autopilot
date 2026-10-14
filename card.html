@@ -170,6 +170,10 @@
           <div class="detail-info">
             <div class="detail-title">Detail Kartu</div>
             <table class="detail-table" id="detail-table"></table>
+            <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--gray-1);">
+              <div style="font-size:11px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Digunakan di Akun Iklan</div>
+              <div id="detail-used-by" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+            </div>
             <div class="detail-actions" id="detail-actions"></div>
           </div>
         </div>
@@ -430,6 +434,26 @@
     const panel = document.getElementById('detail-panel');
     panel.style.display = 'block';
     setTimeout(() => panel.scrollIntoView({ behavior:'smooth', block:'nearest' }), 50);
+
+    // Load akun iklan yang pakai kartu ini
+    const usedEl = document.getElementById('detail-used-by');
+    if (usedEl) {
+      usedEl.innerHTML = '<span style="color:var(--text-sub);font-size:12px;">Memuat...</span>';
+      sb.from('topup_ad_accounts')
+        .select('id, nama_akun, products(name)')
+        .eq('linebank_card_id', c.id)
+        .then(({ data: accts }) => {
+          if (!accts?.length) {
+            usedEl.innerHTML = '<span style="color:var(--text-sub);font-size:12px;">Belum digunakan di akun iklan.</span>';
+            return;
+          }
+          usedEl.innerHTML = accts.map(a =>
+            `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--gray-1);border:1px solid var(--gray-2);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;">
+              📦 ${a.nama_akun}${a.products?.name ? ' <span style="font-weight:400;color:var(--text-sub);">· '+a.products.name+'</span>' : ''}
+            </span>`
+          ).join('');
+        });
+    }
   }
 
   // ── Reveal toggle ──
