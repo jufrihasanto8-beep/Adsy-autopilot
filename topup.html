@@ -175,6 +175,7 @@
         <button class="topup-tab active" data-tab="request" onclick="switchTab('request')" id="tab-request">Request Top Up</button>
         <button class="topup-tab" data-tab="riwayat" onclick="switchTab('riwayat')">Riwayat</button>
         <button class="topup-tab" data-tab="akun-iklan" onclick="switchTab('akun-iklan')">Akun Iklan</button>
+        <button class="topup-tab" data-tab="kartu" onclick="switchTab('kartu')" id="tab-kartu">Kartu</button>
       </div>
 
       <!-- ── Panel: Request ── -->
@@ -367,6 +368,47 @@
         </div>
       </div>
 
+      <!-- ── Panel: Kartu ── -->
+      <div id="panel-kartu" class="topup-panel" style="display:none; max-width:680px; margin:0 auto;">
+
+        <!-- Form request (advertiser only) -->
+        <div id="kartu-form-wrap">
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Request Kartu Baru</div>
+                <div class="card-sub">Isi form di bawah, admin akan segera memproses permintaan kamu</div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nama <span>*</span></label>
+              <input type="text" id="kartu-nama" class="form-input" placeholder="Nama kamu" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kebutuhan <span>*</span></label>
+              <textarea id="kartu-kebutuhan" class="form-input" rows="3" placeholder="Contoh: Untuk iklan produk X, akun iklan Y..." style="resize:vertical;"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jumlah Kartu <span>*</span></label>
+              <input type="number" id="kartu-jumlah" class="form-input" value="1" min="1" max="10" style="max-width:120px;" />
+            </div>
+            <div id="kartu-err" style="font-size:12px;color:var(--danger);display:none;margin-bottom:8px;"></div>
+            <button class="btn btn-primary" id="kartu-submit" onclick="submitKartuRequest()" style="width:100%;">
+              Submit Request
+            </button>
+          </div>
+        </div>
+
+        <!-- List request -->
+        <div class="card">
+          <div class="card-title" style="margin-bottom:14px;" id="kartu-list-title">Riwayat Request Kartu</div>
+          <div id="kartu-list">
+            <div class="loading-state"><div class="spinner"></div></div>
+          </div>
+        </div>
+
+      </div>
+
     </div><!-- end page-content -->
   </main>
 </div><!-- end app-layout -->
@@ -539,6 +581,29 @@
   </div>
 </div>
 
+<!-- ── Modal: Isi Info Kartu (admin) ── -->
+<div class="modal-overlay hidden" id="modal-kartu-info">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h3>💳 Isi Info Kartu</h3>
+      <div class="modal-close" onclick="closeModal('modal-kartu-info')">✕</div>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ki-request-id" />
+      <div id="ki-detail" style="background:var(--gray-1);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;"></div>
+      <div class="modal-field">
+        <label>Info Kartu untuk Advertiser <span style="color:var(--danger)">*</span></label>
+        <textarea id="ki-info" class="form-input" rows="4" placeholder="Contoh: Kartu sudah dibuat. Nama: John Doe, 4 digit terakhir: 1234, berlaku s/d 12/27..." style="resize:vertical;"></textarea>
+      </div>
+      <div id="ki-err" style="font-size:12px;color:var(--danger);display:none;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-kartu-info')">Batal</button>
+        <button class="btn btn-primary" style="flex:2;" id="ki-save-btn" onclick="saveKartuInfo()">Kirim Info</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
   import { requireAuth, renderUserInfo, getProfile } from './js/auth.js';
@@ -581,6 +646,12 @@
       // Rename Riwayat tab
       const tabRiwayat = document.querySelector('.topup-tab[data-tab="riwayat"]');
       if (tabRiwayat) tabRiwayat.textContent = 'Manajemen Top Up';
+      // Rename Kartu tab
+      const tabKartu = document.getElementById('tab-kartu');
+      if (tabKartu) tabKartu.textContent = 'Manajemen Kartu';
+      // Sembunyikan form request kartu untuk admin
+      document.getElementById('kartu-form-wrap').style.display = 'none';
+      document.getElementById('kartu-list-title').textContent = 'Semua Request Kartu';
       document.getElementById('status-filter').style.display = 'block';
       // Aktifkan panel summary sebagai default
       document.getElementById('panel-request').style.display = 'none';
@@ -1379,6 +1450,7 @@
       document.getElementById('akun-list').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
       loadAdAccounts().then(() => renderAdAccounts());
     }
+    if (tab === 'kartu') loadKartuList();
   };
 
   window.switchStatus = function(status) {
@@ -1879,6 +1951,146 @@
     document.body.style.overflow = '';
   };
   document.addEventListener('keydown', e => { if (e.key === 'Escape') window.closeTopupLightbox(); });
+
+  // ── Kartu Requests ──
+  async function loadKartuList() {
+    const el = document.getElementById('kartu-list');
+    el.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+    const isAdmin = ['admin', 'superadmin'].includes(currentProfile?.role);
+
+    let query = sb.from('kartu_requests').select('*').order('created_at', { ascending: false });
+    if (!isAdmin) {
+      const { data: { user } } = await sb.auth.getUser();
+      query = query.eq('user_id', user.id);
+    }
+
+    const { data, error } = await query;
+    if (error) { el.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
+    if (!data?.length) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">💳</div><div>Belum ada request kartu</div></div>';
+      return;
+    }
+
+    el.innerHTML = data.map(r => {
+      const statusMap = { pending: ['badge-pending', '⏳ Pending'], selesai: ['badge-approved', '✅ Selesai'] };
+      const [badgeClass, badgeLabel] = statusMap[r.status] || ['badge-pending', r.status];
+      const tgl = new Date(r.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+      const kebutuhanSafe = (r.kebutuhan || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const userNameSafe = (r.user_name || '').replace(/'/g, "\\'");
+
+      return `<div class="req-card">
+        <div class="req-card-header">
+          <div>
+            ${isAdmin ? `<div style="font-weight:700;font-size:14px;">${r.user_name || '—'}</div>` : ''}
+            <div style="font-size:13px;font-weight:600;color:var(--text);${isAdmin ? 'margin-top:2px;' : ''}">${r.nama}</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-top:4px;">${tgl}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-start;flex-shrink:0;">
+            <span class="${badgeClass}">${badgeLabel}</span>
+            ${isAdmin && r.status === 'pending' ? `<button class="btn btn-outline btn-sm" onclick="openKartuInfoModal('${r.id}','${userNameSafe}',${r.jumlah},'${kebutuhanSafe}')">ℹ️ Isi Info</button>` : ''}
+          </div>
+        </div>
+        <div class="req-chips" style="margin-top:10px;">
+          <span class="chip">💳 ${r.jumlah} kartu</span>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.5;">📝 ${r.kebutuhan}</div>
+        ${r.info_admin ? `<div style="margin-top:10px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:12px;line-height:1.6;color:var(--text);">
+          <strong>ℹ️ Info dari Admin:</strong><br>${r.info_admin}
+        </div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  window.submitKartuRequest = async function() {
+    const nama = document.getElementById('kartu-nama').value.trim();
+    const kebutuhan = document.getElementById('kartu-kebutuhan').value.trim();
+    const jumlah = parseInt(document.getElementById('kartu-jumlah').value) || 1;
+    const errEl = document.getElementById('kartu-err');
+    errEl.style.display = 'none';
+
+    if (!nama) { errEl.textContent = 'Nama wajib diisi.'; errEl.style.display = 'block'; return; }
+    if (!kebutuhan) { errEl.textContent = 'Kebutuhan wajib diisi.'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('kartu-submit');
+    btn.disabled = true; btn.textContent = 'Mengirim...';
+
+    try {
+      const { data: { user } } = await sb.auth.getUser();
+      const { data, error } = await sb.from('kartu_requests').insert({
+        user_id: user.id,
+        user_name: currentProfile?.name || user.email,
+        nama, kebutuhan, jumlah,
+        status: 'pending'
+      }).select().single();
+      if (error) throw new Error(error.message);
+
+      await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'notify_kartu_request', user_name: data.user_name, nama, kebutuhan, jumlah, request_id: data.id })
+      }).catch(() => {});
+
+      showToast('Request kartu berhasil dikirim!', 'success');
+      document.getElementById('kartu-nama').value = '';
+      document.getElementById('kartu-kebutuhan').value = '';
+      document.getElementById('kartu-jumlah').value = '1';
+      loadKartuList();
+    } catch (e) {
+      errEl.textContent = 'Error: ' + e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Submit Request';
+    }
+  };
+
+  window.openKartuInfoModal = function(id, userName, jumlah, kebutuhan) {
+    document.getElementById('ki-request-id').value = id;
+    document.getElementById('ki-info').value = '';
+    document.getElementById('ki-err').style.display = 'none';
+    document.getElementById('ki-detail').innerHTML = `
+      <div style="font-weight:700;margin-bottom:4px;">${userName}</div>
+      <div>Jumlah: <strong>${jumlah} kartu</strong></div>
+      <div style="margin-top:6px;color:var(--text-sub);line-height:1.5;">${kebutuhan}</div>
+    `;
+    openModal('modal-kartu-info');
+  };
+
+  window.saveKartuInfo = async function() {
+    const id = document.getElementById('ki-request-id').value;
+    const info = document.getElementById('ki-info').value.trim();
+    const errEl = document.getElementById('ki-err');
+    errEl.style.display = 'none';
+
+    if (!info) { errEl.textContent = 'Info kartu wajib diisi.'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('ki-save-btn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    try {
+      const { data: req, error: fetchErr } = await sb.from('kartu_requests').select('*').eq('id', id).single();
+      if (fetchErr) throw new Error(fetchErr.message);
+
+      const { error } = await sb.from('kartu_requests')
+        .update({ info_admin: info, status: 'selesai', updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+
+      await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'notify_kartu_info', request_id: id, user_id: req.user_id, user_name: req.user_name, nama: req.nama, jumlah: req.jumlah, info_admin: info })
+      }).catch(() => {});
+
+      showToast('Info kartu berhasil dikirim ke advertiser!', 'success');
+      closeModal('modal-kartu-info');
+      loadKartuList();
+    } catch (e) {
+      errEl.textContent = 'Error: ' + e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Kirim Info';
+    }
+  };
 </script>
 
 <!-- Lightbox SS -->
