@@ -591,56 +591,77 @@ Field tidak ditemukan = null.` }
     if (adAccountId && spend > 0) {
       try {
         let spendToRecord = spend;
+        let skipReason = null;
 
-        // Hitung delta untuk cegah double-count:
-        // - SORE: SS cumulative dari 00:00, cek request sore sebelumnya hari ini
-        // - PAGI: SS full day kemarin, cek apakah kemarin ada request sore (sudah sebagian tercatat)
+        // Semua tanggal pakai WIB (UTC+7) biar konsisten dengan laporan advertiser
+        const WIB_MS = 7 * 60 * 60 * 1000;
+        const todayWIB    = new Date(Date.now() + WIB_MS).toISOString().slice(0, 10);
+        const yesterdayWIB = new Date(Date.now() + WIB_MS - 86400000).toISOString().slice(0, 10);
+        const todayStart     = `${todayWIB}T00:00:00+07:00`;
+        const yesterdayStart = `${yesterdayWIB}T00:00:00+07:00`;
+        const yesterdayEnd   = `${yesterdayWIB}T23:59:59+07:00`;
+
         if (topupTime === 'sore') {
-          const today = new Date().toISOString().split('T')[0];
+          // SS Sore cumulative dari 00:00 — ambil delta dari sore sebelumnya hari ini
+          // (exclude rejected supaya Sore yg ditolak tidak ikut mengurangi)
           const { data: lastSore } = await sb
             .from('topup_requests')
             .select('extracted_data')
             .eq('topup_ad_account_id', adAccountId)
             .eq('topup_time', 'sore')
             .neq('id', body.request_id)
-            .gte('created_at', today + 'T00:00:00Z')
+            .neq('status', 'rejected')
+            .gte('created_at', todayStart)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
           const lastSpend = Number(lastSore?.extracted_data?.spend) || 0;
           spendToRecord = Math.max(0, spend - lastSpend);
-        } else if (topupTime === 'pagi') {
-          // Cek apakah kemarin ada request SORE untuk akun ini
-          // Kalau ada → sebagian spend kemarin sudah tercatat, ambil delta saja
-          const now = new Date();
-          const yesterdayStart = new Date(now);
-          yesterdayStart.setDate(now.getDate() - 1);
-          yesterdayStart.setHours(0, 0, 0, 0);
-          const yesterdayEnd = new Date(now);
-          yesterdayEnd.setDate(now.getDate() - 1);
-          yesterdayEnd.setHours(23, 59, 59, 999);
 
-          const { data: lastSoreYesterday } = await sb
+        } else if (topupTime === 'pagi') {
+          // Bug 3 fix: cek apakah sudah ada Pagi hari ini untuk akun ini (bukan rejected)
+          // Kalau ada → skip, sudah tercatat sebelumnya
+          const { data: existingPagi } = await sb
             .from('topup_requests')
-            .select('extracted_data')
+            .select('id')
             .eq('topup_ad_account_id', adAccountId)
-            .eq('topup_time', 'sore')
-            .gte('created_at', yesterdayStart.toISOString())
-            .lte('created_at', yesterdayEnd.toISOString())
-            .order('created_at', { ascending: false })
+            .eq('topup_time', 'pagi')
+            .neq('id', body.request_id)
+            .neq('status', 'rejected')
+            .gte('created_at', todayStart)
             .limit(1)
             .maybeSingle();
 
-          const alreadyRecorded = Number(lastSoreYesterday?.extracted_data?.spend) || 0;
-          spendToRecord = Math.max(0, spend - alreadyRecorded);
+          if (existingPagi) {
+            skipReason = 'Pagi sudah tercatat hari ini untuk akun ini';
+            spendToRecord = 0;
+          } else {
+            // Bug 2 fix: hanya kurangi dari Sore kemarin yang TIDAK ditolak
+            const { data: lastSoreYesterday } = await sb
+              .from('topup_requests')
+              .select('extracted_data')
+              .eq('topup_ad_account_id', adAccountId)
+              .eq('topup_time', 'sore')
+              .neq('status', 'rejected')
+              .gte('created_at', yesterdayStart)
+              .lte('created_at', yesterdayEnd)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            const alreadyRecorded = Number(lastSoreYesterday?.extracted_data?.spend) || 0;
+            spendToRecord = Math.max(0, spend - alreadyRecorded);
+          }
         }
 
-        const catatanLog = topupTime === 'sore'
-          ? `Spend sore (Rp ${spend.toLocaleString('id-ID')} total, delta +Rp ${spendToRecord.toLocaleString('id-ID')})`
-          : spendToRecord < spend
-            ? `Spend pagi kemarin (Rp ${spend.toLocaleString('id-ID')} full day, delta +Rp ${spendToRecord.toLocaleString('id-ID')} setelah dikurangi sore kemarin)`
-            : `Spend ${extracted?.date_range || 'kemarin'}`;
+        const catatanLog = skipReason
+          ? `[Skip] ${skipReason}`
+          : topupTime === 'sore'
+            ? `Spend sore (Rp ${spend.toLocaleString('id-ID')} total, delta +Rp ${spendToRecord.toLocaleString('id-ID')})`
+            : spendToRecord < spend
+              ? `Spend pagi kemarin (Rp ${spend.toLocaleString('id-ID')} full day, delta +Rp ${spendToRecord.toLocaleString('id-ID')} setelah dikurangi sore kemarin)`
+              : `Spend ${extracted?.date_range || 'kemarin'}`;
 
         if (spendToRecord > 0) {
           const { data: acct } = await sb.from('topup_ad_accounts').select('saldo_saat_ini').eq('id', adAccountId).single();
@@ -652,7 +673,7 @@ Field tidak ditemukan = null.` }
             amount: spendToRecord,
             request_id: body.request_id,
             catatan: catatanLog,
-            tanggal: new Date().toISOString().split('T')[0]
+            tanggal: todayWIB
           });
         }
       } catch (_) {}
