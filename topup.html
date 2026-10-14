@@ -847,10 +847,10 @@
 
   // ── Load kartu dari linebank_cards (untuk dropdown di form akun iklan) ──
   async function loadLinebankCards() {
-    const { data } = await sb.from('linebank_cards')
+    const { data, error: lbErr } = await sb.from('linebank_cards')
       .select('id, label, nomor_kartu, saldo')
-      .eq('status', 'active')
       .order('label');
+    if (lbErr) console.error('loadLinebankCards error:', lbErr.message);
     linebankCards = data || [];
     const sel = document.getElementById('aa-linebank-card');
     if (!sel) return;
