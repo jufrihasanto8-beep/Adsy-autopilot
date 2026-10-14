@@ -378,6 +378,27 @@
   </div>
 </div>
 
+<!-- ── Modal: Tolak Top Up ── -->
+<div class="modal-overlay hidden" id="modal-reject">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h3>❌ Tolak Request Top Up</h3>
+      <div class="modal-close" onclick="closeModal('modal-reject')">✕</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;color:var(--text-sub);margin-bottom:16px;">Masukkan alasan penolakan. Alasan ini akan dikirim ke advertiser via WhatsApp.</p>
+      <div class="modal-field">
+        <label>Alasan Penolakan <span style="color:var(--danger);"></span></label>
+        <textarea id="reject-reason" class="form-input" rows="3" placeholder="Contoh: SS tidak valid, nominal tidak sesuai, dll..." style="resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn" style="flex:1;" onclick="closeModal('modal-reject');openModal('modal-approve');">Batal</button>
+        <button class="btn btn-danger" style="flex:2;" onclick="confirmReject()">❌ Konfirmasi Tolak</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal: Add/Edit Akun Iklan ── -->
 <div class="modal-overlay hidden" id="modal-adaccount">
   <div class="modal" style="max-width:480px;">
@@ -1658,12 +1679,8 @@
         </div>
         ${rec.recommendation_pct && rec.recommendation_pct < 100 ? `<div class="form-hint" style="margin-top:4px;">💡 Pre-filled dari rekomendasi ${rec.recommendation_pct}% · ubah jika perlu</div>` : ''}
       </div>
-      <div class="modal-field">
-        <label>Catatan (opsional)</label>
-        <input type="text" class="form-input" id="modal-catatan" placeholder="Catatan untuk advertiser..." />
-      </div>
       <div style="display:flex;gap:10px;margin-top:4px;">
-        <button class="btn btn-danger" style="flex:1;" onclick="doReject()">❌ Tolak</button>
+        <button class="btn btn-danger" style="flex:1;" onclick="openRejectModal()">❌ Tolak</button>
         <button class="btn btn-success" style="flex:2;" onclick="doApprove()">✅ Approve</button>
       </div>`;
     openModal('modal-approve');
@@ -1688,8 +1705,17 @@
     } catch (e) { showToast('Error: ' + e.message, 'error'); }
   };
 
-  window.doReject = async function() {
-    const catatan = document.getElementById('modal-catatan').value.trim() || prompt('Alasan penolakan (opsional):') || '';
+  window.openRejectModal = function() {
+    closeModal('modal-approve');
+    document.getElementById('reject-reason').value = '';
+    openModal('modal-reject');
+  };
+
+  window.confirmReject = async function() {
+    const catatan = document.getElementById('reject-reason').value.trim();
+    if (!catatan) { showToast('Masukkan alasan penolakan', 'warning'); return; }
+    const btn = document.querySelector('#modal-reject .btn-danger');
+    btn.disabled = true; btn.textContent = 'Memproses...';
     try {
       const r = await fetch('/api/notify-wa', {
         method: 'POST',
@@ -1699,9 +1725,12 @@
       const d = await r.json();
       if (!d.ok) throw new Error(d.error);
       showToast('Request ditolak.', 'error');
-      closeModal('modal-approve');
+      closeModal('modal-reject');
       loadHistory();
-    } catch (e) { showToast('Error: ' + e.message, 'error'); }
+    } catch (e) {
+      showToast('Error: ' + e.message, 'error');
+      btn.disabled = false; btn.textContent = '❌ Konfirmasi Tolak';
+    }
   };
 
   async function getApproveToken(id) {
