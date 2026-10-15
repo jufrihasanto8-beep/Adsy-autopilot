@@ -1846,6 +1846,8 @@
   window.openRejectModal = function() {
     closeModal('modal-approve');
     document.getElementById('reject-reason').value = '';
+    const btn = document.querySelector('#modal-reject .btn-danger');
+    if (btn) { btn.disabled = false; btn.textContent = '❌ Konfirmasi Tolak'; }
     openModal('modal-reject');
   };
 
