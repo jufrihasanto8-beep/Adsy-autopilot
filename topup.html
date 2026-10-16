@@ -824,7 +824,7 @@
     if (!sb) return;
     const { data: { user } } = await sb.auth.getUser();
     const isAdmin = ['admin', 'superadmin'].includes(currentProfile?.role);
-    let q = sb.from('topup_ad_accounts').select('*, products(name)').order('created_at', { ascending: false });
+    let q = sb.from('topup_ad_accounts').select('*, products(name), profiles(name, email)').order('created_at', { ascending: false });
     if (!isAdmin) q = q.eq('user_id', user.id);
     const { data } = await q;
     adAccounts = data || [];
@@ -964,7 +964,11 @@
       ? `<span style="display:inline-block;background:#eff6ff;color:#0369a1;border:1px solid #bae6fd;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:4px;">🔵 Selow.id</span>`
       : `<span style="display:inline-block;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:4px;">🏦 Kartu Adsy</span>`;
 
+    const isAdminView = ['admin','superadmin'].includes(currentProfile?.role);
+    const advertiserName = a.profiles?.name || a.profiles?.email || '';
+
     return `<div class="acct-card" id="acct-${a.id}">
+      ${isAdminView && advertiserName ? `<div style="font-size:11px;font-weight:700;color:var(--primary);margin-bottom:4px;">👤 ${advertiserName}</div>` : ''}
       ${a.products?.name ? `<div style="font-size:10px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📦 ${a.products.name}</div>` : ''}
       <div class="acct-card-name">${a.nama_akun}${adTypeBadge}${pmBadge}</div>
       <div class="acct-card-actions">
