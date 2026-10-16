@@ -880,35 +880,37 @@
     });
   }
 
+  function populateAdvertiserFilter() {
+    const isAdminView = ['admin','superadmin'].includes(currentProfile?.role);
+    const filterSel = document.getElementById('filter-advertiser');
+    if (!isAdminView || !filterSel) return;
+    filterSel.style.display = '';
+    const seen = new Map();
+    adAccounts.forEach(a => {
+      if (a.user_id && !seen.has(a.user_id)) {
+        seen.set(a.user_id, a.profiles?.name || a.profiles?.email || a.user_id);
+      }
+    });
+    const prev = filterSel.value;
+    filterSel.innerHTML = '<option value="">Semua Advertiser</option>' +
+      Array.from(seen.entries()).map(([uid, name]) =>
+        `<option value="${uid}">${name}</option>`
+      ).join('');
+    if (prev && filterSel.querySelector(`option[value="${prev}"]`)) filterSel.value = prev;
+  }
+
   function renderAdAccounts() {
     const el = document.getElementById('akun-list');
     const isAdminView = ['admin','superadmin'].includes(currentProfile?.role);
-
-    // Isi & tampilkan dropdown filter advertiser (admin only)
     const filterSel = document.getElementById('filter-advertiser');
-    let selected = '';
-    if (isAdminView && filterSel) {
-      filterSel.style.display = '';
-      selected = filterSel.value;
-      // Kumpulkan unique advertiser dari data
-      const seen = new Map();
-      adAccounts.forEach(a => {
-        if (a.user_id && !seen.has(a.user_id)) {
-          seen.set(a.user_id, a.profiles?.name || a.profiles?.email || a.user_id);
-        }
-      });
-      filterSel.innerHTML = '<option value="">Semua Advertiser</option>' +
-        Array.from(seen.entries()).map(([uid, name]) =>
-          `<option value="${uid}" ${uid === selected ? 'selected' : ''}>${name}</option>`
-        ).join('');
-    }
+    const selected = isAdminView ? (filterSel?.value || '') : '';
 
-    const filtered = isAdminView && selected
+    const filtered = selected
       ? adAccounts.filter(a => a.user_id === selected)
       : adAccounts;
 
     if (!filtered.length) {
-      el.innerHTML = `<div class="empty-state"><div class="icon">💳</div><h3 style="font-size:15px;margin-bottom:4px;">Belum ada akun iklan</h3><p style="font-size:13px;">${isAdminView && filterSel?.value ? 'Advertiser ini belum punya akun iklan.' : 'Tambah akun iklan untuk menyimpan info billing Meta Ads.'}</p></div>`;
+      el.innerHTML = `<div class="empty-state"><div class="icon">💳</div><h3 style="font-size:15px;margin-bottom:4px;">Belum ada akun iklan</h3><p style="font-size:13px;">${selected ? 'Advertiser ini belum punya akun iklan.' : 'Tambah akun iklan untuk menyimpan info billing Meta Ads.'}</p></div>`;
       return;
     }
 
@@ -1195,6 +1197,7 @@
       showToast(editId ? 'Akun iklan diperbarui!' : 'Akun iklan disimpan!', 'success');
       closeModal('modal-adaccount');
       await loadAdAccounts();
+      populateAdvertiserFilter();
       renderAdAccounts();
     } catch (e) {
       errEl.textContent = e.message; errEl.style.display = 'block';
@@ -1209,6 +1212,7 @@
     if (error) { showToast('Gagal hapus: ' + error.message, 'error'); return; }
     showToast('Akun iklan dihapus.', 'success');
     await loadAdAccounts();
+    populateAdvertiserFilter();
     renderAdAccounts();
   };
 
@@ -1522,7 +1526,7 @@
     if (tab === 'summary') { summaryPage = 0; loadSummary(); }
     if (tab === 'akun-iklan') {
       renderAdAccounts();
-      if (sb) loadAdAccounts().then(() => renderAdAccounts());
+      if (sb) loadAdAccounts().then(() => { populateAdvertiserFilter(); renderAdAccounts(); });
     }
     if (tab === 'kartu') loadKartuList();
   };
