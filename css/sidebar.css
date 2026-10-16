@@ -239,3 +239,55 @@
   display: block;
   margin-bottom: 2px;
 }
+
+/* ── SIDEBAR OVERLAY (mobile) ── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 199;
+  backdrop-filter: blur(2px);
+}
+
+.sidebar-overlay.visible { display: block; }
+
+/* ── HAMBURGER BUTTON ── */
+.mob-menu-btn {
+  display: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--gray-2);
+  border: none;
+  color: var(--text);
+  font-size: 18px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.mob-menu-btn:hover { background: var(--gray-3); }
+
+/* ── MOBILE SIDEBAR ── */
+@media (max-width: 768px) {
+  .mob-menu-btn { display: flex; }
+
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 200;
+    box-shadow: none;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+  }
+}

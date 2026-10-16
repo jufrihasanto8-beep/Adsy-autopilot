@@ -640,3 +640,49 @@
 .drp-apply:hover{opacity:.85;}
 .drp-cancel{padding:6px 12px;border-radius:7px;border:1px solid var(--gray-3);background:none;color:var(--text-sub);font-size:12px;cursor:pointer;}
 .drp-cancel:hover{border-color:#ef4444;color:#ef4444;}
+
+/* ══════════════════════════════════
+   RESPONSIVE COMPONENTS (≤ 640px)
+══════════════════════════════════ */
+@media (max-width: 640px) {
+  /* DRP — stack vertical, presets jadi chips */
+  .drp-dropdown {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: 8px;
+    min-width: unset;
+    max-height: 80vh;
+    overflow-y: auto;
+    border-radius: 14px;
+  }
+  .drp-dropdown-inner { flex-direction: column; }
+  .drp-presets {
+    width: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--gray-2);
+    padding: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .drp-preset {
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--gray-3);
+    font-size: 11px;
+    width: auto;
+    text-align: center;
+  }
+  .drp-preset:hover, .drp-preset.active {
+    background: var(--primary-light);
+    color: var(--primary);
+    border-color: var(--primary);
+  }
+  .drp-cal { padding: 12px; }
+
+  /* Button group — full width di mobile */
+  .btn-group { flex-direction: column; }
+  .btn-group .btn { width: 100%; justify-content: center; }
+}
