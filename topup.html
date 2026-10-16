@@ -886,9 +886,10 @@
 
     // Isi & tampilkan dropdown filter advertiser (admin only)
     const filterSel = document.getElementById('filter-advertiser');
+    let selected = '';
     if (isAdminView && filterSel) {
       filterSel.style.display = '';
-      const selected = filterSel.value;
+      selected = filterSel.value;
       // Kumpulkan unique advertiser dari data
       const seen = new Map();
       adAccounts.forEach(a => {
