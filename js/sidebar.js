@@ -1,13 +1,49 @@
 import { logout } from './auth.js';
 import { getSupabase } from './supabase.js';
 
+// ── MOBILE MENU HELPERS ──
+function openMobileMenu() {
+  document.querySelector('.sidebar')?.classList.add('open');
+  document.getElementById('sidebar-overlay')?.classList.add('visible');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMobileMenu() {
+  document.querySelector('.sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('visible');
+  document.body.style.overflow = '';
+}
+
 // ── SIDEBAR ACTIVE STATE ──
 export function initSidebar() {
   const current = window.location.pathname.split('/').pop() || 'dashboard.html';
 
+  // Inject hamburger button ke topbar
+  const topbar = document.querySelector('.topbar');
+  if (topbar && !document.getElementById('mob-menu-btn')) {
+    const btn = document.createElement('button');
+    btn.id = 'mob-menu-btn';
+    btn.className = 'mob-menu-btn';
+    btn.innerHTML = '☰';
+    btn.addEventListener('click', openMobileMenu);
+    topbar.insertBefore(btn, topbar.firstChild);
+  }
+
+  // Inject overlay
+  if (!document.getElementById('sidebar-overlay')) {
+    const overlay = document.createElement('div');
+    overlay.id = 'sidebar-overlay';
+    overlay.className = 'sidebar-overlay';
+    overlay.addEventListener('click', closeMobileMenu);
+    document.body.appendChild(overlay);
+  }
+
   document.querySelectorAll('.nav-item[data-page]').forEach(item => {
     if (item.dataset.page === current) item.classList.add('active');
-    item.addEventListener('click', () => { window.location.href = item.dataset.page; });
+    item.addEventListener('click', () => {
+      closeMobileMenu();
+      window.location.href = item.dataset.page;
+    });
   });
 
   // ⏏ tombol logout (hanya icon eject)
