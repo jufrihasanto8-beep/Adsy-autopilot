@@ -902,8 +902,8 @@
         ).join('');
     }
 
-    const filtered = isAdminView && filterSel?.value
-      ? adAccounts.filter(a => a.user_id === filterSel.value)
+    const filtered = isAdminView && selected
+      ? adAccounts.filter(a => a.user_id === selected)
       : adAccounts;
 
     if (!filtered.length) {
