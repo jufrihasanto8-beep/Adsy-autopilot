@@ -362,7 +362,12 @@
       <div id="panel-akun-iklan" class="topup-panel" style="display:none; max-width:760px; margin:0 auto;">
         <div class="akun-section-header">
           <div class="akun-section-title">💳 Daftar Akun Iklan</div>
-          <button class="btn btn-primary btn-sm" onclick="openAddAccountModal()">+ Tambah Akun Iklan</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="filter-advertiser" class="form-input" style="display:none;font-size:13px;padding:6px 10px;height:36px;min-width:170px;" onchange="renderAdAccounts()">
+              <option value="">Semua Advertiser</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="openAddAccountModal()">+ Tambah Akun Iklan</button>
+          </div>
         </div>
         <div id="akun-list">
           <div class="loading-state"><div class="spinner"></div></div>
@@ -877,12 +882,36 @@
 
   function renderAdAccounts() {
     const el = document.getElementById('akun-list');
-    if (!adAccounts.length) {
-      el.innerHTML = `<div class="empty-state"><div class="icon">💳</div><h3 style="font-size:15px;margin-bottom:4px;">Belum ada akun iklan</h3><p style="font-size:13px;">Tambah akun iklan untuk menyimpan info billing Meta Ads.</p></div>`;
+    const isAdminView = ['admin','superadmin'].includes(currentProfile?.role);
+
+    // Isi & tampilkan dropdown filter advertiser (admin only)
+    const filterSel = document.getElementById('filter-advertiser');
+    if (isAdminView && filterSel) {
+      filterSel.style.display = '';
+      const selected = filterSel.value;
+      // Kumpulkan unique advertiser dari data
+      const seen = new Map();
+      adAccounts.forEach(a => {
+        if (a.user_id && !seen.has(a.user_id)) {
+          seen.set(a.user_id, a.profiles?.name || a.profiles?.email || a.user_id);
+        }
+      });
+      filterSel.innerHTML = '<option value="">Semua Advertiser</option>' +
+        Array.from(seen.entries()).map(([uid, name]) =>
+          `<option value="${uid}" ${uid === selected ? 'selected' : ''}>${name}</option>`
+        ).join('');
+    }
+
+    const filtered = isAdminView && filterSel?.value
+      ? adAccounts.filter(a => a.user_id === filterSel.value)
+      : adAccounts;
+
+    if (!filtered.length) {
+      el.innerHTML = `<div class="empty-state"><div class="icon">💳</div><h3 style="font-size:15px;margin-bottom:4px;">Belum ada akun iklan</h3><p style="font-size:13px;">${isAdminView && filterSel?.value ? 'Advertiser ini belum punya akun iklan.' : 'Tambah akun iklan untuk menyimpan info billing Meta Ads.'}</p></div>`;
       return;
     }
 
-    el.innerHTML = '<div class="acct-grid">' + adAccounts.map(a => renderAccountCard(a)).join('') + '</div>';
+    el.innerHTML = '<div class="acct-grid">' + filtered.map(a => renderAccountCard(a)).join('') + '</div>';
   }
 
   function renderAccountCard(a) {
