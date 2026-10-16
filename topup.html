@@ -363,7 +363,7 @@
         <div class="akun-section-header">
           <div class="akun-section-title">💳 Daftar Akun Iklan</div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <select id="filter-advertiser" class="form-input" style="display:none;font-size:13px;padding:6px 10px;height:36px;min-width:170px;" onchange="renderAdAccounts()">
+            <select id="filter-advertiser" class="form-input" style="display:none;font-size:13px;padding:6px 10px;height:36px;min-width:170px;" onchange="onFilterAdvertiser(this.value)">
               <option value="">Semua Advertiser</option>
             </select>
             <button class="btn btn-primary btn-sm" onclick="openAddAccountModal()">+ Tambah Akun Iklan</button>
@@ -642,6 +642,7 @@
   let adAccountLogs = [];
   let selectedAccountId = null;
   let selectedAccount = null;
+  let filterAdvertiserId = '';
 
   // billing SS state (in add-account modal)
   let billingFile = null;
@@ -899,18 +900,19 @@
     if (prev && filterSel.querySelector(`option[value="${prev}"]`)) filterSel.value = prev;
   }
 
+  window.onFilterAdvertiser = function(val) {
+    filterAdvertiserId = val;
+    renderAdAccounts();
+  };
+
   function renderAdAccounts() {
     const el = document.getElementById('akun-list');
-    const isAdminView = ['admin','superadmin'].includes(currentProfile?.role);
-    const filterSel = document.getElementById('filter-advertiser');
-    const selected = isAdminView ? (filterSel?.value || '') : '';
-
-    const filtered = selected
-      ? adAccounts.filter(a => a.user_id === selected)
+    const filtered = filterAdvertiserId
+      ? adAccounts.filter(a => a.user_id === filterAdvertiserId)
       : adAccounts;
 
     if (!filtered.length) {
-      el.innerHTML = `<div class="empty-state"><div class="icon">💳</div><h3 style="font-size:15px;margin-bottom:4px;">Belum ada akun iklan</h3><p style="font-size:13px;">${selected ? 'Advertiser ini belum punya akun iklan.' : 'Tambah akun iklan untuk menyimpan info billing Meta Ads.'}</p></div>`;
+      el.innerHTML = `<div class="empty-state"><div class="icon">💳</div><h3 style="font-size:15px;margin-bottom:4px;">Belum ada akun iklan</h3><p style="font-size:13px;">${filterAdvertiserId ? 'Advertiser ini belum punya akun iklan.' : 'Tambah akun iklan untuk menyimpan info billing Meta Ads.'}</p></div>`;
       return;
     }
 
