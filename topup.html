@@ -885,7 +885,6 @@
     const isAdminView = ['admin','superadmin'].includes(currentProfile?.role);
     const filterSel = document.getElementById('filter-advertiser');
     if (!isAdminView || !filterSel) return;
-    filterSel.style.display = '';
     const seen = new Map();
     adAccounts.forEach(a => {
       if (a.user_id && !seen.has(a.user_id)) {
@@ -1527,6 +1526,8 @@
     if (tab === 'riwayat') { historyPage = 0; loadHistory(); }
     if (tab === 'summary') { summaryPage = 0; loadSummary(); }
     if (tab === 'akun-iklan') {
+      const isAdminView = ['admin','superadmin'].includes(currentProfile?.role);
+      if (isAdminView) document.getElementById('filter-advertiser').style.display = '';
       renderAdAccounts();
       if (sb) loadAdAccounts().then(() => { populateAdvertiserFilter(); renderAdAccounts(); });
     }
