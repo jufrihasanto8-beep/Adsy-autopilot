@@ -2017,8 +2017,8 @@
       const statusMap = { pending: ['badge-pending', '⏳ Pending'], selesai: ['badge-approved', '✅ Selesai'], ditolak: ['badge-rejected', '❌ Ditolak'] };
       const [badgeClass, badgeLabel] = statusMap[r.status] || ['badge-pending', r.status];
       const tgl = new Date(r.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-      const kebutuhanSafe = (r.kebutuhan || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-      const userNameSafe = (r.user_name || '').replace(/'/g, "\\'");
+      const kebutuhanEnc = encodeURIComponent(r.kebutuhan || '');
+      const userNameEnc = encodeURIComponent(r.user_name || '');
 
       return `<div class="req-card">
         <div class="req-card-header">
@@ -2029,7 +2029,7 @@
           </div>
           <div style="display:flex;gap:8px;align-items:flex-start;flex-shrink:0;">
             <span class="${badgeClass}">${badgeLabel}</span>
-            ${isAdmin && r.status === 'pending' ? `<button class="btn btn-outline btn-sm" onclick="openKartuInfoModal('${r.id}','${userNameSafe}',${r.jumlah},'${kebutuhanSafe}')">ℹ️ Isi Info</button>` : ''}
+            ${isAdmin && r.status === 'pending' ? `<button class="btn btn-outline btn-sm" onclick="openKartuInfoModal('${r.id}','${userNameEnc}',${r.jumlah},'${kebutuhanEnc}')">ℹ️ Isi Info</button>` : ''}
           </div>
         </div>
         <div class="req-chips" style="margin-top:10px;">
@@ -2088,7 +2088,9 @@
     }
   };
 
-  window.openKartuInfoModal = function(id, userName, jumlah, kebutuhan) {
+  window.openKartuInfoModal = function(id, userNameEnc, jumlah, kebutuhanEnc) {
+    const userName = decodeURIComponent(userNameEnc);
+    const kebutuhan = decodeURIComponent(kebutuhanEnc);
     document.getElementById('ki-request-id').value = id;
     document.getElementById('ki-catatan').value = '';
     document.getElementById('ki-err').style.display = 'none';
