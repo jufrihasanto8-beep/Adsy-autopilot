@@ -184,6 +184,14 @@
       color: var(--gray-5);
       margin-top: 3px;
       padding: 0 2px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .chat-read-label {
+      font-size: 10px;
+      color: #10b981;
+      font-weight: 500;
     }
 
     /* Input area */
@@ -567,7 +575,8 @@ function appendAdminMsg(msg, area, scroll = true) {
     ? `<img src="${escAttr(msg.image_url)}" class="chat-img-preview" onclick="window.open('${escAttr(msg.image_url)}','_blank')" />`
     : '';
   const textHtml = msg.message ? `<div class="chat-bubble-admin">${escHtml(msg.message)}</div>` : '';
-  el.innerHTML = imgHtml + textHtml + `<div class="chat-time-admin">${time}</div>`;
+  const readHtml = isMine && msg.is_read ? `<span class="chat-read-label">Dibaca</span>` : '';
+  el.innerHTML = imgHtml + textHtml + `<div class="chat-time-admin">${time}${readHtml ? ' · ' + readHtml : ''}</div>`;
   area.appendChild(el);
   if (scroll) requestAnimationFrame(() => { area.scrollTop = area.scrollHeight; });
 }
@@ -661,6 +670,7 @@ async function sendWAToAdvertiser(receiverId, message) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'chat_reply',
+        sender_id: currentUser?.id,
         receiver_id: receiverId,
         sender_name: currentProfile?.name || 'Admin',
         message_preview: message.length > 80 ? message.slice(0, 80) + '...' : message
@@ -689,6 +699,20 @@ function subscribeRealtime() {
 
       // Refresh conv list
       await loadConversations();
+    })
+    // UPDATE: saat pesan admin di-read oleh advertiser → tampilin "Dibaca"
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'chat_messages',
+      filter: `sender_id=eq.${currentUser.id}`
+    }, (payload) => {
+      const msg = payload.new;
+      if (!msg.is_read) return;
+      const el = document.querySelector(`[data-id="${msg.id}"] .chat-time-admin`);
+      if (el && !el.querySelector('.chat-read-label')) {
+        el.innerHTML += ' · <span class="chat-read-label">Dibaca</span>';
+      }
     })
     .subscribe();
 }
