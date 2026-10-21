@@ -268,6 +268,7 @@ async function sendWANotif(message) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'chat_message',
+        sender_id: _user?.id,
         sender_name: _profile?.name || 'Advertiser',
         message_preview: message.length > 80 ? message.slice(0, 80) + '...' : message
       })
