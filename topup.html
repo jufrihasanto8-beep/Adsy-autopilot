@@ -1716,6 +1716,7 @@
           ${selowBadge || statusBadge}
           ${isAdmin && r.ss_url ? `<button class="btn btn-outline btn-sm" onclick="openTopupLightbox('${r.ss_url}')" title="Lihat Screenshot">📸</button>` : ''}
           ${isAdmin && r.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="openApproveModal('${r.id}', ${r.nominal_request}, '${r.user_name}', '${productName}')">Review</button>` : ''}
+          ${isAdmin && r.status === 'pending' ? `<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteTopupRequest('${r.id}')">🗑️</button>` : ''}
         </div>
       </div>
       <div class="req-chips">
@@ -1882,6 +1883,19 @@
       closeModal('modal-approve');
       loadHistory();
     } catch (e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  window.deleteTopupRequest = async function(id) {
+    if (!confirm('Hapus request top up ini? Aksi ini tidak bisa dibatalkan.')) return;
+    try {
+      const { error } = await sb.from('topup_requests').delete().eq('id', id);
+      if (error) throw error;
+      showToast('Request dihapus.', 'error');
+      document.getElementById('req-' + id)?.remove();
+      loadHistory();
+    } catch (e) {
+      showToast('Gagal hapus: ' + e.message, 'error');
+    }
   };
 
   window.openRejectModal = function() {
