@@ -33,6 +33,10 @@
       .req-card { padding:14px; }
       .req-card-header { flex-direction:column; }
       .nominal-wrap input { font-size:18px !important; }
+      /* Stats summary grid → 2 kolom di mobile */
+      #summary-cards { grid-template-columns: repeat(2, 1fr) !important; }
+      /* Panel max-width tidak lebih dari layar */
+      .topup-panel { max-width: 100% !important; }
     }
 
     /* ── Upload area ── */
