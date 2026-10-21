@@ -691,13 +691,16 @@ function subscribeRealtime() {
       const isForMe = msg.receiver_id === currentUser.id;
       const isFromActive = msg.sender_id === activeConvUserId;
 
+      // Jika INSERT dari admin sendiri → sendAdminMsg sudah update conv list, skip reload
+      if (msg.sender_id === currentUser.id) return;
+
       // Jika thread aktif terbuka untuk pengirim ini → tampilkan + mark read
       if (isForMe && isFromActive) {
         appendAdminMsg(msg, document.getElementById('chat-messages-area'));
         await sb.from('chat_messages').update({ is_read: true }).eq('id', msg.id);
       }
 
-      // Refresh conv list
+      // Refresh conv list hanya untuk pesan masuk dari advertiser
       await loadConversations();
     })
     // UPDATE: saat pesan admin di-read oleh advertiser → tampilin "Dibaca"
