@@ -521,8 +521,9 @@ tbody tr:last-child td { border-bottom: none; }
     font-size: 16px !important;
   }
 
-  /* Layout */
-  .page-content { padding: 16px; }
+  /* Layout — cegah horizontal overflow */
+  .main-content { overflow-x: hidden; }
+  .page-content { padding: 16px; overflow-x: hidden; }
 
   /* Topbar */
   .topbar { padding: 0 16px; gap: 8px; }
