@@ -18,6 +18,9 @@ export async function initChatWidget() {
 
     const isAdmin = ['admin', 'superadmin'].includes(profile.role);
 
+    // Admin yang sudah di chat.html → tidak perlu bubble
+    if (isAdmin && window.location.pathname.split('/').pop() === 'chat.html') return;
+
     if (!isAdmin) {
       // Advertiser: cari admin untuk diajak chat
       const { data: admins } = await _sb.from('profiles')
@@ -158,7 +161,8 @@ function appendMsg(msg, list, scroll = true) {
     ? `<img src="${msg.image_url}" class="cwp-img-preview" onclick="window.open('${msg.image_url}','_blank')" />`
     : '';
   const textHtml = msg.message ? `<div class="cwp-bubble">${escHtml(msg.message)}</div>` : '';
-  el.innerHTML = imgHtml + textHtml + `<div class="cwp-time">${time}</div>`;
+  const readHtml = isMine && msg.is_read ? `<span class="cwp-read-label">Dibaca</span>` : '';
+  el.innerHTML = imgHtml + textHtml + `<div class="cwp-time">${time}${readHtml ? ' · ' + readHtml : ''}</div>`;
   list.appendChild(el);
   if (scroll) requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
 }
@@ -257,6 +261,20 @@ function subscribeRealtime(isAdmin) {
         updateBadge(cur + 1);
       }
     })
+    // UPDATE: saat pesan advertiser di-read oleh admin → tampilin "Dibaca"
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'chat_messages',
+      filter: `sender_id=eq.${_user.id}`
+    }, (payload) => {
+      const msg = payload.new;
+      if (!msg.is_read) return;
+      const el = document.querySelector(`#cwp-messages [data-id="${msg.id}"] .cwp-time`);
+      if (el && !el.querySelector('.cwp-read-label')) {
+        el.innerHTML += ' · <span class="cwp-read-label">Dibaca</span>';
+      }
+    })
     .subscribe();
 }
 
@@ -309,7 +327,8 @@ function injectWidgetCSS() {
     .cwp-bubble{padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.5;word-break:break-word;}
     .cwp-msg.mine .cwp-bubble{background:var(--primary,#6366f1);color:#fff;border-bottom-right-radius:4px;}
     .cwp-msg.theirs .cwp-bubble{background:#fff;color:var(--text,#1e293b);border:1px solid var(--border,#e2e8f0);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
-    .cwp-time{font-size:10px;color:var(--gray-5,#94a3b8);margin-top:3px;padding:0 2px;}
+    .cwp-time{font-size:10px;color:var(--gray-5,#94a3b8);margin-top:3px;padding:0 2px;display:flex;align-items:center;gap:4px;}
+    .cwp-read-label{font-size:10px;color:#10b981;font-weight:500;}
     .cwp-footer{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--border,#e2e8f0);background:var(--bg-card,#fff);flex-shrink:0;}
     .cwp-input{flex:1;padding:9px 14px;border:1.5px solid var(--border,#e2e8f0);border-radius:20px;font-size:13px;outline:none;font-family:inherit;background:var(--bg,#f8fafc);color:var(--text,#1e293b);transition:border-color .2s;}
     .cwp-input:focus{border-color:var(--primary,#6366f1);}
