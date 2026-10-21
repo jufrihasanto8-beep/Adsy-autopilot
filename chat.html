@@ -240,8 +240,8 @@
     }
   </style>
 </head>
-<body>
-<div class="app-layout">
+<body style="overflow:hidden;">
+<div class="app-layout" style="height:100vh; overflow:hidden;">
 
   <aside class="sidebar">
     <div class="sidebar-logo">
@@ -285,7 +285,7 @@
     </div>
   </aside>
 
-  <main class="main-content" style="padding:0; display:flex; flex-direction:column; overflow:hidden;">
+  <main class="main-content" style="padding:0; display:flex; flex-direction:column; overflow:hidden; flex:1; min-height:0;">
     <header class="topbar" style="flex-shrink:0;">
       <div class="topbar-left">
         <h2>💬 Chat</h2>
@@ -315,7 +315,7 @@
           <p>Pilih percakapan untuk memulai</p>
         </div>
         <!-- Thread aktif (hidden sampai dipilih) -->
-        <div id="chat-active-thread" style="display:none; flex:1; display:none; flex-direction:column; overflow:hidden;">
+        <div id="chat-active-thread" style="display:none; flex:1; flex-direction:column; overflow:hidden; min-height:0;">
           <div class="chat-thread-header" id="chat-thread-header">
             <div class="chat-conv-avatar" id="thread-avatar" style="width:36px;height:36px;font-size:13px;"></div>
             <div>
