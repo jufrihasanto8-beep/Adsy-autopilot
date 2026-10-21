@@ -1888,8 +1888,10 @@
   window.deleteTopupRequest = async function(id) {
     if (!confirm('Hapus request top up ini? Aksi ini tidak bisa dibatalkan.')) return;
     try {
-      const { error } = await sb.from('topup_requests').delete().eq('id', id);
-      if (error) throw error;
+      const { error: e1 } = await sb.from('topup_ad_account_logs').delete().eq('request_id', id);
+      if (e1) throw e1;
+      const { error: e2 } = await sb.from('topup_requests').delete().eq('id', id);
+      if (e2) throw e2;
       showToast('Request dihapus.', 'error');
       document.getElementById('req-' + id)?.remove();
       loadHistory();
