@@ -1029,5 +1029,46 @@ Field tidak ditemukan = null.` }
     }
   }
 
-  return res.status(400).json({ error: 'Invalid action. Use: send | extract_topup | notify_topup | approve_topup | notify_selow_transfer | confirm_selow | notify_kartu_request | notify_kartu_info' });
+  // ── chat_message: notif WA ke admin saat advertiser kirim pesan ──
+  if (action === 'chat_message') {
+    const { sender_name, message_preview } = body;
+
+    const { data: cfgWithToken } = await sb.from('app_config')
+      .select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle();
+    const fonnteToken = cfgWithToken?.fonnte_token || process.env.FONNTE_TOKEN;
+    if (!fonnteToken) return res.json({ ok: false, warn: 'Fonnte token belum dikonfigurasi' });
+
+    const { data: gs } = await sb.from('global_settings')
+      .select('topup_wa_targets').eq('id', '00000000-0000-0000-0000-000000000001').single();
+    const waTargets = gs?.topup_wa_targets || [];
+    if (!waTargets.length) return res.json({ ok: false, warn: 'Belum ada nomor penerima notif di Settings' });
+
+    const baseUrl = process.env.APP_URL || 'https://adsy-autopilot.vercel.app';
+    const pesan = [
+      `💬 *Pesan Baru — Adsy Autopilot*`,
+      ``,
+      `👤 *${sender_name}* mengirim pesan:`,
+      `_"${message_preview}"_`,
+      ``,
+      `Balas di: ${baseUrl}/chat.html`,
+      `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+    ].join('\n');
+
+    const results = await Promise.all(waTargets.map(async no => {
+      const target = formatWaTarget(no);
+      try {
+        const r2 = await fetch('https://api.fonnte.com/send', {
+          method: 'POST',
+          headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target, message: pesan })
+        });
+        const d = await r2.json();
+        return { no: target, ok: d.status !== false };
+      } catch (e) { return { no: target, ok: false }; }
+    }));
+
+    return res.json({ ok: results.some(r => r.ok) });
+  }
+
+  return res.status(400).json({ error: 'Invalid action. Use: send | extract_topup | notify_topup | approve_topup | notify_selow_transfer | confirm_selow | notify_kartu_request | notify_kartu_info | chat_message' });
 }
