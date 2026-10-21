@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chat — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <style>
+    /* ── Chat layout ── */
+    .chat-layout {
+      display: flex;
+      height: calc(100vh - 70px);
+      overflow: hidden;
+      gap: 0;
+      margin: -20px;
+    }
+
+    /* ── Conversation list (left) ── */
+    .chat-conv-panel {
+      width: 300px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-card);
+      overflow: hidden;
+    }
+    .chat-conv-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .chat-conv-header strong { font-size: 14px; color: var(--text); }
+    .chat-conv-search {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .chat-conv-search input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      font-size: 13px;
+      outline: none;
+      font-family: inherit;
+      background: var(--bg);
+      color: var(--text);
+      transition: border-color .2s;
+    }
+    .chat-conv-search input:focus { border-color: var(--primary); }
+    .chat-conv-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .chat-conv-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background .15s;
+    }
+    .chat-conv-item:hover { background: var(--bg); }
+    .chat-conv-item.active { background: var(--primary-light, #eef2ff); }
+    .chat-conv-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 15px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .chat-conv-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .chat-conv-info { flex: 1; min-width: 0; }
+    .chat-conv-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chat-conv-preview { font-size: 12px; color: var(--gray-5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .chat-conv-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chat-conv-time { font-size: 10px; color: var(--gray-5); }
+    .chat-conv-unread {
+      min-width: 18px; height: 18px;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 9px;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+    }
+    .chat-conv-empty { text-align: center; color: var(--gray-5); font-size: 13px; padding: 40px 16px; }
+
+    /* ── Chat thread (right) ── */
+    .chat-thread-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+      min-width: 0;
+    }
+    .chat-thread-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .chat-thread-header-name { font-weight: 600; font-size: 14px; color: var(--text); }
+    .chat-thread-header-sub { font-size: 12px; color: var(--gray-5); }
+    .chat-thread-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      color: var(--gray-5);
+    }
+    .chat-thread-empty .big-icon { font-size: 48px; }
+    .chat-thread-empty p { font-size: 14px; }
+
+    /* Messages area */
+    .chat-messages-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .chat-messages-area::-webkit-scrollbar { width: 4px; }
+    .chat-messages-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .chat-date-label {
+      text-align: center;
+      font-size: 11px;
+      color: var(--gray-5);
+      margin: 8px 0 4px;
+    }
+    .chat-msg-admin {
+      display: flex;
+      flex-direction: column;
+      max-width: 70%;
+    }
+    .chat-msg-admin.mine { align-self: flex-end; align-items: flex-end; }
+    .chat-msg-admin.theirs { align-self: flex-start; align-items: flex-start; }
+    .chat-bubble-admin {
+      padding: 9px 14px;
+      border-radius: 16px;
+      font-size: 13px;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+    .chat-msg-admin.mine .chat-bubble-admin {
+      background: var(--primary);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .chat-msg-admin.theirs .chat-bubble-admin {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .chat-msg-admin .chat-time-admin {
+      font-size: 10px;
+      color: var(--gray-5);
+      margin-top: 3px;
+      padding: 0 2px;
+    }
+
+    /* Input area */
+    .chat-input-area {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-card);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .chat-main-input {
+      flex: 1;
+      padding: 10px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 24px;
+      font-size: 14px;
+      outline: none;
+      font-family: inherit;
+      background: var(--bg);
+      color: var(--text);
+      transition: border-color .2s;
+    }
+    .chat-main-input:focus { border-color: var(--primary); }
+    .chat-send-main {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background .2s;
+    }
+    .chat-send-main:hover { background: #4f46e5; }
+    .chat-send-main:disabled { background: var(--gray-3); cursor: not-allowed; }
+
+    /* New message indicator */
+    .chat-thread-loading { text-align: center; color: var(--gray-5); font-size: 13px; padding: 32px; }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      .chat-layout { height: calc(100vh - 60px); }
+      .chat-conv-panel { width: 260px; }
+    }
+    @media (max-width: 600px) {
+      .chat-conv-panel { display: none; }
+      .chat-conv-panel.show { display: flex; position: absolute; z-index: 100; height: 100%; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="/assets/autopilot.png" style="width:36px;height:36px;object-fit:contain;border-radius:8px;" alt="Adsy" />
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
+      <div class="nav-item" data-page="ctwa.html"><span class="nav-icon">💬</span> Buat Iklan CTWA</div>
+      <div class="nav-item" data-page="boost-post.html"><span class="nav-icon">🚀</span> Boost Post</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="generate-image.html"><span class="nav-icon">🎨</span> Generate Gambar</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-item" data-page="topup.html"><span class="nav-icon">💳</span> Top Up Budget</div>
+      <div class="nav-item" data-page="card.html"><span class="nav-icon">🏦</span> Kartu Iklan Adsy</div>
+      <div class="nav-item" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
+      <div class="nav-item" data-page="products.html"><span class="nav-icon">📦</span> Produk</div>
+      <div class="nav-item active" data-page="chat.html"><span class="nav-icon">💬</span> Chat <span class="nav-badge" id="chat-nav-badge" style="display:none">0</span></div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content" style="padding:0;">
+    <div class="chat-layout">
+
+      <!-- Kiri: daftar percakapan -->
+      <div class="chat-conv-panel" id="chat-conv-panel">
+        <div class="chat-conv-header">
+          <strong>💬 Percakapan</strong>
+          <span id="conv-total" style="font-size:12px;color:var(--gray-5)"></span>
+        </div>
+        <div class="chat-conv-search">
+          <input type="text" id="conv-search" placeholder="🔍 Cari advertiser..." oninput="filterConvList(this.value)" />
+        </div>
+        <div class="chat-conv-list" id="conv-list">
+          <div class="chat-conv-empty">Memuat percakapan...</div>
+        </div>
+      </div>
+
+      <!-- Kanan: thread chat -->
+      <div class="chat-thread-panel" id="chat-thread-panel">
+        <div class="chat-thread-empty" id="chat-thread-empty">
+          <div class="big-icon">💬</div>
+          <p>Pilih percakapan untuk memulai</p>
+        </div>
+        <!-- Thread aktif (hidden sampai dipilih) -->
+        <div id="chat-active-thread" style="display:none; flex:1; display:none; flex-direction:column; overflow:hidden;">
+          <div class="chat-thread-header" id="chat-thread-header">
+            <div class="chat-conv-avatar" id="thread-avatar" style="width:36px;height:36px;font-size:13px;"></div>
+            <div>
+              <div class="chat-thread-header-name" id="thread-name">-</div>
+              <div class="chat-thread-header-sub" id="thread-sub">-</div>
+            </div>
+          </div>
+          <div class="chat-messages-area" id="chat-messages-area">
+            <div class="chat-thread-loading">Memuat pesan...</div>
+          </div>
+          <div class="chat-input-area">
+            <input type="text" id="chat-main-input" class="chat-main-input" placeholder="Ketik pesan ke advertiser..." maxlength="2000" />
+            <button class="chat-send-main" id="chat-send-main">➤</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { requireAuth, getProfile, renderUserInfo } from './js/auth.js';
+import { initSidebar, showToast } from './js/sidebar.js';
+import { getSupabase } from './js/supabase.js';
+
+let sb, currentUser, currentProfile;
+let activeConvUserId = null;
+let allConversations = [];
+let realtimeSub = null;
+
+// ── Init ──
+(async () => {
+  await requireAuth();
+  currentProfile = await getProfile();
+
+  // Admin only
+  if (!['admin', 'superadmin'].includes(currentProfile?.role)) {
+    window.location.href = 'dashboard.html';
+    return;
+  }
+
+  renderUserInfo(currentProfile);
+  initSidebar();
+
+  sb = await getSupabase();
+  const { data: { user } } = await sb.auth.getUser();
+  currentUser = user;
+
+  await loadConversations();
+  subscribeRealtime();
+})();
+
+// ── Load semua percakapan ──
+async function loadConversations() {
+  const listEl = document.getElementById('conv-list');
+
+  // Ambil semua messages yang melibatkan admin atau advertiser
+  const { data: msgs, error } = await sb.from('chat_messages')
+    .select('id, sender_id, receiver_id, message, is_read, created_at')
+    .order('created_at', { ascending: false })
+    .limit(1000);
+
+  if (error) { listEl.innerHTML = '<div class="chat-conv-empty">Gagal memuat.</div>'; return; }
+
+  // Ambil semua user profiles
+  const userIds = [...new Set([...(msgs||[]).map(m => m.sender_id), ...(msgs||[]).map(m => m.receiver_id)])];
+  if (!userIds.length) { listEl.innerHTML = '<div class="chat-conv-empty">Belum ada percakapan.</div>'; return; }
+
+  const { data: profiles } = await sb.from('profiles')
+    .select('id, name, role, avatar_url').in('id', userIds);
+  const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]));
+
+  // Group by advertiser (non-admin party)
+  const convMap = {};
+  for (const msg of (msgs || [])) {
+    const senderProfile = profileMap[msg.sender_id];
+    const receiverProfile = profileMap[msg.receiver_id];
+    // Tentukan partner (bukan admin)
+    const isAdminSender = ['admin', 'superadmin'].includes(senderProfile?.role);
+    const partnerId = isAdminSender ? msg.receiver_id : msg.sender_id;
+    const partnerProfile = isAdminSender ? receiverProfile : senderProfile;
+
+    if (!partnerProfile || ['admin', 'superadmin'].includes(partnerProfile.role)) continue;
+
+    if (!convMap[partnerId]) {
+      convMap[partnerId] = { user: partnerProfile, lastMsg: msg, unreadCount: 0 };
+    }
+    // Hitung unread (pesan ke admin yang belum dibaca)
+    if (!msg.is_read && msg.receiver_id === currentUser.id) {
+      convMap[partnerId].unreadCount++;
+    }
+  }
+
+  allConversations = Object.values(convMap);
+  document.getElementById('conv-total').textContent = allConversations.length + ' chat';
+  renderConvList(allConversations);
+}
+
+function renderConvList(convs) {
+  const listEl = document.getElementById('conv-list');
+  if (!convs.length) {
+    listEl.innerHTML = '<div class="chat-conv-empty">Belum ada percakapan.</div>';
+    return;
+  }
+  listEl.innerHTML = convs.map(c => {
+    const initials = (c.user.name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const avatar = c.user.avatar_url
+      ? `<img src="${c.user.avatar_url}" />`
+      : initials;
+    const preview = escHtml(c.lastMsg.message).replace(/<br>/g, ' ').slice(0, 45) + (c.lastMsg.message.length > 45 ? '...' : '');
+    const time = fmtTime(c.lastMsg.created_at);
+    const unreadBadge = c.unreadCount > 0 ? `<div class="chat-conv-unread">${c.unreadCount}</div>` : '';
+    const isActive = activeConvUserId === c.user.id ? ' active' : '';
+    return `
+      <div class="chat-conv-item${isActive}" data-user-id="${c.user.id}" onclick="openConversation('${c.user.id}')">
+        <div class="chat-conv-avatar">${avatar}</div>
+        <div class="chat-conv-info">
+          <div class="chat-conv-name">${escHtml(c.user.name || 'Advertiser')}</div>
+          <div class="chat-conv-preview">${preview}</div>
+        </div>
+        <div class="chat-conv-meta">
+          <div class="chat-conv-time">${time}</div>
+          ${unreadBadge}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── Filter search ──
+window.filterConvList = function(q) {
+  const filtered = q.trim()
+    ? allConversations.filter(c => (c.user.name || '').toLowerCase().includes(q.toLowerCase()))
+    : allConversations;
+  renderConvList(filtered);
+};
+
+// ── Buka percakapan ──
+window.openConversation = async function(userId) {
+  activeConvUserId = userId;
+
+  // Update active state di list
+  document.querySelectorAll('.chat-conv-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.userId === userId);
+  });
+
+  // Tampilkan thread panel
+  document.getElementById('chat-thread-empty').style.display = 'none';
+  const thread = document.getElementById('chat-active-thread');
+  thread.style.display = 'flex';
+  thread.style.flexDirection = 'column';
+
+  // Set header
+  const conv = allConversations.find(c => c.user.id === userId);
+  if (conv) {
+    const initials = (conv.user.name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const avatarEl = document.getElementById('thread-avatar');
+    avatarEl.innerHTML = conv.user.avatar_url ? `<img src="${conv.user.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : initials;
+    document.getElementById('thread-name').textContent = conv.user.name || 'Advertiser';
+    document.getElementById('thread-sub').textContent = 'Advertiser';
+  }
+
+  // Load messages
+  const area = document.getElementById('chat-messages-area');
+  area.innerHTML = '<div class="chat-thread-loading">Memuat pesan...</div>';
+
+  const { data: msgs } = await sb.from('chat_messages')
+    .select('*')
+    .or(`and(sender_id.eq.${userId},receiver_id.eq.${currentUser.id}),and(sender_id.eq.${currentUser.id},receiver_id.eq.${userId})`)
+    .order('created_at', { ascending: true })
+    .limit(200);
+
+  area.innerHTML = '';
+  if (!msgs?.length) {
+    area.innerHTML = '<div class="chat-thread-loading">Belum ada pesan.</div>';
+  } else {
+    let lastDate = '';
+    for (const msg of msgs) {
+      const msgDate = new Date(msg.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      if (msgDate !== lastDate) {
+        area.insertAdjacentHTML('beforeend', `<div class="chat-date-label">${msgDate}</div>`);
+        lastDate = msgDate;
+      }
+      appendAdminMsg(msg, area, false);
+    }
+    area.scrollTop = area.scrollHeight;
+  }
+
+  // Mark unread as read
+  await sb.from('chat_messages')
+    .update({ is_read: true })
+    .eq('receiver_id', currentUser.id)
+    .eq('sender_id', userId)
+    .eq('is_read', false);
+
+  // Reset unread di conv list
+  const convObj = allConversations.find(c => c.user.id === userId);
+  if (convObj) { convObj.unreadCount = 0; }
+  renderConvList(allConversations);
+
+  // Focus input
+  document.getElementById('chat-main-input')?.focus();
+};
+
+function appendAdminMsg(msg, area, scroll = true) {
+  if (!area) area = document.getElementById('chat-messages-area');
+  if (!area || !currentUser) return;
+  if (area.querySelector(`[data-id="${msg.id}"]`)) return;
+  const isMine = msg.sender_id === currentUser.id;
+  const time = new Date(msg.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  const el = document.createElement('div');
+  el.className = `chat-msg-admin ${isMine ? 'mine' : 'theirs'}`;
+  el.dataset.id = msg.id;
+  el.innerHTML = `<div class="chat-bubble-admin">${escHtml(msg.message)}</div><div class="chat-time-admin">${time}</div>`;
+  area.appendChild(el);
+  if (scroll) requestAnimationFrame(() => { area.scrollTop = area.scrollHeight; });
+}
+
+// ── Send pesan (admin ke advertiser) ──
+document.getElementById('chat-send-main')?.addEventListener('click', sendAdminMsg);
+document.getElementById('chat-main-input')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAdminMsg(); }
+});
+
+async function sendAdminMsg() {
+  const input = document.getElementById('chat-main-input');
+  const btn = document.getElementById('chat-send-main');
+  const msg = input?.value?.trim();
+  if (!msg || !activeConvUserId) return;
+
+  btn.disabled = true;
+  input.value = '';
+
+  const { data: inserted, error } = await sb.from('chat_messages').insert({
+    sender_id: currentUser.id,
+    receiver_id: activeConvUserId,
+    message: msg
+  }).select().single();
+
+  if (error) {
+    input.value = msg;
+    showToast('Gagal kirim pesan', 'error');
+  } else if (inserted) {
+    appendAdminMsg(inserted, document.getElementById('chat-messages-area'));
+    // Update conv list preview
+    const convObj = allConversations.find(c => c.user.id === activeConvUserId);
+    if (convObj) { convObj.lastMsg = inserted; renderConvList(allConversations); }
+  }
+
+  btn.disabled = false;
+  input.focus();
+}
+
+// ── Supabase Realtime ──
+function subscribeRealtime() {
+  realtimeSub = sb.channel('chat-admin-' + currentUser.id)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'chat_messages'
+    }, async (payload) => {
+      const msg = payload.new;
+      const isForMe = msg.receiver_id === currentUser.id;
+      const isFromActive = msg.sender_id === activeConvUserId;
+
+      // Jika thread aktif terbuka untuk pengirim ini → tampilkan + mark read
+      if (isForMe && isFromActive) {
+        appendAdminMsg(msg, document.getElementById('chat-messages-area'));
+        await sb.from('chat_messages').update({ is_read: true }).eq('id', msg.id);
+      }
+
+      // Refresh conv list
+      await loadConversations();
+    })
+    .subscribe();
+}
+
+// ── Format helpers ──
+function fmtTime(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return 'baru saja';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm';
+  if (diff < 86400000) return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
+}
+</script>
+</body>
+</html>
