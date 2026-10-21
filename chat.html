@@ -227,6 +227,33 @@
     .chat-send-main:hover { background: #4f46e5; }
     .chat-send-main:disabled { background: var(--gray-3); cursor: not-allowed; }
 
+    /* Image messages */
+    .chat-img-preview {
+      max-width: 220px;
+      max-height: 200px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: block;
+      margin-bottom: 4px;
+      object-fit: cover;
+    }
+    .chat-img-btn {
+      background: none;
+      border: 1.5px solid var(--border);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--gray-5);
+      transition: border-color .2s, color .2s;
+    }
+    .chat-img-btn:hover { border-color: var(--primary); color: var(--primary); }
+
     /* New message indicator */
     .chat-thread-loading { text-align: center; color: var(--gray-5); font-size: 13px; padding: 32px; }
 
@@ -327,6 +354,8 @@
             <div class="chat-thread-loading">Memuat pesan...</div>
           </div>
           <div class="chat-input-area">
+            <input type="file" id="chat-img-input" accept="image/*" style="display:none;" />
+            <button class="chat-img-btn" id="chat-img-btn" title="Kirim foto">📷</button>
             <input type="text" id="chat-main-input" class="chat-main-input" placeholder="Ketik pesan ke advertiser..." maxlength="2000" />
             <button class="chat-send-main" id="chat-send-main">➤</button>
           </div>
@@ -427,8 +456,9 @@ function renderConvList(convs) {
     const avatar = c.user.avatar_url
       ? `<img src="${c.user.avatar_url}" />`
       : initials;
+    const lastMsgText = c.lastMsg?.image_url && !c.lastMsg?.message ? '📷 Foto' : (c.lastMsg?.message || '');
     const preview = c.lastMsg
-      ? escHtml(c.lastMsg.message).replace(/<br>/g, ' ').slice(0, 45) + (c.lastMsg.message.length > 45 ? '...' : '')
+      ? escHtml(lastMsgText).replace(/<br>/g, ' ').slice(0, 45) + (lastMsgText.length > 45 ? '...' : '')
       : '<span style="color:var(--gray-4);font-style:italic;font-size:11px;">Belum ada pesan</span>';
     const time = c.lastMsg ? fmtTime(c.lastMsg.created_at) : '';
     const unreadBadge = c.unreadCount > 0 ? `<div class="chat-conv-unread">${c.unreadCount}</div>` : '';
@@ -533,7 +563,11 @@ function appendAdminMsg(msg, area, scroll = true) {
   const el = document.createElement('div');
   el.className = `chat-msg-admin ${isMine ? 'mine' : 'theirs'}`;
   el.dataset.id = msg.id;
-  el.innerHTML = `<div class="chat-bubble-admin">${escHtml(msg.message)}</div><div class="chat-time-admin">${time}</div>`;
+  const imgHtml = msg.image_url
+    ? `<img src="${escAttr(msg.image_url)}" class="chat-img-preview" onclick="window.open('${escAttr(msg.image_url)}','_blank')" />`
+    : '';
+  const textHtml = msg.message ? `<div class="chat-bubble-admin">${escHtml(msg.message)}</div>` : '';
+  el.innerHTML = imgHtml + textHtml + `<div class="chat-time-admin">${time}</div>`;
   area.appendChild(el);
   if (scroll) requestAnimationFrame(() => { area.scrollTop = area.scrollHeight; });
 }
@@ -543,6 +577,53 @@ document.getElementById('chat-send-main')?.addEventListener('click', sendAdminMs
 document.getElementById('chat-main-input')?.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAdminMsg(); }
 });
+document.getElementById('chat-img-btn')?.addEventListener('click', () => {
+  if (!activeConvUserId) { showToast('Pilih percakapan dulu', 'warning'); return; }
+  document.getElementById('chat-img-input')?.click();
+});
+document.getElementById('chat-img-input')?.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) { uploadAdminImage(file); e.target.value = ''; }
+});
+
+async function uploadAdminImage(file) {
+  if (!file.type.startsWith('image/')) { showToast('Hanya file gambar yang diizinkan', 'error'); return; }
+  if (file.size > 5 * 1024 * 1024) { showToast('Ukuran maksimal 5MB', 'error'); return; }
+  if (!activeConvUserId) return;
+
+  const btn = document.getElementById('chat-send-main');
+  btn.disabled = true;
+
+  try {
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${currentUser.id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await sb.storage.from('chat-images').upload(path, file, { contentType: file.type });
+    if (upErr) throw new Error('Gagal upload: ' + upErr.message);
+
+    const { data: urlData } = sb.storage.from('chat-images').getPublicUrl(path);
+    const caption = document.getElementById('chat-main-input')?.value?.trim() || '';
+    if (caption) document.getElementById('chat-main-input').value = '';
+
+    const { data: inserted, error } = await sb.from('chat_messages').insert({
+      sender_id: currentUser.id,
+      receiver_id: activeConvUserId,
+      message: caption,
+      image_url: urlData.publicUrl
+    }).select().single();
+
+    if (error) throw new Error(error.message);
+    if (inserted) {
+      appendAdminMsg(inserted, document.getElementById('chat-messages-area'));
+      const convObj = allConversations.find(c => c.user.id === activeConvUserId);
+      if (convObj) { convObj.lastMsg = inserted; renderConvList(allConversations); }
+      sendWAToAdvertiser(activeConvUserId, caption || '📷 Mengirim foto');
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
 
 async function sendAdminMsg() {
   const input = document.getElementById('chat-main-input');
@@ -564,10 +645,8 @@ async function sendAdminMsg() {
     showToast('Gagal kirim pesan', 'error');
   } else if (inserted) {
     appendAdminMsg(inserted, document.getElementById('chat-messages-area'));
-    // Update conv list preview
     const convObj = allConversations.find(c => c.user.id === activeConvUserId);
     if (convObj) { convObj.lastMsg = inserted; renderConvList(allConversations); }
-    // Kirim WA notif ke advertiser (fire & forget)
     sendWAToAdvertiser(activeConvUserId, msg);
   }
 
@@ -627,9 +706,13 @@ function fmtTime(dateStr) {
 }
 
 function escHtml(s) {
-  return String(s)
+  return String(s || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/\n/g, '<br>');
+}
+
+function escAttr(s) {
+  return String(s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 </script>
 </body>
