@@ -1,5 +1,6 @@
 import { logout } from './auth.js';
 import { getSupabase } from './supabase.js';
+import { initChatWidget } from './chat-widget.js';
 
 // ── MOBILE MENU HELPERS ──
 function openMobileMenu() {
@@ -78,6 +79,25 @@ export function initSidebar() {
   }
 
   injectProfileModal();
+  injectChatNavItem();
+  // Init floating chat bubble (async, tidak block render)
+  initChatWidget().catch(() => {});
+}
+
+function injectChatNavItem() {
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav || nav.querySelector('[data-page="chat.html"]')) return;
+  const item = document.createElement('div');
+  item.className = 'nav-item';
+  item.dataset.page = 'chat.html';
+  item.innerHTML = '<span class="nav-icon">💬</span> Chat <span class="nav-badge" id="chat-nav-badge" style="display:none;background:#ef4444;">0</span>';
+  // Insert setelah settings.html
+  const settingsItem = nav.querySelector('[data-page="settings.html"]');
+  if (settingsItem) settingsItem.insertAdjacentElement('afterend', item);
+  else nav.appendChild(item);
+  // Set active state
+  const current = window.location.pathname.split('/').pop() || 'dashboard.html';
+  if (current === 'chat.html') item.classList.add('active');
 }
 
 // ── PROFILE MODAL ──
