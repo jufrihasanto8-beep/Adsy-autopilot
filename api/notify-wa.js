@@ -1029,6 +1029,47 @@ Field tidak ditemukan = null.` }
     }
   }
 
+  // ── chat_reply: notif WA ke advertiser saat admin balas pesan ──
+  if (action === 'chat_reply') {
+    const { receiver_id, sender_name, message_preview } = body;
+    if (!receiver_id) return res.status(400).json({ error: 'receiver_id diperlukan' });
+
+    // Ambil wa_target advertiser dari app_config
+    const { data: userCfg } = await sb.from('app_config')
+      .select('wa_target').eq('user_id', receiver_id).maybeSingle();
+    const noWa = userCfg?.wa_target;
+    if (!noWa) return res.json({ ok: false, warn: 'Nomor WA advertiser belum diset di Settings' });
+
+    // Ambil fonnte token dari admin mana saja
+    const { data: cfgWithToken } = await sb.from('app_config')
+      .select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle();
+    const fonnteToken = cfgWithToken?.fonnte_token || process.env.FONNTE_TOKEN;
+    if (!fonnteToken) return res.json({ ok: false, warn: 'Fonnte token belum dikonfigurasi' });
+
+    const baseUrl = process.env.APP_URL || 'https://adsy-autopilot.vercel.app';
+    const target = formatWaTarget(noWa);
+    const pesan = [
+      `💬 *Pesan dari ${sender_name} — Adsy Autopilot*`,
+      ``,
+      `_"${message_preview}"_`,
+      ``,
+      `Balas di: ${baseUrl}/dashboard.html`,
+      `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+    ].join('\n');
+
+    try {
+      const r2 = await fetch('https://api.fonnte.com/send', {
+        method: 'POST',
+        headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target, message: pesan, countryCode: '62' })
+      });
+      const d = await r2.json();
+      return res.json({ ok: d.status !== false });
+    } catch (e) {
+      return res.json({ ok: false, warn: e.message });
+    }
+  }
+
   // ── chat_message: notif WA ke admin saat advertiser kirim pesan ──
   if (action === 'chat_message') {
     const { sender_name, message_preview } = body;
