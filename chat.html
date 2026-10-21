@@ -265,13 +265,54 @@
     /* New message indicator */
     .chat-thread-loading { text-align: center; color: var(--gray-5); font-size: 13px; padding: 32px; }
 
+    /* Tombol back — hanya mobile */
+    .chat-back-btn {
+      display: none;
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--text);
+      padding: 0 8px 0 0;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
     /* Mobile */
     @media (max-width: 768px) {
       .chat-conv-panel { width: 260px; }
     }
     @media (max-width: 600px) {
-      .chat-conv-panel { display: none; }
-      .chat-conv-panel.show { display: flex; position: absolute; z-index: 100; height: 100%; }
+      .chat-layout { position: relative; overflow: hidden; }
+
+      /* Panel kiri: full width, default tampil */
+      .chat-conv-panel {
+        width: 100%;
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        transition: transform .25s ease;
+      }
+      .chat-conv-panel.mobile-hidden {
+        transform: translateX(-100%);
+        pointer-events: none;
+      }
+
+      /* Panel kanan: full width, default di belakang */
+      .chat-thread-panel {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        transform: translateX(100%);
+        transition: transform .25s ease;
+      }
+      .chat-thread-panel.mobile-active {
+        transform: translateX(0);
+        z-index: 3;
+      }
+
+      /* Tombol back muncul di mobile */
+      .chat-back-btn { display: block; }
     }
   </style>
 </head>
@@ -352,6 +393,7 @@
         <!-- Thread aktif (hidden sampai dipilih) -->
         <div id="chat-active-thread" style="display:none; flex:1; flex-direction:column; overflow:hidden; min-height:0;">
           <div class="chat-thread-header" id="chat-thread-header">
+            <button class="chat-back-btn" id="chat-back-btn" title="Kembali">‹</button>
             <div class="chat-conv-avatar" id="thread-avatar" style="width:36px;height:36px;font-size:13px;"></div>
             <div>
               <div class="chat-thread-header-name" id="thread-name">-</div>
@@ -510,6 +552,12 @@ window.openConversation = async function(userId) {
   thread.style.display = 'flex';
   thread.style.flexDirection = 'column';
 
+  // Mobile: geser ke thread panel
+  if (window.innerWidth <= 600) {
+    document.getElementById('chat-conv-panel').classList.add('mobile-hidden');
+    document.getElementById('chat-thread-panel').classList.add('mobile-active');
+  }
+
   // Set header
   const conv = allConversations.find(c => c.user.id === userId);
   if (conv) {
@@ -580,6 +628,14 @@ function appendAdminMsg(msg, area, scroll = true) {
   area.appendChild(el);
   if (scroll) requestAnimationFrame(() => { area.scrollTop = area.scrollHeight; });
 }
+
+// ── Tombol back (mobile) ──
+document.getElementById('chat-back-btn')?.addEventListener('click', () => {
+  document.getElementById('chat-conv-panel').classList.remove('mobile-hidden');
+  document.getElementById('chat-thread-panel').classList.remove('mobile-active');
+  activeConvUserId = null;
+  document.querySelectorAll('.chat-conv-item').forEach(el => el.classList.remove('active'));
+});
 
 // ── Send pesan (admin ke advertiser) ──
 document.getElementById('chat-send-main')?.addEventListener('click', sendAdminMsg);
