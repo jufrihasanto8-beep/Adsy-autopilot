@@ -567,10 +567,27 @@ async function sendAdminMsg() {
     // Update conv list preview
     const convObj = allConversations.find(c => c.user.id === activeConvUserId);
     if (convObj) { convObj.lastMsg = inserted; renderConvList(allConversations); }
+    // Kirim WA notif ke advertiser (fire & forget)
+    sendWAToAdvertiser(activeConvUserId, msg);
   }
 
   btn.disabled = false;
   input.focus();
+}
+
+async function sendWAToAdvertiser(receiverId, message) {
+  try {
+    await fetch('/api/notify-wa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'chat_reply',
+        receiver_id: receiverId,
+        sender_name: currentProfile?.name || 'Admin',
+        message_preview: message.length > 80 ? message.slice(0, 80) + '...' : message
+      })
+    });
+  } catch (_) {}
 }
 
 // ── Supabase Realtime ──
