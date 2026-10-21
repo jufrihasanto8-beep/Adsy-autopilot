@@ -92,7 +92,7 @@
     .chat-conv-time { font-size: 10px; color: var(--gray-5); }
     .chat-conv-unread {
       min-width: 18px; height: 18px;
-      background: var(--primary);
+      background: #ef4444;
       color: #fff;
       border-radius: 9px;
       font-size: 10px;
@@ -102,6 +102,11 @@
       justify-content: center;
       padding: 0 4px;
     }
+    /* Item dengan unread → nama tebal + background lebih terang */
+    .chat-conv-item.has-unread { background: #fef2f2; }
+    .chat-conv-item.has-unread:hover { background: #fee2e2; }
+    .chat-conv-item.has-unread .chat-conv-name { font-weight: 700; color: var(--text); }
+    .chat-conv-item.has-unread .chat-conv-preview { color: var(--text); font-weight: 500; }
     .chat-conv-empty { text-align: center; color: var(--gray-5); font-size: 13px; padding: 40px 16px; }
 
     /* ── Chat thread (right) ── */
@@ -281,6 +286,8 @@
     /* Mobile */
     @media (max-width: 768px) {
       .chat-conv-panel { width: 260px; }
+      /* iOS zoom fix khusus chat input */
+      .chat-main-input, .chat-conv-search input { font-size: 16px !important; }
     }
     @media (max-width: 600px) {
       .chat-layout { position: relative; overflow: hidden; }
@@ -464,7 +471,7 @@ async function loadConversations() {
 
   // 2. Ambil messages untuk last message + unread count
   const { data: msgs } = await sb.from('chat_messages')
-    .select('id, sender_id, receiver_id, message, is_read, created_at')
+    .select('id, sender_id, receiver_id, message, image_url, is_read, created_at')
     .order('created_at', { ascending: false })
     .limit(500);
 
@@ -513,8 +520,9 @@ function renderConvList(convs) {
     const time = c.lastMsg ? fmtTime(c.lastMsg.created_at) : '';
     const unreadBadge = c.unreadCount > 0 ? `<div class="chat-conv-unread">${c.unreadCount}</div>` : '';
     const isActive = activeConvUserId === c.user.id ? ' active' : '';
+    const hasUnread = c.unreadCount > 0 && activeConvUserId !== c.user.id ? ' has-unread' : '';
     return `
-      <div class="chat-conv-item${isActive}" data-user-id="${c.user.id}" onclick="openConversation('${c.user.id}')">
+      <div class="chat-conv-item${isActive}${hasUnread}" data-user-id="${c.user.id}" onclick="openConversation('${c.user.id}')">
         <div class="chat-conv-avatar">${avatar}</div>
         <div class="chat-conv-info">
           <div class="chat-conv-name">${escHtml(c.user.name || 'Advertiser')}</div>
@@ -728,7 +736,7 @@ async function sendWAToAdvertiser(receiverId, message) {
         action: 'chat_reply',
         sender_id: currentUser?.id,
         receiver_id: receiverId,
-        sender_name: currentProfile?.name || 'Admin',
+        sender_name: 'Tim Adsy',
         message_preview: message.length > 80 ? message.slice(0, 80) + '...' : message
       })
     });
