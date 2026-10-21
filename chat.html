@@ -372,46 +372,47 @@ let realtimeSub = null;
 // ── Load semua percakapan ──
 async function loadConversations() {
   const listEl = document.getElementById('conv-list');
+  listEl.innerHTML = '<div class="chat-conv-empty">Memuat...</div>';
 
-  // Ambil semua messages yang melibatkan admin atau advertiser
-  const { data: msgs, error } = await sb.from('chat_messages')
+  // 1. Ambil SEMUA advertiser (bukan admin) — supaya muncul meski belum pernah chat
+  const { data: advertisers, error: advErr } = await sb.from('profiles')
+    .select('id, name, role, avatar_url, status')
+    .not('role', 'in', '("admin","superadmin")')
+    .eq('status', 'active')
+    .order('name');
+
+  if (advErr) { listEl.innerHTML = '<div class="chat-conv-empty">Gagal memuat.</div>'; return; }
+
+  // 2. Ambil messages untuk last message + unread count
+  const { data: msgs } = await sb.from('chat_messages')
     .select('id, sender_id, receiver_id, message, is_read, created_at')
     .order('created_at', { ascending: false })
-    .limit(1000);
+    .limit(500);
 
-  if (error) { listEl.innerHTML = '<div class="chat-conv-empty">Gagal memuat.</div>'; return; }
-
-  // Ambil semua user profiles
-  const userIds = [...new Set([...(msgs||[]).map(m => m.sender_id), ...(msgs||[]).map(m => m.receiver_id)])];
-  if (!userIds.length) { listEl.innerHTML = '<div class="chat-conv-empty">Belum ada percakapan.</div>'; return; }
-
-  const { data: profiles } = await sb.from('profiles')
-    .select('id, name, role, avatar_url').in('id', userIds);
-  const profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]));
-
-  // Group by advertiser (non-admin party)
+  // Build conv map dari messages
   const convMap = {};
   for (const msg of (msgs || [])) {
-    const senderProfile = profileMap[msg.sender_id];
-    const receiverProfile = profileMap[msg.receiver_id];
-    // Tentukan partner (bukan admin)
-    const isAdminSender = ['admin', 'superadmin'].includes(senderProfile?.role);
-    const partnerId = isAdminSender ? msg.receiver_id : msg.sender_id;
-    const partnerProfile = isAdminSender ? receiverProfile : senderProfile;
-
-    if (!partnerProfile || ['admin', 'superadmin'].includes(partnerProfile.role)) continue;
-
-    if (!convMap[partnerId]) {
-      convMap[partnerId] = { user: partnerProfile, lastMsg: msg, unreadCount: 0 };
-    }
-    // Hitung unread (pesan ke admin yang belum dibaca)
-    if (!msg.is_read && msg.receiver_id === currentUser.id) {
-      convMap[partnerId].unreadCount++;
-    }
+    const partnerId = msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id;
+    if (!convMap[partnerId]) convMap[partnerId] = { lastMsg: msg, unreadCount: 0 };
+    if (!msg.is_read && msg.receiver_id === currentUser.id) convMap[partnerId].unreadCount++;
   }
 
-  allConversations = Object.values(convMap);
-  document.getElementById('conv-total').textContent = allConversations.length + ' chat';
+  // 3. Gabung: semua advertiser + data chat kalau ada
+  allConversations = (advertisers || []).map(user => ({
+    user,
+    lastMsg: convMap[user.id]?.lastMsg || null,
+    unreadCount: convMap[user.id]?.unreadCount || 0
+  }));
+
+  // Sort: yang ada pesan terbaru dulu, sisanya urut nama
+  allConversations.sort((a, b) => {
+    if (a.lastMsg && b.lastMsg) return new Date(b.lastMsg.created_at) - new Date(a.lastMsg.created_at);
+    if (a.lastMsg) return -1;
+    if (b.lastMsg) return 1;
+    return (a.user.name || '').localeCompare(b.user.name || '', 'id');
+  });
+
+  document.getElementById('conv-total').textContent = allConversations.length + ' advertiser';
   renderConvList(allConversations);
 }
 
@@ -426,8 +427,10 @@ function renderConvList(convs) {
     const avatar = c.user.avatar_url
       ? `<img src="${c.user.avatar_url}" />`
       : initials;
-    const preview = escHtml(c.lastMsg.message).replace(/<br>/g, ' ').slice(0, 45) + (c.lastMsg.message.length > 45 ? '...' : '');
-    const time = fmtTime(c.lastMsg.created_at);
+    const preview = c.lastMsg
+      ? escHtml(c.lastMsg.message).replace(/<br>/g, ' ').slice(0, 45) + (c.lastMsg.message.length > 45 ? '...' : '')
+      : '<span style="color:var(--gray-4);font-style:italic;font-size:11px;">Belum ada pesan</span>';
+    const time = c.lastMsg ? fmtTime(c.lastMsg.created_at) : '';
     const unreadBadge = c.unreadCount > 0 ? `<div class="chat-conv-unread">${c.unreadCount}</div>` : '';
     const isActive = activeConvUserId === c.user.id ? ' active' : '';
     return `
