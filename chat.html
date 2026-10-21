@@ -13,10 +13,10 @@
     /* ── Chat layout ── */
     .chat-layout {
       display: flex;
-      height: calc(100vh - 70px);
+      flex: 1;
+      min-height: 0;
       overflow: hidden;
       gap: 0;
-      margin: -20px;
     }
 
     /* ── Conversation list (left) ── */
@@ -231,7 +231,6 @@
 
     /* Mobile */
     @media (max-width: 768px) {
-      .chat-layout { height: calc(100vh - 60px); }
       .chat-conv-panel { width: 260px; }
     }
     @media (max-width: 600px) {
@@ -285,7 +284,13 @@
     </div>
   </aside>
 
-  <main class="main-content" style="padding:0;">
+  <main class="main-content" style="padding:0; display:flex; flex-direction:column; overflow:hidden;">
+    <header class="topbar" style="flex-shrink:0;">
+      <div class="topbar-left">
+        <h2>💬 Chat</h2>
+        <p>Percakapan dengan advertiser</p>
+      </div>
+    </header>
     <div class="chat-layout">
 
       <!-- Kiri: daftar percakapan -->
@@ -352,7 +357,7 @@ let realtimeSub = null;
     return;
   }
 
-  renderUserInfo(currentProfile);
+  await renderUserInfo();
   initSidebar();
 
   sb = await getSupabase();

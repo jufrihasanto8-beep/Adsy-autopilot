@@ -79,6 +79,19 @@
     .empty-state { text-align:center; padding:56px 24px; color:var(--text-sub); }
     .empty-state .icon { font-size:48px; margin-bottom:12px; }
 
+    /* ── Finance ACC Card ── */
+    .fin-card { background:#fff; border:1.5px solid var(--gray-2); border-radius:14px; padding:16px 18px; margin-bottom:10px; display:flex; align-items:flex-start; gap:14px; }
+    .fin-card.done { border-color:#6ee7b7; background:#f0fdf4; }
+    .fin-card-body { flex:1; min-width:0; }
+    .fin-card-top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+    .fin-card-name { font-size:14px; font-weight:700; color:var(--text); }
+    .fin-card-rows { display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; }
+    .fin-card-row { display:flex; gap:6px; font-size:12px; }
+    .fin-card-row .lbl { color:var(--text-sub); flex-shrink:0; }
+    .fin-card-row .val { font-weight:600; color:var(--text); }
+    .fin-acc-btn { flex-shrink:0; align-self:center; }
+    @media(max-width:600px) { .fin-card { flex-direction:column; } .fin-acc-btn { align-self:stretch; width:100%; } .fin-card-rows { grid-template-columns:1fr; } }
+
     /* ── Ad Account selector in request form ── */
     .billing-info-bar { background:linear-gradient(135deg,#eff6ff,#f0fdf4); border:1.5px solid #bfdbfe; border-radius:12px; padding:14px 16px; margin-top:8px; display:none; }
     .billing-info-bar .bi-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:3px 0; }
@@ -338,6 +351,56 @@
             <div class="loading-state"><div class="spinner"></div></div>
           </div>
         </div>
+      </div>
+
+      <!-- ── Panel: ACC Finance (admin only) ── -->
+      <div id="panel-finance" class="topup-panel" style="display:none; max-width:760px; margin:0 auto;">
+
+        <!-- Header + filter -->
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
+          <div>
+            <div style="font-size:16px; font-weight:700; color:var(--text);">📋 ACC Finance</div>
+            <div style="font-size:12px; color:var(--text-sub); margin-top:2px;">Tracking transfer budget ke akun iklan advertiser</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <span id="finance-count-pending" style="background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; border-radius:20px; padding:4px 12px; font-size:12px; font-weight:700;">⏳ Belum: 0</span>
+            <span id="finance-count-done" style="background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; border-radius:20px; padding:4px 12px; font-size:12px; font-weight:700;">✅ Sudah: 0</span>
+            <button class="btn btn-outline btn-sm" onclick="loadFinanceList()" style="font-size:12px; padding:6px 14px;">🔄 Refresh</button>
+          </div>
+        </div>
+
+        <!-- Filter tanggal -->
+        <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;" id="finance-date-filters">
+          <button class="status-tab active" data-fdate="today" onclick="setFinanceDateFilter('today',this)">📅 Hari Ini</button>
+          <button class="status-tab" data-fdate="yesterday" onclick="setFinanceDateFilter('yesterday',this)">🕐 Kemarin</button>
+          <button class="status-tab" data-fdate="week" onclick="setFinanceDateFilter('week',this)">📆 7 Hari</button>
+          <button class="status-tab" data-fdate="all" onclick="setFinanceDateFilter('all',this)">📋 Semua</button>
+        </div>
+
+        <!-- Seksi: Belum Transfer -->
+        <div id="finance-section-pending">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+            <div style="width:4px; height:18px; background:#f59e0b; border-radius:2px;"></div>
+            <strong style="font-size:13px; color:var(--text);">Belum Transfer</strong>
+            <span id="finance-badge-pending" style="background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; border-radius:20px; padding:2px 8px; font-size:11px; font-weight:700;">0</span>
+          </div>
+          <div id="finance-list-pending">
+            <div class="loading-state"><div class="spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- Seksi: Sudah Transfer -->
+        <div id="finance-section-done" style="margin-top:28px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+            <div style="width:4px; height:18px; background:#10b981; border-radius:2px;"></div>
+            <strong style="font-size:13px; color:var(--text);">Sudah Transfer</strong>
+            <span id="finance-badge-done" style="background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; border-radius:20px; padding:2px 8px; font-size:11px; font-weight:700;">0</span>
+          </div>
+          <div id="finance-list-done">
+            <div class="empty-state" style="padding:20px;"><p style="font-size:13px;">Belum ada yang sudah ditransfer.</p></div>
+          </div>
+        </div>
+
       </div>
 
       <!-- ── Panel: Riwayat / Manajemen ── -->
@@ -672,6 +735,19 @@
       document.getElementById('kartu-form-wrap').style.display = 'none';
       document.getElementById('kartu-list-title').textContent = 'Semua Request Kartu';
       document.getElementById('status-filter').style.display = 'block';
+      // Inject tab ACC Finance (admin only)
+      const tabsEl = document.getElementById('topup-tabs');
+      if (tabsEl && !tabsEl.querySelector('[data-tab="finance"]')) {
+        const finTab = document.createElement('button');
+        finTab.className = 'topup-tab';
+        finTab.dataset.tab = 'finance';
+        finTab.setAttribute('onclick', "switchTab('finance')");
+        finTab.innerHTML = '📋 ACC Finance';
+        // Insert sebelum tab Akun Iklan
+        const akunTab = tabsEl.querySelector('[data-tab="akun-iklan"]');
+        if (akunTab) akunTab.before(finTab);
+        else tabsEl.appendChild(finTab);
+      }
       // Aktifkan panel summary sebagai default
       document.getElementById('panel-request').style.display = 'none';
       document.getElementById('panel-summary').style.display = 'block';
@@ -1525,6 +1601,7 @@
     document.getElementById('panel-' + tab).style.display = 'block';
     if (tab === 'riwayat') { historyPage = 0; loadHistory(); }
     if (tab === 'summary') { summaryPage = 0; loadSummary(); }
+    if (tab === 'finance') { loadFinanceList(); }
     if (tab === 'akun-iklan') {
       const isAdminView = ['admin','superadmin'].includes(currentProfile?.role);
       if (isAdminView) document.getElementById('filter-advertiser').style.display = '';
@@ -1539,6 +1616,173 @@
     historyPage = 0;
     document.querySelectorAll('.status-tab').forEach(t => t.classList.toggle('active', t.dataset.status === status));
     loadHistory();
+  };
+
+  // ── ACC Finance ──
+  let financeDateFilter = 'today'; // today | yesterday | week | all
+
+  window.setFinanceDateFilter = function(val, btn) {
+    financeDateFilter = val;
+    document.querySelectorAll('#finance-date-filters .status-tab').forEach(t => t.classList.toggle('active', t.dataset.fdate === val));
+    loadFinanceList();
+  };
+
+  async function loadFinanceList() {
+    const pendingEl = document.getElementById('finance-list-pending');
+    const doneEl = document.getElementById('finance-list-done');
+    pendingEl.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+    doneEl.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+
+    // Hitung rentang tanggal WIB
+    const WIB = 7 * 3600000;
+    const todayWIB = new Date(Date.now() + WIB).toISOString().slice(0, 10);
+    const yestWIB = new Date(Date.now() + WIB - 86400000).toISOString().slice(0, 10);
+    const weekWIB = new Date(Date.now() + WIB - 7 * 86400000).toISOString().slice(0, 10);
+
+    let query = sb.from('topup_requests')
+      .select('id, user_name, nominal_request, nominal_disetujui, status, created_at, updated_at, finance_acc, finance_acc_at, finance_acc_by, ad_account_name, topup_time, extracted_data, products(name)')
+      .eq('status', 'approved')
+      .order('updated_at', { ascending: false });
+
+    if (financeDateFilter === 'today') {
+      query = query.gte('updated_at', todayWIB + 'T00:00:00+07:00');
+    } else if (financeDateFilter === 'yesterday') {
+      query = query.gte('updated_at', yestWIB + 'T00:00:00+07:00').lt('updated_at', todayWIB + 'T00:00:00+07:00');
+    } else if (financeDateFilter === 'week') {
+      query = query.gte('updated_at', weekWIB + 'T00:00:00+07:00');
+    }
+
+    const { data, error } = await query.limit(200);
+    if (error) {
+      pendingEl.innerHTML = '<div class="empty-state"><p>Gagal memuat data.</p></div>';
+      doneEl.innerHTML = '';
+      return;
+    }
+
+    // Tentukan isDone per item: Selow pakai transfer_confirmed, non-Selow pakai finance_acc
+    const isTransferDone = r => {
+      const isSelow = r.extracted_data?.payment_method === 'selow';
+      return isSelow ? !!r.extracted_data?.transfer_confirmed : !!r.finance_acc;
+    };
+    const pending = (data || []).filter(r => !isTransferDone(r));
+    const done = (data || []).filter(r => isTransferDone(r));
+
+    // Update badges & counters
+    document.getElementById('finance-badge-pending').textContent = pending.length;
+    document.getElementById('finance-badge-done').textContent = done.length;
+    document.getElementById('finance-count-pending').textContent = '⏳ Belum: ' + pending.length;
+    document.getElementById('finance-count-done').textContent = '✅ Sudah: ' + done.length;
+
+    // Render belum transfer
+    if (!pending.length) {
+      pendingEl.innerHTML = '<div class="empty-state" style="padding:20px;"><p style="font-size:13px; color:#10b981;">🎉 Semua sudah ditransfer!</p></div>';
+    } else {
+      pendingEl.innerHTML = pending.map(r => renderFinanceCard(r, false)).join('');
+    }
+
+    // Render sudah transfer
+    if (!done.length) {
+      doneEl.innerHTML = '<div class="empty-state" style="padding:16px;"><p style="font-size:13px;">Belum ada yang sudah ditransfer.</p></div>';
+    } else {
+      doneEl.innerHTML = done.map(r => renderFinanceCard(r, true)).join('');
+    }
+  }
+
+  function renderFinanceCard(r, isDone) {
+    const fmtNum = n => n != null ? 'Rp ' + Number(n).toLocaleString('id-ID') : '-';
+    const nominal = r.nominal_disetujui ?? r.nominal_request;
+    const tglAcc = new Date(r.updated_at).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' });
+    const waktuChip = r.topup_time === 'sore' ? '🌆 Sore' : '🌅 Pagi';
+    const productName = r.products?.name || '-';
+    const ext = r.extracted_data || {};
+    const isSelow = ext.payment_method === 'selow';
+    const metodeBadge = isSelow
+      ? '<span style="background:#eff6ff;color:#1d4ed8;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;">🔵 Selow.id</span>'
+      : '<span style="background:#f3f4f6;color:#374151;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;">💳 Kartu/LB</span>';
+
+    let actionBtn = '';
+    if (isDone) {
+      if (isSelow) {
+        // Selow: konfirmasi sudah via link — tampilkan info transfer
+        const bankLabel = r.transfer_bank === 'bri' ? 'BRI' : r.transfer_bank === 'mandiri' ? 'Mandiri' : '-';
+        const nominalTf = r.nominal_transfer ? 'Rp ' + Number(r.nominal_transfer).toLocaleString('id-ID') : '-';
+        actionBtn = `<div style="text-align:center; min-width:120px;">
+          <div style="font-size:22px; margin-bottom:2px;">✅</div>
+          <div style="font-size:11px; color:#065f46; font-weight:700;">Dikonfirmasi Finance</div>
+          <div style="font-size:10px; color:var(--text-sub); margin-top:2px;">🏦 ${bankLabel} · ${nominalTf}</div>
+        </div>`;
+      } else {
+        // Non-Selow: tombol ACC manual
+        const accAt = r.finance_acc_at ? new Date(r.finance_acc_at).toLocaleString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' }) : null;
+        actionBtn = `<div style="text-align:center; min-width:120px;">
+          <div style="font-size:22px; margin-bottom:2px;">✅</div>
+          <div style="font-size:11px; color:#065f46; font-weight:700;">Sudah Transfer</div>
+          ${accAt ? '<div style="font-size:10px; color:var(--text-sub); margin-top:2px;">' + accAt + '</div>' : ''}
+          ${r.finance_acc_by ? '<div style="font-size:10px; color:var(--text-sub);">oleh ' + r.finance_acc_by + '</div>' : ''}
+        </div>`;
+      }
+    } else {
+      if (isSelow) {
+        // Selow belum confirm: tampilkan status step-nya, tidak ada tombol manual
+        const step = ext.transfer_confirmed ? 4 : r.nominal_transfer ? 3 : 2;
+        const stepLabels = { 2:'Menunggu input nominal', 3:'Menunggu konfirmasi finance', 4:'Selesai' };
+        actionBtn = `<div style="text-align:center; min-width:130px;">
+          <div style="font-size:20px; margin-bottom:4px;">⏳</div>
+          <div style="font-size:11px; color:#92400e; font-weight:700;">${stepLabels[step] || 'Proses'}</div>
+          <div style="font-size:10px; color:var(--text-sub); margin-top:2px;">Konfirmasi via link WA</div>
+        </div>`;
+      } else {
+        // Non-Selow: tombol ACC
+        actionBtn = `<button class="btn btn-sm" onclick="accFinance('${r.id}')" id="fin-btn-${r.id}"
+          style="background:var(--primary);color:#fff;border:none;white-space:nowrap;min-width:120px;">
+          ✅ Sudah Transfer
+        </button>`;
+      }
+    }
+
+    return `
+      <div class="fin-card ${isDone ? 'done' : ''}" id="fin-${r.id}">
+        <div class="fin-card-body">
+          <div class="fin-card-top">
+            <span class="fin-card-name">👤 ${r.user_name || '-'}</span>
+            <span class="chip">${waktuChip}</span>
+            ${metodeBadge}
+            <span style="background:#eff6ff;color:#1d4ed8;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;">📦 ${productName}</span>
+          </div>
+          <div class="fin-card-rows">
+            <div class="fin-card-row"><span class="lbl">💰 Nominal Disetujui</span><span class="val" style="color:var(--primary);font-size:13px;">${fmtNum(nominal)}</span></div>
+            <div class="fin-card-row"><span class="lbl">🖥️ Akun Iklan</span><span class="val">${r.ad_account_name || '-'}</span></div>
+            <div class="fin-card-row"><span class="lbl">📅 Disetujui</span><span class="val">${tglAcc}</span></div>
+            ${r.nominal_transfer ? '<div class="fin-card-row"><span class="lbl">💸 Transfer</span><span class="val">Rp ' + Number(r.nominal_transfer).toLocaleString('id-ID') + '</span></div>' : ''}
+          </div>
+        </div>
+        <div class="fin-acc-btn" style="align-self:center;">
+          ${actionBtn}
+        </div>
+      </div>
+    `;
+  }
+
+  window.accFinance = async function(id) {
+    const btn = document.getElementById('fin-btn-' + id);
+    if (btn) { btn.disabled = true; btn.textContent = 'Memproses...'; }
+
+    try {
+      const { error } = await sb.from('topup_requests').update({
+        finance_acc: true,
+        finance_acc_at: new Date().toISOString(),
+        finance_acc_by: currentProfile?.name || null
+      }).eq('id', id);
+
+      if (error) throw error;
+
+      showToast('Transfer tercatat!', 'success');
+      // Refresh kartu langsung tanpa reload semua
+      await loadFinanceList();
+    } catch (e) {
+      showToast('Gagal: ' + e.message, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Sudah Transfer'; }
+    }
   };
 
   // ── History ──
