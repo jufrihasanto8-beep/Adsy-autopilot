@@ -1031,8 +1031,20 @@ Field tidak ditemukan = null.` }
 
   // ── chat_reply: notif WA ke advertiser saat admin balas pesan ──
   if (action === 'chat_reply') {
-    const { receiver_id, sender_name, message_preview } = body;
+    const { receiver_id, sender_id, sender_name, message_preview } = body;
     if (!receiver_id) return res.status(400).json({ error: 'receiver_id diperlukan' });
+
+    // Skip kalau admin sudah pernah chat ke advertiser ini hari ini
+    // (cukup 1 notif WA per hari per percakapan)
+    if (sender_id) {
+      const todayStartWIB = new Date(new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10) + 'T00:00:00+07:00').toISOString();
+      const { count: todayCount } = await sb.from('chat_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('sender_id', sender_id)
+        .eq('receiver_id', receiver_id)
+        .gte('created_at', todayStartWIB);
+      if (todayCount > 1) return res.json({ ok: true, skipped: true, reason: 'already_notified_today' });
+    }
 
     // Ambil wa_target advertiser dari app_config
     const { data: userCfg } = await sb.from('app_config')
@@ -1072,7 +1084,18 @@ Field tidak ditemukan = null.` }
 
   // ── chat_message: notif WA ke admin saat advertiser kirim pesan ──
   if (action === 'chat_message') {
-    const { sender_name, message_preview } = body;
+    const { sender_id, sender_name, message_preview } = body;
+
+    // Skip kalau advertiser sudah pernah kirim pesan hari ini
+    // (cukup 1 notif WA per hari per percakapan)
+    if (sender_id) {
+      const todayStartWIB = new Date(new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10) + 'T00:00:00+07:00').toISOString();
+      const { count: todayCount } = await sb.from('chat_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('sender_id', sender_id)
+        .gte('created_at', todayStartWIB);
+      if (todayCount > 1) return res.json({ ok: true, skipped: true, reason: 'already_notified_today' });
+    }
 
     const { data: cfgWithToken } = await sb.from('app_config')
       .select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle();
