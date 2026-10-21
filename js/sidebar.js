@@ -91,6 +91,11 @@ function injectChatNavItem() {
   item.className = 'nav-item';
   item.dataset.page = 'chat.html';
   item.innerHTML = '<span class="nav-icon">💬</span> Chat <span class="nav-badge" id="chat-nav-badge" style="display:none;background:#ef4444;">0</span>';
+  // Click handler — harus di-set sendiri karena diinject setelah loop nav item
+  item.addEventListener('click', () => {
+    closeMobileMenu();
+    window.location.href = 'chat.html';
+  });
   // Insert setelah settings.html
   const settingsItem = nav.querySelector('[data-page="settings.html"]');
   if (settingsItem) settingsItem.insertAdjacentElement('afterend', item);
