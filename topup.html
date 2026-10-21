@@ -18,9 +18,12 @@
       background: var(--gray-1);
       border-radius: 12px;
       padding: 4px;
-      width: fit-content;
-      max-width: 100%;
+      width: 100%;
+      box-sizing: border-box;
       margin-bottom: 24px;
+    }
+    @media (min-width: 601px) {
+      .topup-tabs { width: fit-content; max-width: 100%; }
     }
     .topup-tab { padding:8px 16px; border-radius:9px; border:none; background:transparent; font-size:13px; font-weight:600; color:var(--text-sub); cursor:pointer; transition:all .18s; font-family:inherit; white-space:nowrap; }
     .topup-tab.active { background:#fff; color:var(--primary); box-shadow:0 1px 4px rgba(0,0,0,0.08); }
