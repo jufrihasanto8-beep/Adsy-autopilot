@@ -82,11 +82,20 @@ function createChatPanel() {
       <div class="cwp-loading" id="cwp-loading">Memuat pesan...</div>
     </div>
     <div class="cwp-footer">
+      <input type="file" id="cwp-file" accept="image/*" style="display:none" />
+      <button class="cwp-img-btn" id="cwp-img-btn" title="Kirim foto">📷</button>
       <input type="text" id="cwp-input" class="cwp-input" placeholder="Ketik pesan..." maxlength="2000" />
       <button class="cwp-send" id="cwp-send">➤</button>
     </div>
   `;
   document.body.appendChild(el);
+
+  document.getElementById('cwp-img-btn').addEventListener('click', () => document.getElementById('cwp-file').click());
+  document.getElementById('cwp-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (file) await cwpSendImage(file);
+  });
 
   document.getElementById('cwp-close-btn').addEventListener('click', () => {
     _panelOpen = false;
@@ -145,7 +154,11 @@ function appendMsg(msg, list, scroll = true) {
   const el = document.createElement('div');
   el.className = `cwp-msg ${isMine ? 'mine' : 'theirs'}`;
   el.dataset.id = msg.id;
-  el.innerHTML = `<div class="cwp-bubble">${escHtml(msg.message)}</div><div class="cwp-time">${time}</div>`;
+  const imgHtml = msg.image_url
+    ? `<img src="${msg.image_url}" class="cwp-img-preview" onclick="window.open('${msg.image_url}','_blank')" />`
+    : '';
+  const textHtml = msg.message ? `<div class="cwp-bubble">${escHtml(msg.message)}</div>` : '';
+  el.innerHTML = imgHtml + textHtml + `<div class="cwp-time">${time}</div>`;
   list.appendChild(el);
   if (scroll) requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
 }
@@ -164,17 +177,52 @@ async function cwpSend() {
     const { data: inserted, error } = await _sb.from('chat_messages').insert({
       sender_id: _user.id,
       receiver_id: _adminId,
-      message: msg
+      message: msg,
+      image_url: null
     }).select().single();
     if (error) throw error;
     if (inserted) appendMsg(inserted, document.getElementById('cwp-messages'));
     sendWANotif(msg);
   } catch (e) {
-    input.value = msg; // restore on error
+    input.value = msg;
     console.warn('Send error:', e);
   } finally {
     btn.disabled = false;
     input.focus();
+  }
+}
+
+async function cwpSendImage(file) {
+  if (!_sb || !_user || !_adminId) return;
+  if (!file.type.startsWith('image/')) { alert('Hanya file gambar yang diizinkan.'); return; }
+  if (file.size > 5 * 1024 * 1024) { alert('Ukuran maksimal 5MB.'); return; }
+
+  const imgBtn = document.getElementById('cwp-img-btn');
+  if (imgBtn) { imgBtn.disabled = true; imgBtn.textContent = '⏳'; }
+
+  try {
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${_user.id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await _sb.storage.from('chat-images').upload(path, file, { contentType: file.type });
+    if (upErr) throw upErr;
+
+    const { data: urlData } = _sb.storage.from('chat-images').getPublicUrl(path);
+    const caption = document.getElementById('cwp-input')?.value?.trim() || '';
+    if (caption) document.getElementById('cwp-input').value = '';
+
+    const { data: inserted, error } = await _sb.from('chat_messages').insert({
+      sender_id: _user.id,
+      receiver_id: _adminId,
+      message: caption,
+      image_url: urlData.publicUrl
+    }).select().single();
+    if (error) throw error;
+    if (inserted) appendMsg(inserted, document.getElementById('cwp-messages'));
+    sendWANotif(caption || '📷 Mengirim foto');
+  } catch (e) {
+    alert('Gagal kirim foto: ' + e.message);
+  } finally {
+    if (imgBtn) { imgBtn.disabled = false; imgBtn.textContent = '📷'; }
   }
 }
 
@@ -267,6 +315,12 @@ function injectWidgetCSS() {
     .cwp-send{background:var(--primary,#6366f1);color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s;}
     .cwp-send:hover{background:#4f46e5;}
     .cwp-send:disabled{background:var(--gray-3,#cbd5e1);cursor:not-allowed;}
+    .cwp-img-btn{background:none;border:none;font-size:18px;cursor:pointer;padding:0 4px;opacity:.7;transition:opacity .15s;flex-shrink:0;}
+    .cwp-img-btn:hover{opacity:1;}
+    .cwp-img-btn:disabled{opacity:.4;cursor:not-allowed;}
+    .cwp-img-preview{max-width:200px;max-height:200px;border-radius:10px;cursor:pointer;display:block;margin-bottom:4px;object-fit:cover;}
+    .cwp-msg.mine .cwp-img-preview{border-bottom-right-radius:3px;}
+    .cwp-msg.theirs .cwp-img-preview{border-bottom-left-radius:3px;}
 
     /* Mobile */
     @media(max-width:480px){
