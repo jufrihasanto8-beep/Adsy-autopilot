@@ -11,17 +11,28 @@
   <link rel="stylesheet" href="css/components.css" />
   <style>
     /* ── Tabs ── */
-    .topup-tabs { display:flex; gap:4px; background:var(--gray-1); border-radius:12px; padding:4px; width:fit-content; margin-bottom:24px; }
-    .topup-tab { padding:8px 22px; border-radius:9px; border:none; background:transparent; font-size:13px; font-weight:600; color:var(--text-sub); cursor:pointer; transition:all .18s; font-family:inherit; white-space:nowrap; }
+    .topup-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--gray-1);
+      border-radius: 12px;
+      padding: 4px;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      margin-bottom: 24px;
+      flex-shrink: 0;
+    }
+    .topup-tabs::-webkit-scrollbar { display: none; }
+    .topup-tab { padding:8px 16px; border-radius:9px; border:none; background:transparent; font-size:13px; font-weight:600; color:var(--text-sub); cursor:pointer; transition:all .18s; font-family:inherit; white-space:nowrap; flex-shrink:0; }
     .topup-tab.active { background:#fff; color:var(--primary); box-shadow:0 1px 4px rgba(0,0,0,0.08); }
 
     @media (max-width: 600px) {
-      .topup-tabs { width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
-      .topup-tabs::-webkit-scrollbar { display:none; }
-      .topup-tab { padding:8px 14px; font-size:12px; flex-shrink:0; }
+      .topup-tab { padding:8px 12px; font-size:12px; }
       .req-card { padding:14px; }
       .req-card-header { flex-direction:column; }
-      .nominal-wrap input { font-size:18px !important; } /* nominal boleh besar, bukan trigger zoom */
+      .nominal-wrap input { font-size:18px !important; }
     }
 
     /* ── Upload area ── */
