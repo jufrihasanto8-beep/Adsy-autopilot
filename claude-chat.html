@@ -467,11 +467,12 @@
 
     .input-box {
       display: flex;
+      flex-wrap: wrap;
       align-items: flex-end;
       gap: 10px;
       border: 1.5px solid #e0e0e0;
       border-radius: 16px;
-      padding: 10px 10px 10px 16px;
+      padding: 10px 10px 10px 10px;
       background: white;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
@@ -517,6 +518,142 @@
       color: #c0c0c0;
       margin-top: 8px;
     }
+
+    /* ─── PLUS MENU ─── */
+    .plus-wrap { position: relative; flex-shrink: 0; }
+
+    #plus-btn {
+      width: 34px; height: 34px;
+      background: none;
+      border: 1.5px solid #d1d5db;
+      border-radius: 10px;
+      color: #6b7280;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+      line-height: 1;
+    }
+    #plus-btn:hover { border-color: var(--primary); color: var(--primary); background: rgba(217,119,6,0.04); }
+
+    .plus-menu {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 0;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 6px;
+      min-width: 220px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+      z-index: 100;
+    }
+
+    .pm-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13.5px;
+      color: #374151;
+      transition: background 0.12s;
+      position: relative;
+    }
+    .pm-item:hover { background: #f3f4f6; }
+    .pm-item-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+    .pm-item-text { flex: 1; }
+    .pm-item-kbd { font-size: 11px; color: #9ca3af; background: #f3f4f6; padding: 1px 6px; border-radius: 4px; }
+    .pm-item-arrow { color: #9ca3af; font-size: 11px; }
+    .pm-divider { height: 1px; background: #f3f4f6; margin: 4px 0; }
+
+    /* Skills submenu */
+    .skills-sub {
+      position: absolute;
+      bottom: 0;
+      left: calc(100% + 6px);
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 6px;
+      min-width: 220px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+      z-index: 101;
+    }
+    .ss-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .ss-item:hover { background: #f3f4f6; }
+    .ss-icon { font-size: 14px; width: 20px; flex-shrink: 0; margin-top: 1px; }
+    .ss-name { font-size: 13px; font-weight: 600; color: #111827; }
+    .ss-desc { font-size: 11.5px; color: #6b7280; margin-top: 1px; }
+
+    /* ─── IMAGE PREVIEW in input ─── */
+    .img-preview-wrap {
+      padding: 8px 12px 2px;
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .img-thumb {
+      position: relative;
+      width: 56px; height: 56px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+      flex-shrink: 0;
+    }
+    .img-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .img-thumb-del {
+      position: absolute; top: 2px; right: 2px;
+      background: rgba(0,0,0,0.55);
+      border: none;
+      border-radius: 50%;
+      width: 16px; height: 16px;
+      color: white;
+      font-size: 10px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+    }
+
+    /* ─── SKILL SLASH DROPDOWN ─── */
+    .slash-drop {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0; right: 0;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 6px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+      z-index: 100;
+    }
+    .slash-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .slash-item:hover, .slash-item.active { background: #f3f4f6; }
+    .slash-icon { font-size: 15px; width: 22px; text-align: center; flex-shrink: 0; }
+    .slash-name { font-size: 13px; font-weight: 600; color: #111827; }
+    .slash-desc { font-size: 11.5px; color: #6b7280; margin-left: 4px; }
+
+    /* Image in chat bubble */
+    .chat-img { max-width: 280px; border-radius: 10px; margin-bottom: 6px; display: block; cursor: zoom-in; }
+
+    /* Lightbox */
+    .lightbox {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 999;
+      display: flex; align-items: center; justify-content: center;
+      cursor: zoom-out;
+    }
+    .lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
 
     /* ─── UTILS ─── */
     .hidden { display: none !important; }
@@ -614,11 +751,41 @@
 
   <!-- Input -->
   <div class="input-wrap">
-    <div class="input-inner">
-      <div class="input-box">
-        <textarea id="ci" placeholder="Kirim pesan ke Claude..." rows="1"></textarea>
+    <div class="input-inner" style="position:relative;">
+
+      <!-- Slash dropdown -->
+      <div class="slash-drop hidden" id="slash-drop"></div>
+
+      <div class="input-box" id="input-box">
+        <!-- Image previews -->
+        <div class="img-preview-wrap hidden" id="img-previews" style="width:100%;order:-1;"></div>
+
+        <!-- Plus button -->
+        <div class="plus-wrap">
+          <button id="plus-btn" onclick="togglePlusMenu(event)" title="Lampirkan / Skills">+</button>
+          <div class="plus-menu hidden" id="plus-menu">
+            <div class="pm-item" onclick="triggerFileUpload()">
+              <span class="pm-item-icon">📎</span>
+              <span class="pm-item-text">Upload foto / file</span>
+              <span class="pm-item-kbd">⌘U</span>
+            </div>
+            <div class="pm-divider"></div>
+            <div class="pm-item" id="pm-skills" onmouseenter="showSkillsSub()" onmouseleave="hideSkillsSub()">
+              <span class="pm-item-icon">🎯</span>
+              <span class="pm-item-text">Skills</span>
+              <span class="pm-item-arrow">›</span>
+              <div class="skills-sub hidden" id="skills-sub"></div>
+            </div>
+          </div>
+        </div>
+
+        <textarea id="ci" placeholder="Kirim pesan ke Claude... (ketik / untuk skills)" rows="1"></textarea>
         <button id="sbtn" onclick="send()">↑</button>
       </div>
+
+      <!-- Hidden file input -->
+      <input type="file" id="file-input" accept="image/*,.pdf" multiple style="display:none;" onchange="handleFiles(this.files)"/>
+
       <div class="input-foot">Claude Sonnet 4.6 · Anthropic · Riwayat tersimpan di browser kamu</div>
     </div>
   </div>
@@ -632,6 +799,16 @@
 import { requireAuth } from './js/auth.js';
 import { getSupabase } from './js/supabase.js';
 
+// ── SKILLS ──
+const SKILLS = [
+  { id: 'analisa-iklan',   icon: '🔍', name: 'analisa-iklan',   desc: 'Analisa performa & kelemahan iklan',        prompt: 'Tolong analisa iklan ini secara detail dari sisi copywriting, visual appeal, dan target audience. Berikan:\n1. Skor keseluruhan (1-10)\n2. Kelebihan yang sudah bagus\n3. Kelemahan yang perlu diperbaiki\n4. Rekomendasi perbaikan spesifik' },
+  { id: 'bikin-copy',      icon: '✍️', name: 'bikin-copy',      desc: 'Generate 3 variasi copy iklan',             prompt: 'Buatkan 3 variasi copy iklan Meta (Facebook/Instagram) untuk produk berikut:\n\nProduk: ' },
+  { id: 'riset-audience',  icon: '🎯', name: 'riset-audience',  desc: 'Definisikan target audience ideal',         prompt: 'Bantu saya riset dan definisikan target audience ideal untuk:\n\nProduk/bisnis: ' },
+  { id: 'strategi-budget', icon: '💰', name: 'strategi-budget', desc: 'Strategi alokasi budget Meta Ads',          prompt: 'Berikan strategi alokasi budget Meta Ads yang optimal.\n\nTotal budget harian: Rp\nTujuan utama iklan: ' },
+  { id: 'hook-ideas',      icon: '🪝', name: 'hook-ideas',      desc: '10 ide hook untuk video/caption iklan',     prompt: 'Buatkan 10 ide hook pembuka yang kuat untuk video iklan atau caption, untuk produk:\n\nProduk: ' },
+  { id: 'cek-kompetitor',  icon: '🕵️', name: 'cek-kompetitor', desc: 'Analisa & kalahkan strategi kompetitor',    prompt: 'Bantu analisa strategi iklan kompetitor dan cara mengalahkannya.\n\nProduk saya: \nKompetitor: ' },
+];
+
 // ── STATE ──
 const STORE = 'adsy_claude_chats_v2';
 const MAX   = 60;
@@ -639,6 +816,7 @@ let convs   = {};       // { id: { id, title, msgs:[], ts } }
 let curId   = null;
 let busy    = false;
 let userInitial = 'U';
+let attachedImages = []; // [{ base64, mime_type, dataUrl, name }]
 
 // ── INIT ──
 async function init() {
@@ -807,9 +985,22 @@ window.send = async function() {
   document.getElementById('msgs').classList.remove('hidden');
 
   const conv = ensureConv(text);
-  conv.msgs.push({ role: 'user', content: text });
 
-  renderMsg('user', text, true);
+  // Build content — with images if any
+  const imgs = [...attachedImages];
+  const userContent = imgs.length
+    ? [ ...imgs.map(img => ({ type: 'image', source: { type: 'base64', media_type: img.mime_type, data: img.base64 } })),
+        { type: 'text', text } ]
+    : text;
+
+  conv.msgs.push({ role: 'user', content: userContent });
+
+  // Clear attached images
+  attachedImages = [];
+  renderImagePreviews();
+
+  // Render user message + image thumbnails
+  renderUserMsgWithImages(text, imgs);
   scrollBot();
   renderThinking();
 
@@ -850,6 +1041,54 @@ window.send = async function() {
     document.getElementById('sbtn').disabled = false;
   }
 };
+
+// ── RENDER USER MSG WITH IMAGES ──
+function renderUserMsgWithImages(text, imgs) {
+  const msgsEl = document.getElementById('msgs');
+  const row = document.createElement('div');
+  row.className = 'msg-row user msg-fadein';
+
+  const av = document.createElement('div');
+  av.className = 'msg-av av-user';
+  av.textContent = userInitial;
+
+  const body = document.createElement('div');
+  body.className = 'msg-body';
+
+  if (imgs.length) {
+    const imgWrap = document.createElement('div');
+    imgWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;';
+    imgs.forEach(img => {
+      const el = document.createElement('img');
+      el.src = img.dataUrl;
+      el.className = 'chat-img';
+      el.style.maxWidth = '160px';
+      el.onclick = () => openLightbox(img.dataUrl);
+      imgWrap.appendChild(el);
+    });
+    body.appendChild(imgWrap);
+  }
+
+  if (text) {
+    const textEl = document.createElement('div');
+    textEl.className = 'msg-text';
+    textEl.textContent = text;
+    body.appendChild(textEl);
+  }
+
+  row.appendChild(av);
+  row.appendChild(body);
+  msgsEl.appendChild(row);
+}
+
+// ── LIGHTBOX ──
+function openLightbox(src) {
+  const lb = document.createElement('div');
+  lb.className = 'lightbox';
+  lb.innerHTML = `<img src="${src}"/>`;
+  lb.onclick = () => lb.remove();
+  document.body.appendChild(lb);
+}
 
 // ── SHOW ERROR ──
 function showError(msg, retryable, lastUserMsg, conv) {
@@ -963,10 +1202,160 @@ function processCodeBlocks(el) {
 function setupInput() {
   const ci = document.getElementById('ci');
   ci.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); window.send(); }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (!document.getElementById('slash-drop').classList.contains('hidden')) {
+        e.preventDefault(); applySlashActive(); return;
+      }
+      e.preventDefault(); window.send();
+    }
+    if (e.key === 'Escape') closeAllMenus();
+    if (e.key === 'ArrowDown') slashNav(1);
+    if (e.key === 'ArrowUp')   slashNav(-1);
   });
-  ci.addEventListener('input', () => autoH(ci));
+  ci.addEventListener('input', () => { autoH(ci); handleSlashInput(ci.value); });
+
+  // Keyboard shortcut ⌘U
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'u') { e.preventDefault(); triggerFileUpload(); }
+  });
+
+  // Click outside closes menus
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.plus-wrap') && !e.target.closest('#slash-drop')) closeAllMenus();
+  });
+
+  // Init skills submenu
+  renderSkillsSub();
 }
+
+// ── PLUS MENU ──
+window.togglePlusMenu = function(e) {
+  e.stopPropagation();
+  const m = document.getElementById('plus-menu');
+  m.classList.toggle('hidden');
+};
+
+window.showSkillsSub = function() { document.getElementById('skills-sub').classList.remove('hidden'); };
+window.hideSkillsSub = function() {
+  setTimeout(() => {
+    const sub = document.getElementById('skills-sub');
+    if (!sub.matches(':hover') && !document.getElementById('pm-skills').matches(':hover')) sub.classList.add('hidden');
+  }, 100);
+};
+
+function closeAllMenus() {
+  document.getElementById('plus-menu').classList.add('hidden');
+  document.getElementById('skills-sub').classList.add('hidden');
+  document.getElementById('slash-drop').classList.add('hidden');
+}
+
+function renderSkillsSub() {
+  const sub = document.getElementById('skills-sub');
+  sub.innerHTML = SKILLS.map(s => `
+    <div class="ss-item" onclick="applySkill('${s.id}')">
+      <span class="ss-icon">${s.icon}</span>
+      <div><div class="ss-name">${s.name}</div><div class="ss-desc">${s.desc}</div></div>
+    </div>`).join('');
+}
+
+window.applySkill = function(id) {
+  const s = SKILLS.find(x => x.id === id);
+  if (!s) return;
+  const ci = document.getElementById('ci');
+  ci.value = s.prompt;
+  ci.focus();
+  autoH(ci);
+  // Move cursor to end
+  ci.setSelectionRange(ci.value.length, ci.value.length);
+  closeAllMenus();
+};
+
+// ── SLASH COMMAND ──
+let slashIdx = 0;
+let slashFiltered = [];
+
+function handleSlashInput(val) {
+  const drop = document.getElementById('slash-drop');
+  if (!val.startsWith('/')) { drop.classList.add('hidden'); return; }
+
+  const query = val.slice(1).toLowerCase();
+  slashFiltered = SKILLS.filter(s => s.id.includes(query) || s.desc.toLowerCase().includes(query));
+
+  if (!slashFiltered.length) { drop.classList.add('hidden'); return; }
+  slashIdx = 0;
+  renderSlashDrop();
+  drop.classList.remove('hidden');
+}
+
+function renderSlashDrop() {
+  document.getElementById('slash-drop').innerHTML = slashFiltered.map((s, i) => `
+    <div class="slash-item ${i === slashIdx ? 'active' : ''}" onclick="applySlashItem(${i})">
+      <span class="slash-icon">${s.icon}</span>
+      <span class="slash-name">${s.name}</span>
+      <span class="slash-desc">— ${s.desc}</span>
+    </div>`).join('');
+}
+
+function slashNav(dir) {
+  if (document.getElementById('slash-drop').classList.contains('hidden')) return;
+  slashIdx = Math.max(0, Math.min(slashFiltered.length - 1, slashIdx + dir));
+  renderSlashDrop();
+}
+
+function applySlashActive() { if (slashFiltered[slashIdx]) applySlashItem(slashIdx); }
+
+window.applySlashItem = function(i) {
+  const s = slashFiltered[i];
+  if (!s) return;
+  const ci = document.getElementById('ci');
+  ci.value = s.prompt;
+  ci.focus();
+  autoH(ci);
+  ci.setSelectionRange(ci.value.length, ci.value.length);
+  document.getElementById('slash-drop').classList.add('hidden');
+};
+
+// ── FILE UPLOAD ──
+window.triggerFileUpload = function() {
+  document.getElementById('file-input').click();
+  closeAllMenus();
+};
+
+window.handleFiles = async function(files) {
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue; // only images for now
+    if (attachedImages.length >= 4) break; // max 4 images
+    const b64 = await fileToBase64(file);
+    const dataUrl = `data:${file.type};base64,${b64}`;
+    attachedImages.push({ base64: b64, mime_type: file.type, dataUrl, name: file.name });
+  }
+  renderImagePreviews();
+  document.getElementById('file-input').value = '';
+};
+
+function fileToBase64(file) {
+  return new Promise(res => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(',')[1]);
+    r.readAsDataURL(file);
+  });
+}
+
+function renderImagePreviews() {
+  const wrap = document.getElementById('img-previews');
+  if (!attachedImages.length) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = attachedImages.map((img, i) => `
+    <div class="img-thumb">
+      <img src="${img.dataUrl}" alt="${img.name}"/>
+      <button class="img-thumb-del" onclick="removeImg(${i})">✕</button>
+    </div>`).join('');
+}
+
+window.removeImg = function(i) {
+  attachedImages.splice(i, 1);
+  renderImagePreviews();
+};
 
 function autoH(el) {
   el.style.height = 'auto';
