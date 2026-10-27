@@ -80,6 +80,7 @@ export function initSidebar() {
 
   injectProfileModal();
   injectChatNavItem();
+  injectClaudeChatNavItem();
   // Init floating chat bubble (async, tidak block render)
   initChatWidget().catch(() => {});
 }
@@ -103,6 +104,24 @@ function injectChatNavItem() {
   // Set active state
   const current = window.location.pathname.split('/').pop() || 'dashboard.html';
   if (current === 'chat.html') item.classList.add('active');
+}
+
+function injectClaudeChatNavItem() {
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav || nav.querySelector('[data-page="claude-chat.html"]')) return;
+  const item = document.createElement('div');
+  item.className = 'nav-item';
+  item.dataset.page = 'claude-chat.html';
+  item.innerHTML = '<span class="nav-icon">🤖</span> Claude AI';
+  item.addEventListener('click', () => {
+    closeMobileMenu();
+    window.location.href = 'claude-chat.html';
+  });
+  const copyItem = nav.querySelector('[data-page="copywriting.html"]');
+  if (copyItem) copyItem.insertAdjacentElement('afterend', item);
+  else nav.appendChild(item);
+  const current = window.location.pathname.split('/').pop() || 'dashboard.html';
+  if (current === 'claude-chat.html') item.classList.add('active');
 }
 
 // ── PROFILE MODAL ──
