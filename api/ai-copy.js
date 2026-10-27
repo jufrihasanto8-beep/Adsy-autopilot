@@ -116,25 +116,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── CLAUDE CHAT (Anthropic) ──
-  if (action === 'claude_chat') {
-    const { messages } = req.body;
-    if (!messages?.length) return res.status(400).json({ error: 'messages wajib diisi' });
-
-    try {
-      const msg = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 8096,
-        system: 'Kamu adalah Claude, asisten AI yang helpful, harmless, dan honest. Jawab dalam Bahasa Indonesia kecuali user meminta bahasa lain.',
-        messages
-      });
-      const text = msg.content?.[0]?.text || '';
-      return res.json({ ok: true, text });
-    } catch (e) {
-      return res.status(500).json({ error: e.message });
-    }
-  }
-
   // ── ANALISA WINNER ──
   if (action === 'analyze-winners') {
     const { winners } = req.body;
