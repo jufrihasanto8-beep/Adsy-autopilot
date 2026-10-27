@@ -922,8 +922,10 @@
       <div id="sk-list"></div>
       <div id="sk-form-wrap"></div>
     </div>
-    <div class="sk-modal-foot">
-      <button class="sk-btn-save" style="width:100%;" onclick="showAddForm()">+ Tambah Skill Baru</button>
+    <div class="sk-modal-foot" style="display:flex;gap:8px;">
+      <button class="sk-btn-cancel" style="flex:0 0 auto;" onclick="triggerSkillImport()" title="Import file .skill">📥 Import</button>
+      <input type="file" id="skill-file-input" accept=".skill,.json" style="display:none;" onchange="importSkillFile(this.files)"/>
+      <button class="sk-btn-save" style="flex:1;" onclick="showAddForm()">+ Tambah Skill Baru</button>
     </div>
   </div>
 </div>
@@ -944,6 +946,7 @@ const SKILLS = [
   { id: 'strategi-budget', icon: '💰', name: 'strategi-budget', desc: 'Strategi alokasi budget Meta Ads',          prompt: 'Berikan strategi alokasi budget Meta Ads yang optimal.\n\nTotal budget harian: Rp\nTujuan utama iklan: ' },
   { id: 'hook-ideas',      icon: '🪝', name: 'hook-ideas',      desc: '10 ide hook untuk video/caption iklan',     prompt: 'Buatkan 10 ide hook pembuka yang kuat untuk video iklan atau caption, untuk produk:\n\nProduk: ' },
   { id: 'cek-kompetitor',  icon: '🕵️', name: 'cek-kompetitor', desc: 'Analisa & kalahkan strategi kompetitor',    prompt: 'Bantu analisa strategi iklan kompetitor dan cara mengalahkannya.\n\nProduk saya: \nKompetitor: ' },
+  { id: 'video-scene-image-prompts', icon: '🎬', name: 'video-scene-image-prompts', desc: 'Generate image prompts dari frame/scene video iklan', prompt: 'Kamu adalah creative director iklan berpengalaman.\n\nAnalisa frame video/gambar yang dilampirkan dan lakukan:\n\n1. **Deskripsi Scene** — Jelaskan apa yang terlihat: subjek, latar, komposisi, pencahayaan, warna dominan\n2. **Mood & Tone** — Apa feel dari visual ini? (energetik, tenang, luxury, fun, dll)\n3. **Image Generation Prompts** — Buatkan 3 prompt siap pakai untuk Midjourney / DALL-E / Stable Diffusion:\n   - Prompt 1: Versi persis / realistik\n   - Prompt 2: Versi lebih cinematic/editorial\n   - Prompt 3: Versi yang lebih bold untuk iklan\n4. **Rekomendasi Iklan** — Visual ini cocok untuk produk/kategori apa? Format iklan apa (feed, story, reels)?\n\nLampirkan foto atau frame video, lalu ketik nama produk atau brief singkat kamu:' },
 ];
 
 // ── STATE ──
@@ -1465,6 +1468,7 @@ function renderSkList() {
           <div class="sk-card-desc">${esc(s.desc)}</div>
         </div>
         <div class="sk-card-actions">
+          <button class="sk-card-btn" onclick="exportSkill(${i})" title="Download sebagai .skill">⬇</button>
           <button class="sk-card-btn" onclick="showEditForm(${i})">Edit</button>
           <button class="sk-card-btn del" onclick="deleteCustomSkill(${i})">Hapus</button>
         </div>
@@ -1557,6 +1561,76 @@ window.deleteCustomSkill = function(i) {
   customs.splice(i, 1);
   saveCustomSkills(customs);
   renderSkList();
+};
+
+// ── IMPORT / EXPORT SKILL ──
+window.triggerSkillImport = function() {
+  document.getElementById('skill-file-input').click();
+};
+
+window.importSkillFile = function(files) {
+  if (!files?.length) return;
+  const file = files[0];
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+
+      // Support single skill or array
+      const items = Array.isArray(data) ? data
+        : data.skills ? data.skills
+        : data.format === 'adsy-skill' || data.icon || data.name ? [data]
+        : null;
+
+      if (!items) throw new Error('Format file tidak dikenal');
+
+      const customs = loadCustomSkills();
+      let added = 0;
+
+      for (const s of items) {
+        if (!s.name || !s.prompt) continue;
+        // Skip duplikat berdasarkan name
+        if (customs.find(c => c.name === s.name)) continue;
+        customs.push({
+          id: 'custom_' + s.name.replace(/\s+/g,'-') + '_' + Date.now(),
+          icon: s.icon || '⚡',
+          name: s.name,
+          desc: s.desc || s.name,
+          prompt: s.prompt
+        });
+        added++;
+      }
+
+      saveCustomSkills(customs);
+      renderSkList();
+      renderSkillsSub();
+      document.getElementById('skill-file-input').value = '';
+
+      // Feedback
+      const foot = document.querySelector('.sk-modal-foot');
+      const toast = document.createElement('div');
+      toast.style.cssText = 'font-size:12px;color:#16a34a;text-align:center;padding:4px 0;';
+      toast.textContent = added ? `✅ ${added} skill berhasil diimport!` : '⚠️ Skill sudah ada atau format tidak valid';
+      foot.insertAdjacentElement('beforebegin', toast);
+      setTimeout(() => toast.remove(), 3000);
+
+    } catch (err) {
+      alert('Gagal import: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+};
+
+window.exportSkill = function(i) {
+  const s = loadCustomSkills()[i];
+  if (!s) return;
+  const payload = { format: 'adsy-skill', version: 1, icon: s.icon, name: s.name, desc: s.desc, prompt: s.prompt };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${s.name.replace(/\s+/g,'-')}.skill`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 };
 
 window.applySkill = function(id) {
