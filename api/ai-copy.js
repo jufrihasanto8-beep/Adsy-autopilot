@@ -124,7 +124,13 @@ export default async function handler(req, res) {
     const KIE_KEY = process.env.KIE_API_KEY;
     if (!KIE_KEY) return res.status(500).json({ error: 'KIE_API_KEY belum dikonfigurasi' });
 
-    try {
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const isRetryable = (data) => {
+      const msg = (data?.error?.message || data?.message || '').toLowerCase();
+      return msg.includes('resources') || msg.includes('tight') || msg.includes('overloaded') || msg.includes('try again');
+    };
+
+    const doCall = async () => {
       const kieResp = await fetch('https://api.kie.ai/claude/v1/messages', {
         method: 'POST',
         headers: {
@@ -139,11 +145,25 @@ export default async function handler(req, res) {
           messages
         })
       });
-
       const data = await kieResp.json();
-      if (!kieResp.ok) return res.status(500).json({ error: data.error?.message || JSON.stringify(data) });
+      return { ok: kieResp.ok, data };
+    };
 
-      const text = data.content?.[0]?.text || '';
+    try {
+      let result = await doCall();
+
+      // Retry sekali setelah 2 detik jika server kie.ai penuh
+      if (!result.ok && isRetryable(result.data)) {
+        await sleep(2000);
+        result = await doCall();
+      }
+
+      if (!result.ok) {
+        const msg = result.data?.error?.message || result.data?.message || JSON.stringify(result.data);
+        return res.status(503).json({ error: msg, retryable: isRetryable(result.data) });
+      }
+
+      const text = result.data.content?.[0]?.text || '';
       return res.json({ ok: true, text });
     } catch (e) {
       return res.status(500).json({ error: e.message });
