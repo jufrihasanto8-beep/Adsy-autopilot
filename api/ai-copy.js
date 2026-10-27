@@ -125,7 +125,7 @@ export default async function handler(req, res) {
       const msg = await client.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 8096,
-        system: 'Kamu adalah asisten AI untuk tim Adsy, platform manajemen Meta Ads. Kamu ahli dalam copywriting iklan Facebook/Instagram, strategi Meta Ads, analisa performa kampanye, dan marketing digital. Jawab dalam Bahasa Indonesia kecuali user meminta bahasa lain. Jawaban harus jelas, praktis, dan langsung ke poin.',
+        system: 'Kamu adalah Claude, asisten AI yang helpful, harmless, dan honest. Jawab dalam Bahasa Indonesia kecuali user meminta bahasa lain.',
         messages
       });
       const text = msg.content?.[0]?.text || '';
