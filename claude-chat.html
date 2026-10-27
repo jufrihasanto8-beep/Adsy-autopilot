@@ -824,9 +824,14 @@ window.send = async function() {
     });
 
     const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || 'Gagal dapat respons');
 
     document.getElementById('thinking')?.remove();
+
+    if (!res.ok || !data.ok) {
+      const isRetryable = data.retryable || (data.error || '').toLowerCase().includes('tight') || (data.error || '').toLowerCase().includes('resources');
+      showError(isRetryable ? `⏳ Server kie.ai sedang sibuk. Klik **Coba Lagi** untuk mencoba ulang.` : `❌ **Error:** ${data.error || 'Gagal dapat respons'}`, isRetryable, text, conv);
+      return;
+    }
 
     conv.msgs.push({ role: 'assistant', content: data.text });
     conv.ts = Date.now();
@@ -838,13 +843,68 @@ window.send = async function() {
 
   } catch (err) {
     document.getElementById('thinking')?.remove();
-    renderMsg('assistant', `❌ **Error:** ${err.message}\n\nCoba ulangi beberapa saat lagi.`, true);
+    showError(`❌ **Error:** ${err.message}`, false, null, null);
     scrollBot();
   } finally {
     busy = false;
     document.getElementById('sbtn').disabled = false;
   }
 };
+
+// ── SHOW ERROR ──
+function showError(msg, retryable, lastUserMsg, conv) {
+  const msgsEl = document.getElementById('msgs');
+  const row = document.createElement('div');
+  row.className = 'msg-row claude msg-fadein';
+  row.innerHTML = `
+    <div class="msg-av av-claude">✦</div>
+    <div class="msg-body">
+      <div class="msg-name">Claude</div>
+      <div class="msg-text" style="color:#b91c1c;">${parseMarkdown(msg)}</div>
+      ${retryable ? `<div class="msg-acts" style="opacity:1;margin-top:10px;">
+        <button class="msg-act" style="border-color:#d97706;color:#d97706;" id="retry-btn">🔄 Coba Lagi</button>
+      </div>` : ''}
+    </div>`;
+  msgsEl.appendChild(row);
+  scrollBot();
+
+  if (retryable && lastUserMsg) {
+    row.querySelector('#retry-btn')?.addEventListener('click', async () => {
+      row.remove();
+      renderThinking();
+      busy = true;
+      document.getElementById('sbtn').disabled = true;
+
+      try {
+        const res2 = await fetch('/api/ai-copy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'claude_chat', messages: conv.msgs })
+        });
+        const d2 = await res2.json();
+        document.getElementById('thinking')?.remove();
+
+        if (!res2.ok || !d2.ok) {
+          showError(`⏳ Masih sibuk. Tunggu sebentar lalu coba lagi.`, true, lastUserMsg, conv);
+          return;
+        }
+
+        conv.msgs.push({ role: 'assistant', content: d2.text });
+        conv.ts = Date.now();
+        saveStore();
+        renderList();
+        renderMsg('assistant', d2.text, true);
+        scrollBot();
+      } catch (e2) {
+        document.getElementById('thinking')?.remove();
+        showError(`❌ **Error:** ${e2.message}`, false, null, null);
+      } finally {
+        busy = false;
+        document.getElementById('sbtn').disabled = false;
+      }
+    });
+  }
+}
 
 // ── CHIP ──
 window.useChip = function(el) {
