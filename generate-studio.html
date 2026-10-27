@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Generate Studio — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico"/>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="css/sidebar.css"/>
+  <link rel="stylesheet" href="css/components.css"/>
+  <style>
+    /* ── TABS ── */
+    .studio-tabs {
+      display: flex;
+      gap: 6px;
+      background: var(--gray-1, #f5f5f5);
+      border-radius: 12px;
+      padding: 4px;
+      width: fit-content;
+      margin-bottom: 20px;
+    }
+    .studio-tab {
+      padding: 8px 20px;
+      border-radius: 9px;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--gray-5, #888);
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .studio-tab.active {
+      background: white;
+      color: var(--text-main, #111);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      font-weight: 600;
+    }
+
+    /* ── SLOTS ── */
+    .slots-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .slot-card {
+      border: 1.5px solid var(--gray-2, #eee);
+      border-radius: 14px;
+      overflow: hidden;
+      background: white;
+    }
+
+    .slot-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--gray-2, #eee);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .slot-num {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--gray-5, #888);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    .slot-body { padding: 14px; }
+
+    /* Result area in slot */
+    .slot-result {
+      aspect-ratio: 1;
+      background: var(--gray-1, #f5f5f5);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+    .slot-result img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 10px;
+    }
+    .slot-result-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: var(--gray-4, #bbb);
+    }
+    .slot-result-empty span { font-size: 28px; }
+    .slot-result-empty p { font-size: 12px; }
+
+    .slot-result-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      opacity: 0;
+      transition: opacity 0.15s;
+      border-radius: 10px;
+    }
+    .slot-result:hover .slot-result-overlay { opacity: 1; }
+    .slot-overlay-btn {
+      background: rgba(255,255,255,0.9);
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .slot-overlay-btn:hover { background: white; }
+
+    /* Progress bar */
+    .slot-progress {
+      height: 3px;
+      background: var(--gray-2, #eee);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .slot-progress-bar {
+      height: 100%;
+      background: var(--primary, #d97706);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.5s;
+      animation: progressPulse 2s ease-in-out infinite;
+    }
+    @keyframes progressPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .slot-status {
+      font-size: 12px;
+      color: var(--gray-5, #888);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    /* ── UPLOAD ZONE ── */
+    .upload-zone {
+      border: 2px dashed var(--gray-3, #ddd);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: var(--gray-1, #f9f9f9);
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--primary, #d97706);
+      background: rgba(217,119,6,0.04);
+    }
+    .upload-zone-icon { font-size: 28px; margin-bottom: 6px; }
+    .upload-zone-text { font-size: 13px; color: var(--gray-5, #888); }
+    .upload-zone-text strong { color: var(--primary, #d97706); }
+
+    .ref-thumbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .ref-thumb {
+      position: relative;
+      width: 64px; height: 64px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1.5px solid var(--gray-2, #eee);
+    }
+    .ref-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .ref-thumb-del {
+      position: absolute; top: 2px; right: 2px;
+      background: rgba(0,0,0,0.55);
+      border: none; border-radius: 50%;
+      width: 16px; height: 16px;
+      color: white; font-size: 10px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── SETTINGS ROW ── */
+    .settings-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    /* ── HISTORY ── */
+    .history-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .history-card {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--gray-2, #eee);
+      background: white;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .history-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+    .history-card img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+    .history-card-foot {
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .history-card-prompt {
+      font-size: 11px;
+      color: var(--gray-5, #888);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .history-card-del {
+      background: none; border: none;
+      font-size: 13px; color: var(--gray-4, #ccc);
+      cursor: pointer; padding: 1px 3px;
+      transition: color 0.12s;
+      flex-shrink: 0;
+    }
+    .history-card-del:hover { color: var(--danger, #ef4444); }
+
+    /* ── LIGHTBOX ── */
+    .lightbox {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 14px;
+      padding: 20px;
+    }
+    .lightbox img { max-width: 90vw; max-height: 80vh; border-radius: 10px; }
+    .lightbox-actions { display: flex; gap: 10px; }
+    .lightbox-btn {
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .lightbox-btn.close { background: rgba(255,255,255,0.15); color: white; }
+    .lightbox-btn.close:hover { background: rgba(255,255,255,0.25); }
+    .lightbox-btn.dl { background: var(--primary, #d97706); color: white; }
+    .lightbox-btn.dl:hover { background: var(--primary-dark, #b45309); }
+
+    @media (max-width: 900px) {
+      .slots-grid { grid-template-columns: 1fr 1fr; }
+      .settings-row { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
+      .slots-grid { grid-template-columns: 1fr; }
+      .settings-row { grid-template-columns: 1fr; }
+      .studio-tabs { width: 100%; }
+      .studio-tab { flex: 1; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="/assets/autopilot.png" style="width:36px;height:36px;object-fit:contain;border-radius:8px;" alt="Adsy"/>
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
+      <div class="nav-item" data-page="ctwa.html"><span class="nav-icon">💬</span> Buat Iklan CTWA</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="generate-image.html"><span class="nav-icon">🎨</span> Generate Gambar</div>
+      <div class="nav-item active" data-page="generate-studio.html"><span class="nav-icon">✨</span> Generate Studio</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="copywriting.html"><span class="nav-icon">✍️</span> Copywriting AI</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-item" data-page="topup.html"><span class="nav-icon">💳</span> Top Up Budget</div>
+      <div class="nav-item" data-page="products.html"><span class="nav-icon">📦</span> Produk</div>
+      <div class="nav-item" data-page="card.html"><span class="nav-icon">🏦</span> Kartu Iklan Adsy</div>
+      <div class="nav-item" data-page="settings.html" data-admin-only><span class="nav-icon">⚙️</span> Pengaturan</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>✨ Generate Studio</h2>
+        <p>Buat gambar dari teks atau ubah gambar yang ada</p>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- TABS -->
+      <div class="studio-tabs">
+        <button class="studio-tab active" id="tab-t2i" onclick="switchTab('t2i')">✍️ Text → Gambar</button>
+        <button class="studio-tab" id="tab-i2i" onclick="switchTab('i2i')">🖼️ Gambar → Gambar</button>
+      </div>
+
+      <!-- ── TEXT TO IMAGE ── -->
+      <div id="panel-t2i">
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header">
+            <div>
+              <div class="card-title">✍️ Text → Gambar</div>
+              <div class="card-sub">Deskripsikan gambar yang ingin dibuat — AI akan generate-nya</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Prompt <span>*</span></label>
+            <textarea class="form-input form-textarea" id="t2i-prompt" rows="4"
+              placeholder="Deskripsikan gambar secara detail. Misal: A beautiful Indonesian woman wearing traditional batik, golden hour lighting, bokeh background, professional photography..."></textarea>
+          </div>
+
+          <div class="settings-row">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Aspect Ratio</label>
+              <select class="form-input form-select" id="t2i-ratio">
+                <option value="auto">Auto</option>
+                <option value="1:1">1:1 (Square)</option>
+                <option value="16:9">16:9 (Landscape)</option>
+                <option value="9:16" selected>9:16 (Portrait/Story)</option>
+                <option value="4:3">4:3</option>
+                <option value="3:4">3:4</option>
+                <option value="3:2">3:2</option>
+                <option value="2:3">2:3</option>
+                <option value="21:9">21:9 (Ultrawide)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Resolusi</label>
+              <select class="form-input form-select" id="t2i-res">
+                <option value="1K" selected>1K (Standard)</option>
+                <option value="2K">2K (High)</option>
+                <option value="4K">4K (Ultra)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Background</label>
+              <select class="form-input form-select" id="t2i-bg">
+                <option value="auto" selected>Auto</option>
+                <option value="opaque">Opaque</option>
+                <option value="transparent">Transparent (PNG)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="btn-t2i-gen" onclick="generateT2I()" style="min-width:160px;">
+              ✨ Generate Gambar
+            </button>
+            <span style="font-size:12px;color:var(--gray-5);">Klik untuk generate 3 variasi sekaligus</span>
+          </div>
+        </div>
+
+        <!-- Slots T2I -->
+        <div class="slots-grid" id="t2i-slots"></div>
+      </div>
+
+      <!-- ── IMAGE TO IMAGE ── -->
+      <div id="panel-i2i" style="display:none;">
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🖼️ Gambar → Gambar</div>
+              <div class="card-sub">Upload gambar referensi, lalu deskripsikan perubahan yang diinginkan</div>
+            </div>
+          </div>
+
+          <!-- Upload zone -->
+          <div class="form-group">
+            <label class="form-label">Gambar Referensi <span>*</span></label>
+            <div class="upload-zone" id="i2i-zone"
+              onclick="document.getElementById('i2i-file').click()"
+              ondragover="event.preventDefault();this.classList.add('dragover')"
+              ondragleave="this.classList.remove('dragover')"
+              ondrop="handleI2IDrop(event)">
+              <div class="upload-zone-icon">🖼️</div>
+              <div class="upload-zone-text">
+                <strong>Klik untuk upload</strong> atau drag & drop<br/>
+                JPG, PNG, WEBP — max 30MB — max 4 gambar
+              </div>
+            </div>
+            <div class="ref-thumbs" id="i2i-thumbs"></div>
+            <input type="file" id="i2i-file" accept="image/*" multiple style="display:none;" onchange="handleI2IFiles(this.files)"/>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Prompt — Apa yang ingin diubah? <span>*</span></label>
+            <textarea class="form-input form-textarea" id="i2i-prompt" rows="3"
+              placeholder="Misal: Ganti background dengan pantai sunset. Pertahankan pose dan wajah orang di gambar..."></textarea>
+          </div>
+
+          <div class="settings-row">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Aspect Ratio</label>
+              <select class="form-input form-select" id="i2i-ratio">
+                <option value="auto" selected>Auto</option>
+                <option value="1:1">1:1 (Square)</option>
+                <option value="16:9">16:9 (Landscape)</option>
+                <option value="9:16">9:16 (Portrait/Story)</option>
+                <option value="4:3">4:3</option>
+                <option value="3:4">3:4</option>
+                <option value="3:2">3:2</option>
+                <option value="2:3">2:3</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Resolusi</label>
+              <select class="form-input form-select" id="i2i-res">
+                <option value="1K" selected>1K (Standard)</option>
+                <option value="2K">2K (High)</option>
+                <option value="4K">4K (Ultra)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Background</label>
+              <select class="form-input form-select" id="i2i-bg">
+                <option value="auto" selected>Auto</option>
+                <option value="opaque">Opaque</option>
+                <option value="transparent">Transparent (PNG)</option>
+              </select>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="btn-i2i-gen" onclick="generateI2I()" style="min-width:160px;">
+            ✨ Generate
+          </button>
+        </div>
+
+        <!-- Slots I2I -->
+        <div class="slots-grid" id="i2i-slots" style="grid-template-columns:repeat(2,1fr);"></div>
+      </div>
+
+      <!-- ── HISTORY ── -->
+      <div class="card" style="margin-top:24px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">🗂️ Riwayat Generate</div>
+            <div class="card-sub">Hasil generate tersimpan selama 14 hari</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="loadHistory()">🔄 Refresh</button>
+        </div>
+        <div id="history-area">
+          <div class="empty-state" style="padding:30px;">
+            <div class="empty-icon">🖼️</div>
+            <p>Belum ada riwayat generate</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div class="toast-container"></div>
+
+<!-- Lightbox -->
+<div class="lightbox hidden" id="lightbox" onclick="closeLightbox(event)">
+  <img id="lb-img" src="" alt=""/>
+  <div class="lightbox-actions" onclick="event.stopPropagation()">
+    <button class="lightbox-btn dl" onclick="downloadLbImg()">⬇ Download</button>
+    <button class="lightbox-btn close" onclick="document.getElementById('lightbox').classList.add('hidden')">✕ Tutup</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import { requireAuth, renderUserInfo } from './js/auth.js';
+import { initSidebar, showToast, initModals } from './js/sidebar.js';
+import { getSupabase } from './js/supabase.js';
+
+let sb, currentProfile;
+let i2iImages = []; // [{ base64, mime_type, dataUrl }]
+const MAX_SLOTS_T2I = 3;
+const MAX_SLOTS_I2I = 2;
+
+// ── INIT ──
+async function init() {
+  sb = await getSupabase();
+  const session = await requireAuth();
+  if (!session) return;
+  currentProfile = await renderUserInfo();
+  initSidebar();
+  initModals();
+  initSlots('t2i', MAX_SLOTS_T2I);
+  initSlots('i2i', MAX_SLOTS_I2I);
+  await loadHistory();
+}
+
+// ── TABS ──
+window.switchTab = function(tab) {
+  document.getElementById('panel-t2i').style.display = tab === 't2i' ? '' : 'none';
+  document.getElementById('panel-i2i').style.display = tab === 'i2i' ? '' : 'none';
+  document.getElementById('tab-t2i').classList.toggle('active', tab === 't2i');
+  document.getElementById('tab-i2i').classList.toggle('active', tab === 'i2i');
+};
+
+// ── SLOTS ──
+function initSlots(mode, count) {
+  const container = document.getElementById(`${mode}-slots`);
+  container.innerHTML = Array.from({ length: count }, (_, i) => `
+    <div class="slot-card" id="${mode}-slot-${i}">
+      <div class="slot-head">
+        <span class="slot-num">Variasi ${i + 1}</span>
+        <span class="badge badge-gray" id="${mode}-slot-badge-${i}" style="font-size:10px;">Siap</span>
+      </div>
+      <div class="slot-body">
+        <div class="slot-progress hidden" id="${mode}-slot-prog-${i}">
+          <div class="slot-progress-bar" id="${mode}-slot-progbar-${i}"></div>
+        </div>
+        <div class="slot-result" id="${mode}-slot-result-${i}" onclick="openLightboxSlot('${mode}', ${i})">
+          <div class="slot-result-empty">
+            <span>🖼️</span>
+            <p>Hasil generate</p>
+          </div>
+          <div class="slot-result-overlay" id="${mode}-slot-overlay-${i}" style="display:none;">
+            <button class="slot-overlay-btn" onclick="event.stopPropagation();downloadSlot('${mode}',${i})">⬇ Download</button>
+            <button class="slot-overlay-btn" onclick="event.stopPropagation();openLightboxSlot('${mode}',${i})">🔍 Perbesar</button>
+          </div>
+        </div>
+        <div class="slot-status hidden" id="${mode}-slot-status-${i}"></div>
+      </div>
+    </div>`).join('');
+}
+
+// slot state
+const slotState = {}; // { 't2i-0': { task_id, result_url, ref_files } }
+
+function setSlotState(mode, idx, data) {
+  slotState[`${mode}-${idx}`] = { ...slotState[`${mode}-${idx}`], ...data };
+}
+function getSlotState(mode, idx) { return slotState[`${mode}-${idx}`] || {}; }
+
+function setSlotBadge(mode, idx, text, cls) {
+  const el = document.getElementById(`${mode}-slot-badge-${idx}`);
+  if (!el) return;
+  el.textContent = text;
+  el.className = `badge badge-${cls}`;
+  el.style.fontSize = '10px';
+}
+
+function setSlotStatus(mode, idx, text) {
+  const el = document.getElementById(`${mode}-slot-status-${idx}`);
+  if (!el) return;
+  if (text) { el.textContent = text; el.classList.remove('hidden'); }
+  else el.classList.add('hidden');
+}
+
+function setSlotProgress(mode, idx, show, pct = 30) {
+  document.getElementById(`${mode}-slot-prog-${idx}`)?.classList.toggle('hidden', !show);
+  const bar = document.getElementById(`${mode}-slot-progbar-${idx}`);
+  if (bar) bar.style.width = pct + '%';
+}
+
+function setSlotResult(mode, idx, url) {
+  const resultEl = document.getElementById(`${mode}-slot-result-${idx}`);
+  const overlayEl = document.getElementById(`${mode}-slot-overlay-${idx}`);
+  if (!resultEl) return;
+  resultEl.innerHTML = `<img src="${url}" alt="Generated"/>
+    <div class="slot-result-overlay">
+      <button class="slot-overlay-btn" onclick="event.stopPropagation();downloadSlot('${mode}',${idx})">⬇ Download</button>
+      <button class="slot-overlay-btn" onclick="event.stopPropagation();openLightboxSlot('${mode}',${idx})">🔍 Perbesar</button>
+    </div>`;
+  setSlotState(mode, idx, { result_url: url });
+}
+
+// ── GENERATE T2I ──
+window.generateT2I = async function() {
+  const prompt = document.getElementById('t2i-prompt').value.trim();
+  if (!prompt) return showToast('Prompt wajib diisi', 'warning');
+
+  const ratio = document.getElementById('t2i-ratio').value;
+  const res   = document.getElementById('t2i-res').value;
+  const bg    = document.getElementById('t2i-bg').value;
+
+  document.getElementById('btn-t2i-gen').disabled = true;
+  document.getElementById('btn-t2i-gen').innerHTML = '<div class="loading-spinner"></div> Generating...';
+
+  // Launch all slots in parallel
+  const jobs = Array.from({ length: MAX_SLOTS_T2I }, (_, i) =>
+    runT2ISlot(i, prompt, ratio, res, bg)
+  );
+  await Promise.allSettled(jobs);
+
+  document.getElementById('btn-t2i-gen').disabled = false;
+  document.getElementById('btn-t2i-gen').innerHTML = '✨ Generate Gambar';
+  await loadHistory();
+};
+
+async function runT2ISlot(idx, prompt, ratio, res, bg) {
+  setSlotBadge('t2i', idx, '⏳ Starting...', 'warning');
+  setSlotProgress('t2i', idx, true, 10);
+  setSlotStatus('t2i', idx, 'Membuat task...');
+
+  try {
+    const r = await fetch('/api/ai-copy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'generate_text_to_image', prompt, aspect_ratio: ratio, resolution: res, background: bg })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Gagal membuat task');
+
+    setSlotState('t2i', idx, { task_id: d.task_id });
+    setSlotBadge('t2i', idx, '⏳ Generating...', 'warning');
+    await pollSlot('t2i', idx, d.task_id, []);
+
+  } catch (e) {
+    setSlotBadge('t2i', idx, '❌ Error', 'danger');
+    setSlotStatus('t2i', idx, e.message);
+    setSlotProgress('t2i', idx, false);
+  }
+}
+
+// ── GENERATE I2I ──
+window.generateI2I = async function() {
+  const prompt = document.getElementById('i2i-prompt').value.trim();
+  if (!prompt) return showToast('Prompt wajib diisi', 'warning');
+  if (!i2iImages.length) return showToast('Upload minimal 1 gambar referensi', 'warning');
+
+  const ratio = document.getElementById('i2i-ratio').value;
+  const res   = document.getElementById('i2i-res').value;
+  const bg    = document.getElementById('i2i-bg').value;
+
+  document.getElementById('btn-i2i-gen').disabled = true;
+  document.getElementById('btn-i2i-gen').innerHTML = '<div class="loading-spinner"></div> Generating...';
+
+  // Launch slots in parallel
+  const jobs = Array.from({ length: MAX_SLOTS_I2I }, (_, i) =>
+    runI2ISlot(i, prompt, ratio, res, bg)
+  );
+  await Promise.allSettled(jobs);
+
+  document.getElementById('btn-i2i-gen').disabled = false;
+  document.getElementById('btn-i2i-gen').innerHTML = '✨ Generate';
+  await loadHistory();
+};
+
+async function runI2ISlot(idx, prompt, ratio, res, bg) {
+  setSlotBadge('i2i', idx, '⏳ Uploading...', 'warning');
+  setSlotProgress('i2i', idx, true, 15);
+  setSlotStatus('i2i', idx, 'Upload gambar referensi...');
+
+  try {
+    const r = await fetch('/api/ai-copy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'generate_image_v2',
+        prompt,
+        images: i2iImages.map(img => ({ base64: img.base64, mime_type: img.mime_type })),
+        aspect_ratio: ratio,
+        resolution: res,
+        background: bg
+      })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Gagal membuat task');
+
+    setSlotState('i2i', idx, { task_id: d.task_id, ref_files: d.ref_files || [] });
+    setSlotBadge('i2i', idx, '⏳ Generating...', 'warning');
+    await pollSlot('i2i', idx, d.task_id, d.ref_files || []);
+
+  } catch (e) {
+    setSlotBadge('i2i', idx, '❌ Error', 'danger');
+    setSlotStatus('i2i', idx, e.message);
+    setSlotProgress('i2i', idx, false);
+  }
+}
+
+// ── POLL ──
+async function pollSlot(mode, idx, taskId, refFiles) {
+  let pct = 20, attempts = 0;
+  const MAX = 60; // 3 menit
+
+  while (attempts < MAX) {
+    await sleep(3000);
+    attempts++;
+    pct = Math.min(90, pct + 4);
+    setSlotProgress(mode, idx, true, pct);
+    setSlotStatus(mode, idx, `Memproses... (${attempts * 3}s)`);
+
+    try {
+      const r = await fetch('/api/ai-copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check_image_task', task_id: taskId, ref_files: refFiles })
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error);
+
+      if (d.state === 'success' && d.result_urls?.length) {
+        setSlotProgress(mode, idx, true, 100);
+        setSlotResult(mode, idx, d.result_urls[0]);
+        setSlotBadge(mode, idx, '✅ Selesai', 'success');
+        setSlotStatus(mode, idx, '');
+        setSlotProgress(mode, idx, false);
+
+        // Save to Supabase
+        const prompt = document.getElementById(`${mode === 't2i' ? 't2i' : 'i2i'}-prompt`).value;
+        await sb.from('image_generations').insert({
+          user_id: currentProfile.id,
+          task_id: taskId,
+          prompt,
+          result_url: d.result_urls[0],
+          aspect_ratio: document.getElementById(`${mode === 't2i' ? 't2i' : 'i2i'}-ratio`).value,
+          resolution: document.getElementById(`${mode === 't2i' ? 't2i' : 'i2i'}-res`).value,
+          background: document.getElementById(`${mode === 't2i' ? 't2i' : 'i2i'}-bg`).value
+        });
+        return;
+      }
+
+      if (d.state === 'fail') throw new Error(d.fail_msg || 'Generate gagal');
+
+    } catch (e) {
+      setSlotBadge(mode, idx, '❌ Error', 'danger');
+      setSlotStatus(mode, idx, e.message);
+      setSlotProgress(mode, idx, false);
+      return;
+    }
+  }
+
+  setSlotBadge(mode, idx, '⏱ Timeout', 'danger');
+  setSlotStatus(mode, idx, 'Terlalu lama, coba lagi');
+  setSlotProgress(mode, idx, false);
+}
+
+// ── IMAGE UPLOAD I2I ──
+window.handleI2IFiles = function(files) {
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    if (i2iImages.length >= 4) break;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      const base64 = dataUrl.split(',')[1];
+      i2iImages.push({ base64, mime_type: file.type, dataUrl });
+      renderI2IThumbs();
+    };
+    reader.readAsDataURL(file);
+  }
+  document.getElementById('i2i-file').value = '';
+};
+
+window.handleI2IDrop = function(e) {
+  e.preventDefault();
+  document.getElementById('i2i-zone').classList.remove('dragover');
+  handleI2IFiles(e.dataTransfer.files);
+};
+
+function renderI2IThumbs() {
+  const el = document.getElementById('i2i-thumbs');
+  el.innerHTML = i2iImages.map((img, i) => `
+    <div class="ref-thumb">
+      <img src="${img.dataUrl}"/>
+      <button class="ref-thumb-del" onclick="removeI2IImg(${i})">✕</button>
+    </div>`).join('');
+  document.getElementById('i2i-zone').style.display = i2iImages.length >= 4 ? 'none' : '';
+}
+
+window.removeI2IImg = function(i) {
+  i2iImages.splice(i, 1);
+  renderI2IThumbs();
+};
+
+// ── HISTORY ──
+window.loadHistory = async function() {
+  const el = document.getElementById('history-area');
+  el.innerHTML = `<div style="text-align:center;padding:20px;"><div class="loading-spinner" style="margin:0 auto;"></div></div>`;
+
+  let q = sb.from('image_generations').select('*').order('created_at', { ascending: false }).limit(40);
+  if (currentProfile?.role !== 'admin') q = q.eq('user_id', currentProfile?.id);
+  const { data } = await q;
+
+  if (!data?.length) {
+    el.innerHTML = `<div class="empty-state" style="padding:30px;"><div class="empty-icon">🖼️</div><p>Belum ada riwayat generate</p></div>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="history-grid">${data.map(item => `
+    <div class="history-card" id="hcard-${item.id}">
+      <img src="${item.result_url}" alt="generated" loading="lazy" onclick="openLightboxUrl('${item.result_url}')"/>
+      <div class="history-card-foot">
+        <span class="history-card-prompt" title="${escHtml(item.prompt || '')}">${escHtml(item.prompt || '-')}</span>
+        <button class="history-card-del" onclick="deleteHistory('${item.id}')" title="Hapus">🗑️</button>
+      </div>
+    </div>`).join('')}</div>`;
+};
+
+window.deleteHistory = async function(id) {
+  const { data } = await sb.from('image_generations').select('result_url').eq('id', id).single();
+  await sb.from('image_generations').delete().eq('id', id);
+  document.getElementById('hcard-' + id)?.remove();
+  showToast('Dihapus', 'success');
+};
+
+// ── LIGHTBOX ──
+window.openLightboxSlot = function(mode, idx) {
+  const img = document.getElementById(`${mode}-slot-result-${idx}`)?.querySelector('img');
+  if (!img) return;
+  openLightboxUrl(img.src);
+};
+
+window.openLightboxUrl = function(url) {
+  document.getElementById('lb-img').src = url;
+  document.getElementById('lightbox').classList.remove('hidden');
+};
+
+window.closeLightbox = function(e) {
+  if (e.target === document.getElementById('lightbox')) document.getElementById('lightbox').classList.add('hidden');
+};
+
+window.downloadLbImg = function() {
+  const url = document.getElementById('lb-img').src;
+  const a = document.createElement('a');
+  a.href = url; a.download = 'adsy-generated-' + Date.now() + '.png';
+  a.target = '_blank'; a.click();
+};
+
+window.downloadSlot = function(mode, idx) {
+  const img = document.getElementById(`${mode}-slot-result-${idx}`)?.querySelector('img');
+  if (!img) return;
+  const a = document.createElement('a');
+  a.href = img.src; a.download = 'adsy-generated-' + Date.now() + '.png';
+  a.target = '_blank'; a.click();
+};
+
+// ── UTILS ──
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
+</script>
+</body>
+</html>
