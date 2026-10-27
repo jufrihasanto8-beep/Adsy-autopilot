@@ -116,6 +116,58 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── GENERATE TEXT TO IMAGE (gpt-image-2-5-flare) ──
+  if (action === 'generate_text_to_image') {
+    const { prompt, aspect_ratio, resolution, background } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'prompt wajib diisi' });
+    const KIE_KEY = process.env.KIE_API_KEY;
+    if (!KIE_KEY) return res.status(500).json({ error: 'KIE_API_KEY belum dikonfigurasi' });
+    try {
+      const kieResp = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${KIE_KEY}` },
+        body: JSON.stringify({
+          model: 'gpt-image-2-5-flare-text-to-image',
+          input: { prompt, aspect_ratio: aspect_ratio || 'auto', resolution: resolution || '1K', background: background || 'auto' }
+        })
+      });
+      const kieData = await kieResp.json();
+      if (kieData.code !== 200) return res.status(500).json({ error: kieData.msg || 'Gagal membuat task' });
+      return res.json({ ok: true, task_id: kieData.data.taskId });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
+  // ── GENERATE IMAGE TO IMAGE V2 (gpt-image-2-5-flare) ──
+  if (action === 'generate_image_v2') {
+    const { prompt, images, aspect_ratio, resolution, background } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'prompt wajib diisi' });
+    const KIE_KEY = process.env.KIE_API_KEY;
+    if (!KIE_KEY) return res.status(500).json({ error: 'KIE_API_KEY belum dikonfigurasi' });
+    try {
+      const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+      const inputUrls = [], uploadedFiles = [];
+      for (const img of (images || [])) {
+        const ext = (img.mime_type || 'image/jpeg').split('/')[1] || 'jpg';
+        const fileName = `ref-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        await sb.storage.from('gen-images').upload(fileName, Buffer.from(img.base64, 'base64'), { contentType: img.mime_type || 'image/jpeg' });
+        const { data: { publicUrl } } = sb.storage.from('gen-images').getPublicUrl(fileName);
+        inputUrls.push(publicUrl);
+        uploadedFiles.push(fileName);
+      }
+      const kieResp = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${KIE_KEY}` },
+        body: JSON.stringify({
+          model: 'gpt-image-2-5-flare-image-to-image',
+          input: { prompt, input_urls: inputUrls, aspect_ratio: aspect_ratio || 'auto', resolution: resolution || '1K', background: background || 'auto' }
+        })
+      });
+      const kieData = await kieResp.json();
+      if (kieData.code !== 200) return res.status(500).json({ error: kieData.msg || 'Gagal membuat task' });
+      return res.json({ ok: true, task_id: kieData.data.taskId, ref_files: uploadedFiles });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
   // ── ANALISA WINNER ──
   if (action === 'analyze-winners') {
     const { winners } = req.body;
