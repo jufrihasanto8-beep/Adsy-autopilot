@@ -857,12 +857,12 @@
     <h1 class="welcome-title">Ada yang bisa dibantu?</h1>
     <p class="welcome-sub">Claude Sonnet 4.6 · Anthropic</p>
     <div class="welcome-chips">
-      <button class="chip" onclick="useChip(this)">✍️ Buatkan copy iklan produk saya</button>
-      <button class="chip" onclick="useChip(this)">📊 Analisa strategi Meta Ads saya</button>
-      <button class="chip" onclick="useChip(this)">🎯 Bantu tentukan target audience</button>
-      <button class="chip" onclick="useChip(this)">💡 Ide konten kreatif untuk produk</button>
-      <button class="chip" onclick="useChip(this)">📝 Tulis caption Instagram yang viral</button>
-      <button class="chip" onclick="useChip(this)">🔥 Strategi scaling iklan budget minim</button>
+      <button class="chip" onclick="useChip(this)">✍️ Bantu saya menulis sesuatu</button>
+      <button class="chip" onclick="useChip(this)">💡 Jelaskan konsep ini kepada saya</button>
+      <button class="chip" onclick="useChip(this)">🔍 Bantu analisa dan beri pendapat</button>
+      <button class="chip" onclick="useChip(this)">🧠 Brainstorm ide bersama</button>
+      <button class="chip" onclick="useChip(this)">📝 Rangkum teks berikut ini</button>
+      <button class="chip" onclick="useChip(this)">💻 Bantu debug kode saya</button>
     </div>
   </div>
 
@@ -940,13 +940,14 @@ import { getSupabase } from './js/supabase.js';
 
 // ── SKILLS ──
 const SKILLS = [
-  { id: 'analisa-iklan',   icon: '🔍', name: 'analisa-iklan',   desc: 'Analisa performa & kelemahan iklan',        prompt: 'Tolong analisa iklan ini secara detail dari sisi copywriting, visual appeal, dan target audience. Berikan:\n1. Skor keseluruhan (1-10)\n2. Kelebihan yang sudah bagus\n3. Kelemahan yang perlu diperbaiki\n4. Rekomendasi perbaikan spesifik' },
-  { id: 'bikin-copy',      icon: '✍️', name: 'bikin-copy',      desc: 'Generate 3 variasi copy iklan',             prompt: 'Buatkan 3 variasi copy iklan Meta (Facebook/Instagram) untuk produk berikut:\n\nProduk: ' },
-  { id: 'riset-audience',  icon: '🎯', name: 'riset-audience',  desc: 'Definisikan target audience ideal',         prompt: 'Bantu saya riset dan definisikan target audience ideal untuk:\n\nProduk/bisnis: ' },
-  { id: 'strategi-budget', icon: '💰', name: 'strategi-budget', desc: 'Strategi alokasi budget Meta Ads',          prompt: 'Berikan strategi alokasi budget Meta Ads yang optimal.\n\nTotal budget harian: Rp\nTujuan utama iklan: ' },
-  { id: 'hook-ideas',      icon: '🪝', name: 'hook-ideas',      desc: '10 ide hook untuk video/caption iklan',     prompt: 'Buatkan 10 ide hook pembuka yang kuat untuk video iklan atau caption, untuk produk:\n\nProduk: ' },
-  { id: 'cek-kompetitor',  icon: '🕵️', name: 'cek-kompetitor', desc: 'Analisa & kalahkan strategi kompetitor',    prompt: 'Bantu analisa strategi iklan kompetitor dan cara mengalahkannya.\n\nProduk saya: \nKompetitor: ' },
-  { id: 'video-scene-image-prompts', icon: '🎬', name: 'video-scene-image-prompts', desc: 'Generate image prompts dari frame/scene video iklan', prompt: 'Kamu adalah creative director iklan berpengalaman.\n\nAnalisa frame video/gambar yang dilampirkan dan lakukan:\n\n1. **Deskripsi Scene** — Jelaskan apa yang terlihat: subjek, latar, komposisi, pencahayaan, warna dominan\n2. **Mood & Tone** — Apa feel dari visual ini? (energetik, tenang, luxury, fun, dll)\n3. **Image Generation Prompts** — Buatkan 3 prompt siap pakai untuk Midjourney / DALL-E / Stable Diffusion:\n   - Prompt 1: Versi persis / realistik\n   - Prompt 2: Versi lebih cinematic/editorial\n   - Prompt 3: Versi yang lebih bold untuk iklan\n4. **Rekomendasi Iklan** — Visual ini cocok untuk produk/kategori apa? Format iklan apa (feed, story, reels)?\n\nLampirkan foto atau frame video, lalu ketik nama produk atau brief singkat kamu:' },
+  { id: 'rangkum',      icon: '📝', name: 'rangkum',      desc: 'Rangkum teks panjang jadi poin utama',   prompt: 'Rangkum teks berikut ini menjadi poin-poin utama yang singkat dan mudah dipahami:\n\n' },
+  { id: 'perbaiki',     icon: '✍️', name: 'perbaiki',     desc: 'Perbaiki tulisan agar lebih baik',        prompt: 'Perbaiki tulisan berikut — perbaiki grammar, keterbacaan, dan alur kalimat tanpa mengubah makna:\n\n' },
+  { id: 'terjemahkan',  icon: '🌐', name: 'terjemahkan',  desc: 'Terjemahkan ke bahasa lain',              prompt: 'Terjemahkan teks berikut ke bahasa Inggris (atau sebutkan target bahasa lain):\n\n' },
+  { id: 'brainstorm',   icon: '🧠', name: 'brainstorm',   desc: 'Brainstorm ide kreatif',                  prompt: 'Bantu saya brainstorm ide-ide kreatif untuk:\n\n' },
+  { id: 'jelaskan',     icon: '💡', name: 'jelaskan',     desc: 'Jelaskan konsep dengan mudah',            prompt: 'Jelaskan konsep berikut dengan bahasa yang sederhana dan mudah dipahami:\n\n' },
+  { id: 'buatkan-tabel',icon: '📊', name: 'buatkan-tabel',desc: 'Buat perbandingan dalam format tabel',    prompt: 'Buatkan tabel perbandingan yang jelas untuk:\n\n' },
+  { id: 'debug-kode',   icon: '💻', name: 'debug-kode',   desc: 'Debug dan perbaiki kode',                 prompt: 'Tolong bantu debug kode berikut, jelaskan masalahnya dan berikan solusi:\n\n```\n\n```' },
+  { id: 'video-scene-image-prompts', icon: '🎬', name: 'video-scene-image-prompts', desc: 'Generate image prompts dari frame/scene video', prompt: 'Analisa frame video/gambar yang dilampirkan dan lakukan:\n\n1. **Deskripsi Scene** — subjek, latar, komposisi, pencahayaan, warna dominan\n2. **Mood & Tone** — feel dari visual ini\n3. **Image Generation Prompts** — 3 prompt siap pakai untuk Midjourney / DALL-E:\n   - Prompt 1: Versi realistik\n   - Prompt 2: Versi cinematic/editorial\n   - Prompt 3: Versi bold/stylized\n4. **Saran Penggunaan** — cocok untuk konten apa?\n\nLampirkan foto/frame video, lalu ketik konteks singkat:' },
 ];
 
 // ── STATE ──
