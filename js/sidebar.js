@@ -80,6 +80,7 @@ export function initSidebar() {
 
   injectProfileModal();
   injectChatNavItem();
+  injectGenerateStudioNavItem();
   // Init floating chat bubble (async, tidak block render)
   initChatWidget().catch(() => {});
 }
@@ -103,6 +104,28 @@ function injectChatNavItem() {
   // Set active state
   const current = window.location.pathname.split('/').pop() || 'dashboard.html';
   if (current === 'chat.html') item.classList.add('active');
+}
+
+function injectGenerateStudioNavItem() {
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav || nav.querySelector('[data-page="generate-studio.html"]')) return;
+  const item = document.createElement('div');
+  item.className = 'nav-item';
+  item.dataset.page = 'generate-studio.html';
+  item.innerHTML = '<span class="nav-icon">🎨</span> Generate Studio';
+  item.addEventListener('click', () => {
+    closeMobileMenu();
+    window.location.href = 'generate-studio.html';
+  });
+  // Insert setelah chat.html (atau settings.html jika chat tidak ada)
+  const chatItem = nav.querySelector('[data-page="chat.html"]');
+  const settingsItem = nav.querySelector('[data-page="settings.html"]');
+  if (chatItem) chatItem.insertAdjacentElement('afterend', item);
+  else if (settingsItem) settingsItem.insertAdjacentElement('afterend', item);
+  else nav.appendChild(item);
+  // Set active state
+  const current = window.location.pathname.split('/').pop() || 'dashboard.html';
+  if (current === 'generate-studio.html') item.classList.add('active');
 }
 
 // ── PROFILE MODAL ──
