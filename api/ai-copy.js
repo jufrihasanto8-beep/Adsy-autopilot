@@ -116,6 +116,40 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── CLAUDE CHAT (kie.ai claude-sonnet-5-5) ──
+  if (action === 'claude_chat') {
+    const { messages } = req.body;
+    if (!messages?.length) return res.status(400).json({ error: 'messages wajib diisi' });
+
+    const KIE_KEY = process.env.KIE_API_KEY;
+    if (!KIE_KEY) return res.status(500).json({ error: 'KIE_API_KEY belum dikonfigurasi' });
+
+    try {
+      const kieResp = await fetch('https://api.kie.ai/claude/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${KIE_KEY}`,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5-5',
+          max_tokens: 8096,
+          system: 'Kamu adalah asisten AI untuk tim Adsy, platform manajemen Meta Ads. Kamu ahli dalam copywriting iklan Facebook/Instagram, strategi Meta Ads, analisa performa kampanye, dan marketing digital. Jawab dalam Bahasa Indonesia kecuali user meminta bahasa lain. Jawaban harus jelas, praktis, dan langsung ke poin.',
+          messages
+        })
+      });
+
+      const data = await kieResp.json();
+      if (!kieResp.ok) return res.status(500).json({ error: data.error?.message || JSON.stringify(data) });
+
+      const text = data.content?.[0]?.text || '';
+      return res.json({ ok: true, text });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ── ANALISA WINNER ──
   if (action === 'analyze-winners') {
     const { winners } = req.body;
