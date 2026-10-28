@@ -863,6 +863,9 @@
   let historyTotal = 0;
   const SUMMARY_PAGE_SIZE = 10;
   let summaryPage = 0;
+  const AKUN_PRO_PAGE_SIZE = 10;
+  let akunProPage = 0;
+  let akunProTotal = 0;
   let summaryTotal = 0;
   let adAccounts = [];
   let linebankCards = [];
@@ -1783,6 +1786,7 @@
       const isAdminView = ['admin','superadmin'].includes(currentProfile?.role);
       if (isAdminView) renderAkunTypeList();
       else loadAkunProDropdown();
+      akunProPage = 0;
       loadAkunProList();
     }
   };
@@ -2675,12 +2679,14 @@
       const panduanEnc = encodeURIComponent(t.panduan || '');
       const namaEnc = encodeURIComponent(t.nama || '');
       const iconEnc = encodeURIComponent(t.icon || '');
+      const panduanId = `panduan-${t.id}`;
       return `
       <div style="padding:12px 0;border-bottom:1px solid var(--gray-1);">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-          <div style="display:flex;align-items:center;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="togglePanduan('${panduanId}', this)">
             <span style="font-size:20px;">${t.icon || '🌟'}</span>
             <span style="font-size:14px;font-weight:600;color:var(--text);">${t.nama}</span>
+            <span style="font-size:11px;color:var(--text-sub);" id="${panduanId}-chevron">${t.panduan ? '▶ panduan' : ''}</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:${t.tersedia ? '#065f46' : 'var(--text-sub)'};">
@@ -2693,7 +2699,9 @@
             <button onclick="deleteAkunType('${t.id}','${t.nama}')" style="border:none;background:var(--gray-1);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;color:var(--danger);" title="Hapus">🗑️</button>
           </div>
         </div>
-        ${t.panduan ? `<div style="margin-top:8px;padding:8px 12px;background:var(--gray-1);border-radius:8px;font-size:12px;color:var(--text-sub);white-space:pre-line;line-height:1.6;">${t.panduan}</div>` : `<div style="margin-top:6px;font-size:11px;color:var(--gray-4);font-style:italic;">Belum ada panduan — klik ✏️ untuk tambahkan</div>`}
+        <div id="${panduanId}" style="display:none;margin-top:8px;padding:10px 12px;background:var(--gray-1);border-radius:8px;font-size:12px;color:var(--text-sub);white-space:pre-line;line-height:1.6;">
+          ${t.panduan || '<span style="font-style:italic;">Belum ada panduan — klik ✏️ untuk tambahkan</span>'}
+        </div>
       </div>`;
     }).join('');
   }
@@ -2765,6 +2773,15 @@
     loadAkunProDropdown();
   };
 
+  window.togglePanduan = function(panduanId) {
+    const el = document.getElementById(panduanId);
+    const chevron = document.getElementById(panduanId + '-chevron');
+    if (!el) return;
+    const isOpen = el.style.display !== 'none';
+    el.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.textContent = isOpen ? '▶ panduan' : '▼ panduan';
+  };
+
   let _akunProTypes = [];
 
   async function loadAkunProDropdown() {
@@ -2817,16 +2834,23 @@
     el.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
     const isAdmin = ['admin','superadmin'].includes(currentProfile?.role);
 
-    let query = sb.from('akun_pro_requests').select('*').order('created_at', { ascending: false });
+    const from = akunProPage * AKUN_PRO_PAGE_SIZE;
+    const to   = from + AKUN_PRO_PAGE_SIZE - 1;
+
+    let query = sb.from('akun_pro_requests')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to);
     if (!isAdmin) {
       const { data: { user } } = await sb.auth.getUser();
       query = query.eq('user_id', user.id);
     }
 
-    const [{ data, error }, { data: types }] = await Promise.all([
+    const [{ data, error, count }, { data: types }] = await Promise.all([
       query,
       sb.from('akun_pro_types').select('nama, icon, panduan')
     ]);
+    akunProTotal = count || 0;
 
     if (error) { el.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
     if (!data?.length) {
@@ -2836,6 +2860,8 @@
 
     const typeMap = {};
     (types || []).forEach(t => { typeMap[t.nama] = t; });
+
+    const totalPages = Math.ceil(akunProTotal / AKUN_PRO_PAGE_SIZE);
 
     el.innerHTML = data.map(r => {
       const statusMap = { pending: ['badge-pending', '⏳ Pending'], selesai: ['badge-approved', '✅ Selesai'], ditolak: ['badge-rejected', '❌ Ditolak'] };
@@ -2889,7 +2915,22 @@
         </div>` : ''}
       </div>`;
     }).join('');
+
+    if (totalPages > 1) {
+      const info = `Halaman ${akunProPage + 1} dari ${totalPages} · ${akunProTotal} request`;
+      el.innerHTML += `<div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding:12px 4px;border-top:1px solid var(--gray-2);">
+        <button class="btn btn-outline btn-sm" onclick="goAkunProPage(${akunProPage - 1})" ${akunProPage === 0 ? 'disabled' : ''} style="min-width:80px;">← Sebelum</button>
+        <span style="font-size:12px;color:var(--text-sub);">${info}</span>
+        <button class="btn btn-outline btn-sm" onclick="goAkunProPage(${akunProPage + 1})" ${akunProPage >= totalPages - 1 ? 'disabled' : ''} style="min-width:80px;">Berikutnya →</button>
+      </div>`;
+    }
   }
+
+  window.goAkunProPage = function(page) {
+    akunProPage = page;
+    loadAkunProList();
+    document.getElementById('ap-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   window.copyAkunInfo = function(elId) {
     const el = document.getElementById(elId);
