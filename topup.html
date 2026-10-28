@@ -894,16 +894,16 @@
       if (tabReq) { tabReq.textContent = 'Ringkasan'; tabReq.dataset.tab = 'summary'; tabReq.setAttribute('onclick', "switchTab('summary')"); }
       // Rename Riwayat tab
       const tabRiwayat = document.querySelector('.topup-tab[data-tab="riwayat"]');
-      if (tabRiwayat) tabRiwayat.textContent = 'Manajemen Top Up';
+      if (tabRiwayat) tabRiwayat.textContent = 'Top Up';
       // Rename Kartu tab
       const tabKartu = document.getElementById('tab-kartu');
-      if (tabKartu) tabKartu.textContent = 'Manajemen Kartu';
+      if (tabKartu) tabKartu.textContent = 'Kartu';
       // Sembunyikan form request kartu untuk admin
       document.getElementById('kartu-form-wrap').style.display = 'none';
       document.getElementById('kartu-list-title').textContent = 'Semua Request Kartu';
       // Rename & sembunyikan form Akun Pro untuk admin, tampilkan panel manage
       const tabAkunPro = document.getElementById('tab-akun-pro');
-      if (tabAkunPro) tabAkunPro.textContent = 'Manajemen Akun Pro';
+      if (tabAkunPro) tabAkunPro.textContent = 'Akun Pro';
       document.getElementById('akun-pro-form-wrap').style.display = 'none';
       document.getElementById('akun-pro-manage-wrap').style.display = 'block';
       document.getElementById('ap-list-title').textContent = 'Semua Request Akun Pro';
