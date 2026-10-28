@@ -214,6 +214,7 @@
         <button class="topup-tab" data-tab="riwayat" onclick="switchTab('riwayat')">Riwayat</button>
         <button class="topup-tab" data-tab="akun-iklan" onclick="switchTab('akun-iklan')">Akun Iklan</button>
         <button class="topup-tab" data-tab="kartu" onclick="switchTab('kartu')" id="tab-kartu">Kartu</button>
+        <button class="topup-tab" data-tab="akun-pro" onclick="switchTab('akun-pro')" id="tab-akun-pro">Akun Pro</button>
       </div>
 
       <!-- ── Panel: Request ── -->
@@ -502,6 +503,66 @@
 
       </div>
 
+      <!-- ── Panel: Akun Pro ── -->
+      <div id="panel-akun-pro" class="topup-panel" style="display:none; max-width:680px; margin:0 auto;">
+
+        <!-- Form request (advertiser only) -->
+        <div id="akun-pro-form-wrap">
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Request Akun Pro</div>
+                <div class="card-sub">Ajukan request akun premium/pro, admin akan segera memproses</div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nama <span>*</span></label>
+              <input type="text" id="ap-nama" class="form-input" placeholder="Nama kamu" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jenis Akun Pro <span>*</span></label>
+              <select id="ap-jenis" class="form-input form-select">
+                <option value="">— Pilih Jenis Akun —</option>
+              </select>
+              <div class="form-hint" id="ap-jenis-hint" style="display:none;color:var(--text-sub);">Tidak ada akun pro yang tersedia saat ini</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Alasan / Kebutuhan <span>*</span></label>
+              <textarea id="ap-alasan" class="form-input" rows="3" placeholder="Contoh: Butuh Gemini Pro untuk riset konten iklan harian..." style="resize:vertical;"></textarea>
+            </div>
+            <div id="ap-err" style="font-size:12px;color:var(--danger);display:none;margin-bottom:8px;"></div>
+            <button class="btn btn-primary" id="ap-submit" onclick="submitAkunProRequest()" style="width:100%;">
+              Submit Request
+            </button>
+          </div>
+        </div>
+
+        <!-- Admin: Kelola Jenis Akun Pro -->
+        <div id="akun-pro-manage-wrap" style="display:none;">
+          <div class="card" style="margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+              <div>
+                <div class="card-title">Kelola Jenis Akun Pro</div>
+                <div class="card-sub">Aktifkan/nonaktifkan akun yang tersedia untuk advertiser</div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="openAddAkunTypeModal()">+ Tambah</button>
+            </div>
+            <div id="akun-type-list">
+              <div class="loading-state"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- List request -->
+        <div class="card">
+          <div class="card-title" style="margin-bottom:14px;" id="ap-list-title">Riwayat Request Akun Pro</div>
+          <div id="ap-list">
+            <div class="loading-state"><div class="spinner"></div></div>
+          </div>
+        </div>
+
+      </div>
+
     </div><!-- end page-content -->
   </main>
 </div><!-- end app-layout -->
@@ -708,6 +769,66 @@
   </div>
 </div>
 
+<!-- ── Modal: Akun Pro Info (admin) ── -->
+<div class="modal-overlay hidden" id="modal-akun-pro-info">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h3>🌟 Request Akun Pro</h3>
+      <div class="modal-close" onclick="closeModal('modal-akun-pro-info')">✕</div>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="api-request-id" />
+      <div id="api-detail" style="background:var(--gray-1);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;"></div>
+
+      <!-- Tombol aksi utama -->
+      <div id="api-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-akun-pro-info')">Batal</button>
+        <button class="btn" style="flex:1;background:#fee2e2;color:#991b1b;border:1.5px solid #fca5a5;" onclick="showAkunProRejectForm()">❌ Tolak</button>
+        <button class="btn btn-success" style="flex:2;" id="api-approve-btn" onclick="approveAkunPro()">✅ Sudah Dibuat</button>
+      </div>
+
+      <!-- Form tolak (hidden by default) -->
+      <div id="api-reject-wrap" style="display:none;margin-top:14px;">
+        <div class="modal-field">
+          <label>Catatan Penolakan <span style="color:var(--danger)">*</span></label>
+          <textarea id="api-catatan" class="form-input" rows="3" placeholder="Contoh: Tidak memenuhi syarat, silakan hubungi admin..." style="resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="hideAkunProRejectForm()">Kembali</button>
+          <button class="btn btn-danger" style="flex:2;" id="api-reject-btn" onclick="rejectAkunPro()">❌ Konfirmasi Tolak</button>
+        </div>
+      </div>
+
+      <div id="api-err" style="font-size:12px;color:var(--danger);display:none;margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Tambah Jenis Akun Pro (admin) ── -->
+<div class="modal-overlay hidden" id="modal-add-akun-type">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <h3>Tambah Jenis Akun Pro</h3>
+      <div class="modal-close" onclick="closeModal('modal-add-akun-type')">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Nama Akun <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="at-nama" class="form-input" placeholder="Contoh: Gemini Pro" />
+      </div>
+      <div class="modal-field">
+        <label>Icon (emoji)</label>
+        <input type="text" id="at-icon" class="form-input" placeholder="✨" maxlength="4" style="max-width:80px;" />
+      </div>
+      <div id="at-err" style="font-size:12px;color:var(--danger);display:none;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-add-akun-type')">Batal</button>
+        <button class="btn btn-primary" style="flex:2;" id="at-save-btn" onclick="saveAkunType()">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
   import { requireAuth, renderUserInfo, getProfile } from './js/auth.js';
@@ -758,6 +879,12 @@
       // Sembunyikan form request kartu untuk admin
       document.getElementById('kartu-form-wrap').style.display = 'none';
       document.getElementById('kartu-list-title').textContent = 'Semua Request Kartu';
+      // Rename & sembunyikan form Akun Pro untuk admin, tampilkan panel manage
+      const tabAkunPro = document.getElementById('tab-akun-pro');
+      if (tabAkunPro) tabAkunPro.textContent = 'Manajemen Akun Pro';
+      document.getElementById('akun-pro-form-wrap').style.display = 'none';
+      document.getElementById('akun-pro-manage-wrap').style.display = 'block';
+      document.getElementById('ap-list-title').textContent = 'Semua Request Akun Pro';
       document.getElementById('status-filter').style.display = 'block';
       // Inject tab ACC Finance (admin only)
       const tabsEl = document.getElementById('topup-tabs');
@@ -1633,6 +1760,12 @@
       if (sb) loadAdAccounts().then(() => { populateAdvertiserFilter(); renderAdAccounts(); });
     }
     if (tab === 'kartu') loadKartuList();
+    if (tab === 'akun-pro') {
+      const isAdminView = ['admin','superadmin'].includes(currentProfile?.role);
+      if (isAdminView) renderAkunTypeList();
+      else loadAkunProDropdown();
+      loadAkunProList();
+    }
   };
 
   window.switchStatus = function(status) {
@@ -2497,6 +2630,295 @@
       showToast('Request kartu ditolak.', 'error');
       closeModal('modal-kartu-info');
       loadKartuList();
+    } catch (e) {
+      errEl.textContent = 'Error: ' + e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = '❌ Konfirmasi Tolak';
+    }
+  };
+
+  // ── AKUN PRO ──
+  async function loadAkunProTypes() {
+    const { data } = await sb.from('akun_pro_types').select('*').order('nama');
+    return data || [];
+  }
+
+  async function renderAkunTypeList() {
+    const el = document.getElementById('akun-type-list');
+    if (!el) return;
+    const types = await loadAkunProTypes();
+    if (!types.length) {
+      el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-sub);font-size:13px;">Belum ada jenis akun. Klik + Tambah</div>';
+      return;
+    }
+    el.innerHTML = types.map(t => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-1);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:20px;">${t.icon || '🌟'}</span>
+          <span style="font-size:14px;font-weight:600;color:var(--text);">${t.nama}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:${t.tersedia ? '#065f46' : 'var(--text-sub)'};">
+            <div onclick="toggleAkunType('${t.id}',${t.tersedia})" style="width:36px;height:20px;border-radius:20px;background:${t.tersedia ? '#10b981' : '#d1d5db'};position:relative;cursor:pointer;transition:background .2s;">
+              <div style="position:absolute;top:2px;left:${t.tersedia ? '18px' : '2px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></div>
+            </div>
+            ${t.tersedia ? 'Tersedia' : 'Tidak Tersedia'}
+          </label>
+          <button onclick="deleteAkunType('${t.id}','${t.nama}')" style="border:none;background:var(--gray-1);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;color:var(--danger);" title="Hapus">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  window.openAddAkunTypeModal = function() {
+    document.getElementById('at-nama').value = '';
+    document.getElementById('at-icon').value = '';
+    document.getElementById('at-err').style.display = 'none';
+    openModal('modal-add-akun-type');
+  };
+
+  window.saveAkunType = async function() {
+    const nama = document.getElementById('at-nama').value.trim();
+    const icon = document.getElementById('at-icon').value.trim() || '🌟';
+    const errEl = document.getElementById('at-err');
+    errEl.style.display = 'none';
+    if (!nama) { errEl.textContent = 'Nama akun wajib diisi.'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('at-save-btn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    try {
+      const { error } = await sb.from('akun_pro_types').insert({ nama, icon, tersedia: true });
+      if (error) throw new Error(error.message);
+      showToast('Jenis akun berhasil ditambahkan!', 'success');
+      closeModal('modal-add-akun-type');
+      renderAkunTypeList();
+      // Refresh dropdown advertiser jika ada
+      loadAkunProDropdown();
+    } catch (e) {
+      errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Simpan';
+    }
+  };
+
+  window.toggleAkunType = async function(id, currentVal) {
+    const { error } = await sb.from('akun_pro_types').update({ tersedia: !currentVal }).eq('id', id);
+    if (error) { showToast('Gagal update: ' + error.message, 'error'); return; }
+    renderAkunTypeList();
+    loadAkunProDropdown();
+  };
+
+  window.deleteAkunType = async function(id, nama) {
+    if (!confirm(`Hapus "${nama}"? Request yang sudah ada tidak terpengaruh.`)) return;
+    const { error } = await sb.from('akun_pro_types').delete().eq('id', id);
+    if (error) { showToast('Gagal hapus: ' + error.message, 'error'); return; }
+    showToast('Jenis akun dihapus.', 'success');
+    renderAkunTypeList();
+    loadAkunProDropdown();
+  };
+
+  async function loadAkunProDropdown() {
+    const sel = document.getElementById('ap-jenis');
+    const hint = document.getElementById('ap-jenis-hint');
+    if (!sel) return;
+    const { data } = await sb.from('akun_pro_types').select('*').eq('tersedia', true).order('nama');
+    sel.innerHTML = '<option value="">— Pilih Jenis Akun —</option>';
+    if (!data?.length) {
+      hint.style.display = 'block';
+      document.getElementById('ap-submit').disabled = true;
+    } else {
+      hint.style.display = 'none';
+      document.getElementById('ap-submit').disabled = false;
+      data.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.nama;
+        opt.textContent = `${t.icon || '🌟'} ${t.nama}`;
+        sel.appendChild(opt);
+      });
+    }
+  }
+
+  async function loadAkunProList() {
+    const el = document.getElementById('ap-list');
+    el.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+    const isAdmin = ['admin','superadmin'].includes(currentProfile?.role);
+
+    let query = sb.from('akun_pro_requests').select('*').order('created_at', { ascending: false });
+    if (!isAdmin) {
+      const { data: { user } } = await sb.auth.getUser();
+      query = query.eq('user_id', user.id);
+    }
+
+    const { data, error } = await query;
+    if (error) { el.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
+    if (!data?.length) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">🌟</div><div>Belum ada request akun pro</div></div>';
+      return;
+    }
+
+    el.innerHTML = data.map(r => {
+      const statusMap = { pending: ['badge-pending', '⏳ Pending'], selesai: ['badge-approved', '✅ Selesai'], ditolak: ['badge-rejected', '❌ Ditolak'] };
+      const [badgeClass, badgeLabel] = statusMap[r.status] || ['badge-pending', r.status];
+      const tgl = new Date(r.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+      const alasanEnc = encodeURIComponent(r.alasan || '');
+      const userNameEnc = encodeURIComponent(r.user_name || '');
+      const jenisEnc = encodeURIComponent(r.jenis_akun || '');
+
+      return `<div class="req-card">
+        <div class="req-card-header">
+          <div>
+            ${isAdmin ? `<div style="font-weight:700;font-size:14px;">${r.user_name || '—'}</div>` : ''}
+            <div style="font-size:13px;font-weight:600;color:var(--text);${isAdmin ? 'margin-top:2px;' : ''}">${r.nama}</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-top:4px;">${tgl}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-start;flex-shrink:0;">
+            <span class="${badgeClass}">${badgeLabel}</span>
+            ${isAdmin && r.status === 'pending' ? `<button class="btn btn-outline btn-sm" onclick="openAkunProInfoModal('${r.id}','${userNameEnc}','${jenisEnc}','${alasanEnc}')">ℹ️ Proses</button>` : ''}
+          </div>
+        </div>
+        <div class="req-chips" style="margin-top:10px;">
+          <span class="chip">🌟 ${r.jenis_akun}</span>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.5;">📝 ${r.alasan}</div>
+        ${r.info_admin && r.status === 'selesai' ? `<div style="margin-top:10px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:12px;line-height:1.6;color:var(--text);">
+          <strong>✅ Akun sudah dibuat/diberikan</strong>
+        </div>` : ''}
+        ${r.info_admin && r.status === 'ditolak' ? `<div style="margin-top:10px;padding:10px 12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;font-size:12px;line-height:1.6;color:var(--text);">
+          <strong>📝 Catatan:</strong> ${r.info_admin}
+        </div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  window.submitAkunProRequest = async function() {
+    const nama = document.getElementById('ap-nama').value.trim();
+    const jenis = document.getElementById('ap-jenis').value;
+    const alasan = document.getElementById('ap-alasan').value.trim();
+    const errEl = document.getElementById('ap-err');
+    errEl.style.display = 'none';
+
+    if (!nama) { errEl.textContent = 'Nama wajib diisi.'; errEl.style.display = 'block'; return; }
+    if (!jenis) { errEl.textContent = 'Jenis akun pro wajib dipilih.'; errEl.style.display = 'block'; return; }
+    if (!alasan) { errEl.textContent = 'Alasan/kebutuhan wajib diisi.'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('ap-submit');
+    btn.disabled = true; btn.textContent = 'Mengirim...';
+
+    try {
+      const { data: { user } } = await sb.auth.getUser();
+      const { data, error } = await sb.from('akun_pro_requests').insert({
+        user_id: user.id,
+        user_name: currentProfile?.name || user.email,
+        nama, jenis_akun: jenis, alasan,
+        status: 'pending'
+      }).select().single();
+      if (error) throw new Error(error.message);
+
+      await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'notify_akun_pro_request', user_name: data.user_name, nama, jenis_akun: jenis, alasan, request_id: data.id })
+      }).catch(() => {});
+
+      showToast('Request akun pro berhasil dikirim!', 'success');
+      document.getElementById('ap-nama').value = '';
+      document.getElementById('ap-jenis').value = '';
+      document.getElementById('ap-alasan').value = '';
+      loadAkunProList();
+    } catch (e) {
+      errEl.textContent = 'Error: ' + e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Submit Request';
+    }
+  };
+
+  window.openAkunProInfoModal = function(id, userNameEnc, jenisEnc, alasanEnc) {
+    const userName = decodeURIComponent(userNameEnc);
+    const jenis = decodeURIComponent(jenisEnc);
+    const alasan = decodeURIComponent(alasanEnc);
+    document.getElementById('api-request-id').value = id;
+    document.getElementById('api-catatan').value = '';
+    document.getElementById('api-err').style.display = 'none';
+    document.getElementById('api-reject-wrap').style.display = 'none';
+    document.getElementById('api-actions').style.display = 'flex';
+    document.getElementById('api-detail').innerHTML = `
+      <div style="font-weight:700;margin-bottom:4px;">${userName}</div>
+      <div>Jenis: <strong>${jenis}</strong></div>
+      <div style="margin-top:6px;color:var(--text-sub);line-height:1.5;">${alasan}</div>
+    `;
+    openModal('modal-akun-pro-info');
+  };
+
+  window.showAkunProRejectForm = function() {
+    document.getElementById('api-actions').style.display = 'none';
+    document.getElementById('api-reject-wrap').style.display = 'block';
+  };
+
+  window.hideAkunProRejectForm = function() {
+    document.getElementById('api-reject-wrap').style.display = 'none';
+    document.getElementById('api-actions').style.display = 'flex';
+    document.getElementById('api-err').style.display = 'none';
+  };
+
+  window.approveAkunPro = async function() {
+    const id = document.getElementById('api-request-id').value;
+    const btn = document.getElementById('api-approve-btn');
+    btn.disabled = true; btn.textContent = 'Memproses...';
+    try {
+      const { data: req, error: fetchErr } = await sb.from('akun_pro_requests').select('*').eq('id', id).single();
+      if (fetchErr) throw new Error(fetchErr.message);
+
+      const { error } = await sb.from('akun_pro_requests')
+        .update({ status: 'selesai', updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+
+      await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'notify_akun_pro_info', user_id: req.user_id, user_name: req.user_name, nama: req.nama, jenis_akun: req.jenis_akun, status: 'selesai' })
+      }).catch(() => {});
+
+      showToast('Akun pro ditandai sudah dibuat!', 'success');
+      closeModal('modal-akun-pro-info');
+      loadAkunProList();
+    } catch (e) {
+      document.getElementById('api-err').textContent = 'Error: ' + e.message;
+      document.getElementById('api-err').style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = '✅ Sudah Dibuat';
+    }
+  };
+
+  window.rejectAkunPro = async function() {
+    const id = document.getElementById('api-request-id').value;
+    const catatan = document.getElementById('api-catatan').value.trim();
+    const errEl = document.getElementById('api-err');
+    errEl.style.display = 'none';
+    if (!catatan) { errEl.textContent = 'Catatan penolakan wajib diisi.'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('api-reject-btn');
+    btn.disabled = true; btn.textContent = 'Memproses...';
+    try {
+      const { data: req, error: fetchErr } = await sb.from('akun_pro_requests').select('*').eq('id', id).single();
+      if (fetchErr) throw new Error(fetchErr.message);
+
+      const { error } = await sb.from('akun_pro_requests')
+        .update({ status: 'ditolak', info_admin: catatan, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+
+      await fetch('/api/notify-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'notify_akun_pro_info', user_id: req.user_id, user_name: req.user_name, nama: req.nama, jenis_akun: req.jenis_akun, status: 'ditolak', catatan })
+      }).catch(() => {});
+
+      showToast('Request akun pro ditolak.', 'error');
+      closeModal('modal-akun-pro-info');
+      loadAkunProList();
     } catch (e) {
       errEl.textContent = 'Error: ' + e.message;
       errEl.style.display = 'block';
