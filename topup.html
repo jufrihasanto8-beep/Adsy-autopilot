@@ -804,21 +804,31 @@
   </div>
 </div>
 
-<!-- ── Modal: Tambah Jenis Akun Pro (admin) ── -->
+<!-- ── Modal: Tambah/Edit Jenis Akun Pro (admin) ── -->
 <div class="modal-overlay hidden" id="modal-add-akun-type">
-  <div class="modal" style="max-width:380px;">
+  <div class="modal" style="max-width:480px;">
     <div class="modal-header">
-      <h3>Tambah Jenis Akun Pro</h3>
+      <h3 id="at-modal-title">Tambah Jenis Akun Pro</h3>
       <div class="modal-close" onclick="closeModal('modal-add-akun-type')">✕</div>
     </div>
     <div class="modal-body">
-      <div class="modal-field">
-        <label>Nama Akun <span style="color:var(--danger)">*</span></label>
-        <input type="text" id="at-nama" class="form-input" placeholder="Contoh: Gemini Pro" />
+      <input type="hidden" id="at-edit-id" />
+      <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;">
+        <div class="modal-field" style="margin-bottom:0;">
+          <label>Nama Akun <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="at-nama" class="form-input" placeholder="Contoh: Gemini Pro" />
+        </div>
+        <div class="modal-field" style="margin-bottom:0;">
+          <label>Icon</label>
+          <input type="text" id="at-icon" class="form-input" placeholder="✨" maxlength="4" style="width:64px;text-align:center;font-size:18px;" />
+        </div>
       </div>
-      <div class="modal-field">
-        <label>Icon (emoji)</label>
-        <input type="text" id="at-icon" class="form-input" placeholder="✨" maxlength="4" style="max-width:80px;" />
+      <div class="modal-field" style="margin-top:14px;">
+        <label>Panduan Penggunaan</label>
+        <textarea id="at-panduan" class="form-input" rows="6"
+          placeholder="Contoh:&#10;• Buka gemini.google.com&#10;• Login dengan akun Google yang diberikan admin&#10;• Klik 'Try Gemini Advanced'&#10;• Gunakan untuk riset konten, buat caption, analisis data iklan"
+          style="resize:vertical;font-size:13px;line-height:1.6;"></textarea>
+        <div style="font-size:11px;color:var(--text-sub);margin-top:4px;">Panduan ini akan ditampilkan ke advertiser saat memilih jenis akun ini</div>
       </div>
       <div id="at-err" style="font-size:12px;color:var(--danger);display:none;margin-bottom:8px;"></div>
       <div style="display:flex;gap:10px;margin-top:4px;">
@@ -2652,35 +2662,58 @@
       el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-sub);font-size:13px;">Belum ada jenis akun. Klik + Tambah</div>';
       return;
     }
-    el.innerHTML = types.map(t => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-1);">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:20px;">${t.icon || '🌟'}</span>
-          <span style="font-size:14px;font-weight:600;color:var(--text);">${t.nama}</span>
+    el.innerHTML = types.map(t => {
+      const panduanEnc = encodeURIComponent(t.panduan || '');
+      const namaEnc = encodeURIComponent(t.nama || '');
+      const iconEnc = encodeURIComponent(t.icon || '');
+      return `
+      <div style="padding:12px 0;border-bottom:1px solid var(--gray-1);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:20px;">${t.icon || '🌟'}</span>
+            <span style="font-size:14px;font-weight:600;color:var(--text);">${t.nama}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:${t.tersedia ? '#065f46' : 'var(--text-sub)'};">
+              <div onclick="toggleAkunType('${t.id}',${t.tersedia})" style="width:36px;height:20px;border-radius:20px;background:${t.tersedia ? '#10b981' : '#d1d5db'};position:relative;cursor:pointer;transition:background .2s;">
+                <div style="position:absolute;top:2px;left:${t.tersedia ? '18px' : '2px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></div>
+              </div>
+              ${t.tersedia ? 'Tersedia' : 'Tidak Tersedia'}
+            </label>
+            <button onclick="openEditAkunTypeModal('${t.id}','${namaEnc}','${iconEnc}','${panduanEnc}')" style="border:none;background:var(--gray-1);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;" title="Edit">✏️</button>
+            <button onclick="deleteAkunType('${t.id}','${t.nama}')" style="border:none;background:var(--gray-1);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;color:var(--danger);" title="Hapus">🗑️</button>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:${t.tersedia ? '#065f46' : 'var(--text-sub)'};">
-            <div onclick="toggleAkunType('${t.id}',${t.tersedia})" style="width:36px;height:20px;border-radius:20px;background:${t.tersedia ? '#10b981' : '#d1d5db'};position:relative;cursor:pointer;transition:background .2s;">
-              <div style="position:absolute;top:2px;left:${t.tersedia ? '18px' : '2px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></div>
-            </div>
-            ${t.tersedia ? 'Tersedia' : 'Tidak Tersedia'}
-          </label>
-          <button onclick="deleteAkunType('${t.id}','${t.nama}')" style="border:none;background:var(--gray-1);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;color:var(--danger);" title="Hapus">🗑️</button>
-        </div>
-      </div>
-    `).join('');
+        ${t.panduan ? `<div style="margin-top:8px;padding:8px 12px;background:var(--gray-1);border-radius:8px;font-size:12px;color:var(--text-sub);white-space:pre-line;line-height:1.6;">${t.panduan}</div>` : `<div style="margin-top:6px;font-size:11px;color:var(--gray-4);font-style:italic;">Belum ada panduan — klik ✏️ untuk tambahkan</div>`}
+      </div>`;
+    }).join('');
   }
 
   window.openAddAkunTypeModal = function() {
+    document.getElementById('at-edit-id').value = '';
+    document.getElementById('at-modal-title').textContent = 'Tambah Jenis Akun Pro';
     document.getElementById('at-nama').value = '';
     document.getElementById('at-icon').value = '';
+    document.getElementById('at-panduan').value = '';
+    document.getElementById('at-err').style.display = 'none';
+    openModal('modal-add-akun-type');
+  };
+
+  window.openEditAkunTypeModal = function(id, namaEnc, iconEnc, panduanEnc) {
+    document.getElementById('at-edit-id').value = id;
+    document.getElementById('at-modal-title').textContent = 'Edit Jenis Akun Pro';
+    document.getElementById('at-nama').value = decodeURIComponent(namaEnc);
+    document.getElementById('at-icon').value = decodeURIComponent(iconEnc);
+    document.getElementById('at-panduan').value = decodeURIComponent(panduanEnc);
     document.getElementById('at-err').style.display = 'none';
     openModal('modal-add-akun-type');
   };
 
   window.saveAkunType = async function() {
+    const editId = document.getElementById('at-edit-id').value;
     const nama = document.getElementById('at-nama').value.trim();
     const icon = document.getElementById('at-icon').value.trim() || '🌟';
+    const panduan = document.getElementById('at-panduan').value.trim();
     const errEl = document.getElementById('at-err');
     errEl.style.display = 'none';
     if (!nama) { errEl.textContent = 'Nama akun wajib diisi.'; errEl.style.display = 'block'; return; }
@@ -2688,12 +2721,17 @@
     const btn = document.getElementById('at-save-btn');
     btn.disabled = true; btn.textContent = 'Menyimpan...';
     try {
-      const { error } = await sb.from('akun_pro_types').insert({ nama, icon, tersedia: true });
-      if (error) throw new Error(error.message);
-      showToast('Jenis akun berhasil ditambahkan!', 'success');
+      if (editId) {
+        const { error } = await sb.from('akun_pro_types').update({ nama, icon, panduan }).eq('id', editId);
+        if (error) throw new Error(error.message);
+        showToast('Jenis akun berhasil diperbarui!', 'success');
+      } else {
+        const { error } = await sb.from('akun_pro_types').insert({ nama, icon, panduan, tersedia: true });
+        if (error) throw new Error(error.message);
+        showToast('Jenis akun berhasil ditambahkan!', 'success');
+      }
       closeModal('modal-add-akun-type');
       renderAkunTypeList();
-      // Refresh dropdown advertiser jika ada
       loadAkunProDropdown();
     } catch (e) {
       errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block';
@@ -2718,25 +2756,45 @@
     loadAkunProDropdown();
   };
 
+  let _akunProTypes = [];
+
   async function loadAkunProDropdown() {
     const sel = document.getElementById('ap-jenis');
     const hint = document.getElementById('ap-jenis-hint');
     if (!sel) return;
     const { data } = await sb.from('akun_pro_types').select('*').eq('tersedia', true).order('nama');
+    _akunProTypes = data || [];
     sel.innerHTML = '<option value="">— Pilih Jenis Akun —</option>';
-    if (!data?.length) {
+    if (!_akunProTypes.length) {
       hint.style.display = 'block';
       document.getElementById('ap-submit').disabled = true;
     } else {
       hint.style.display = 'none';
       document.getElementById('ap-submit').disabled = false;
-      data.forEach(t => {
+      _akunProTypes.forEach(t => {
         const opt = document.createElement('option');
         opt.value = t.nama;
         opt.textContent = `${t.icon || '🌟'} ${t.nama}`;
         sel.appendChild(opt);
       });
     }
+    // Listener: tampilkan panduan saat pilih jenis
+    sel.onchange = function() {
+      const selected = _akunProTypes.find(t => t.nama === sel.value);
+      let panduanEl = document.getElementById('ap-panduan-box');
+      if (!panduanEl) {
+        panduanEl = document.createElement('div');
+        panduanEl.id = 'ap-panduan-box';
+        panduanEl.style.cssText = 'margin-top:8px;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:12.5px;line-height:1.7;color:var(--text);white-space:pre-line;display:none;';
+        sel.parentNode.appendChild(panduanEl);
+      }
+      if (selected?.panduan) {
+        panduanEl.innerHTML = `<div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">📖 Panduan ${selected.nama}</div>${selected.panduan}`;
+        panduanEl.style.display = 'block';
+      } else {
+        panduanEl.style.display = 'none';
+      }
+    };
   }
 
   async function loadAkunProList() {
