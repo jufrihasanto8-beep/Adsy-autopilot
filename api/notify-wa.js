@@ -1179,7 +1179,7 @@ Field tidak ditemukan = null.` }
 
   // ── notify_akun_pro_info: notif WA ke advertiser saat admin approve/tolak request akun pro ──
   if (action === 'notify_akun_pro_info') {
-    const { user_id, user_name, nama, jenis_akun, status, catatan } = body;
+    const { user_id, user_name, nama, jenis_akun, status, catatan, info_link } = body;
 
     const { data: userCfg } = await sb.from('app_config').select('wa_target').eq('user_id', user_id).single();
     const { data: adminCfg } = await sb.from('app_config').select('fonnte_token').not('fonnte_token', 'is', null).limit(1).maybeSingle();
@@ -1206,9 +1206,11 @@ Field tidak ditemukan = null.` }
           `Halo *${user_name}*,`,
           `Request akun *${jenis_akun}* kamu sudah diproses!`,
           ``,
-          `Silakan cek di menu Top Up → Akun Pro untuk info lebih lanjut atau hubungi admin.`,
+          info_link ? `📋 *Info Akun:*\n${info_link}` : '',
+          ``,
+          `Bisa juga cek di menu Top Up → Akun Pro.`,
           `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
-        ].join('\n');
+        ].filter(l => l !== undefined).join('\n');
 
     try {
       const r2 = await fetch('https://api.fonnte.com/send', {
