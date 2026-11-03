@@ -394,7 +394,7 @@
             </div>
             <div class="form-group" style="margin:0;">
               <label class="form-label">Tujuan Kampanye (Objective)</label>
-              <select class="form-input form-select" id="pub-objective" onchange="updatePixelVisibility();updateKpiVisibility();">
+              <select class="form-input form-select" id="pub-objective">
                 <option value="OUTCOME_TRAFFIC">Traffic — Kunjungan website / WA</option>
                 <option value="OUTCOME_LEADS">Leads — Form / DM</option>
                 <option value="OUTCOME_SALES">Sales — Konversi pembelian</option>
@@ -1567,6 +1567,7 @@
   }
 
   updateKpiVisibility();
+  document.getElementById('pub-objective')?.addEventListener('change', updateKpiVisibility);
 
   // ── Budget type toggle ──
   let budgetType = 'ABO';
