@@ -2,6 +2,63 @@ import { logout } from './auth.js';
 import { getSupabase } from './supabase.js';
 import { initChatWidget } from './chat-widget.js';
 
+// ── SIDEBAR COLLAPSE ──
+function initSidebarCollapse() {
+  const logo = document.querySelector('.sidebar-logo');
+  const sidebar = document.querySelector('.sidebar');
+  if (!logo || !sidebar) return;
+
+  // Inject collapse button (‹) inside logo area
+  if (!document.getElementById('sidebar-collapse-btn')) {
+    const collapseBtn = document.createElement('button');
+    collapseBtn.id = 'sidebar-collapse-btn';
+    collapseBtn.className = 'sidebar-collapse-btn';
+    collapseBtn.innerHTML = '‹';
+    collapseBtn.title = 'Sembunyikan sidebar';
+    collapseBtn.addEventListener('click', toggleSidebarCollapse);
+    logo.appendChild(collapseBtn);
+  }
+
+  // Inject expand tab (›) on right edge of sidebar
+  if (!document.getElementById('sidebar-expand-btn')) {
+    const expandBtn = document.createElement('button');
+    expandBtn.id = 'sidebar-expand-btn';
+    expandBtn.className = 'sidebar-expand-btn';
+    expandBtn.innerHTML = '›';
+    expandBtn.title = 'Tampilkan sidebar';
+    expandBtn.addEventListener('click', toggleSidebarCollapse);
+    sidebar.appendChild(expandBtn);
+  }
+
+  // Add data-label to nav items for tooltip
+  document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+    if (!item.dataset.label) {
+      // Extract text: strip icon span
+      const clone = item.cloneNode(true);
+      clone.querySelectorAll('.nav-icon, .nav-badge').forEach(el => el.remove());
+      item.dataset.label = clone.textContent.trim();
+    }
+  });
+
+  // Restore saved state
+  if (localStorage.getItem('sidebar_collapsed') === 'true') {
+    document.body.classList.add('sidebar-collapsed');
+  }
+}
+
+function toggleSidebarCollapse() {
+  const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
+  localStorage.setItem('sidebar_collapsed', isCollapsed);
+  // Re-apply data-label to any newly injected nav items
+  document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+    if (!item.dataset.label) {
+      const clone = item.cloneNode(true);
+      clone.querySelectorAll('.nav-icon, .nav-badge').forEach(el => el.remove());
+      item.dataset.label = clone.textContent.trim();
+    }
+  });
+}
+
 // ── MOBILE MENU HELPERS ──
 function openMobileMenu() {
   document.querySelector('.sidebar')?.classList.add('open');
@@ -81,6 +138,7 @@ export function initSidebar() {
   injectProfileModal();
   injectChatNavItem();
   injectGenerateStudioNavItem();
+  initSidebarCollapse();
   // Init floating chat bubble (async, tidak block render)
   initChatWidget().catch(() => {});
 }
