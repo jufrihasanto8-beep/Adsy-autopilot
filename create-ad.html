@@ -394,13 +394,21 @@
             </div>
             <div class="form-group" style="margin:0;">
               <label class="form-label">Tujuan Kampanye (Objective)</label>
-              <select class="form-input form-select" id="pub-objective">
+              <select class="form-input form-select" id="pub-objective" onchange="updatePixelVisibility();updateKpiVisibility();">
                 <option value="OUTCOME_TRAFFIC">Traffic — Kunjungan website / WA</option>
                 <option value="OUTCOME_LEADS">Leads — Form / DM</option>
                 <option value="OUTCOME_SALES">Sales — Konversi pembelian</option>
                 <option value="OUTCOME_ENGAGEMENT">Engagement — Like, komentar</option>
                 <option value="OUTCOME_AWARENESS">Awareness — Jangkauan luas</option>
               </select>
+            </div>
+            <div class="form-group" style="margin:0; display:none;" id="kpi-type-wrap">
+              <label class="form-label">KPI Evaluasi Autopilot</label>
+              <select class="form-input form-select" id="pub-kpi-type">
+                <option value="purchase">Purchase (default)</option>
+                <option value="prospek">Prospek / Lead</option>
+              </select>
+              <div class="form-hint">Metrik yang dipakai autopilot untuk tentukan adset mati/hidup</div>
             </div>
           </div>
 
@@ -1396,6 +1404,8 @@
         formData.append('auto_activate', document.getElementById('pub-auto-activate').checked ? '1' : '0');
         if (startTime) formData.append('start_time', new Date(startTime).toISOString());
         if (endTime) formData.append('end_time', new Date(endTime).toISOString());
+        const kpiType = document.getElementById('pub-kpi-type')?.value || 'purchase';
+        formData.append('kpi_type', kpiType);
 
         // Reuse campaign & adset dari item pertama yang sukses
         if (metaCampaignId) formData.append('meta_campaign_id', metaCampaignId);
@@ -1519,6 +1529,7 @@
       url_id: urlId,
       bid_strategy: bidStrategy,
       bid_value: bidValue || null,
+      kpi_type: document.getElementById('pub-kpi-type')?.value || 'purchase',
       start_time: startTime ? new Date(startTime).toISOString() : null,
       end_time: endTime ? new Date(endTime).toISOString() : null,
       adsets: adsetsPayload
@@ -1549,7 +1560,13 @@
     if (pixelSel) pixelSel.style.display = (needsPixel && hasPixels) ? '' : 'none';
   }
 
-  document.getElementById('pub-objective')?.addEventListener('change', updatePixelVisibility);
+  function updateKpiVisibility() {
+    const objective = document.getElementById('pub-objective')?.value || '';
+    const wrap = document.getElementById('kpi-type-wrap');
+    if (wrap) wrap.style.display = objective === 'OUTCOME_SALES' ? '' : 'none';
+  }
+
+  updateKpiVisibility();
 
   // ── Budget type toggle ──
   let budgetType = 'ABO';
