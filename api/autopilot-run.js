@@ -51,13 +51,19 @@ export default async function handler(req, res) {
       .in('status', ['ACTIVE', 'PAUSED']);
 
     if (risetCamps?.length) {
-      // Step 1: evaluasi per-adset (pause loser, mark winner)
+      // Step 1: evaluasi per-adset → sync per-ad → deteksi winner per ad
       for (const camp of risetCamps) {
         if (camp.status !== 'ACTIVE') continue;
         try {
           const { data: cfgData } = await sb.from('app_config').select('meta_token').eq('user_id', camp.user_id).single();
           const token = cfgData?.meta_token || process.env.META_ACCESS_TOKEN;
+
+          // Sync adset-level insights (untuk keputusan pause adset)
           await syncCampaignInsights(camp, token);
+
+          // Sync per-ad insights (untuk winner detection)
+          await syncRisetAdInsights(camp.id, camp.meta_adset_id, token);
+
           const { data: fresh } = await sb.from('campaigns').select('*, products(target_cpr), autopilot_blueprints(config)').eq('id', camp.id).single();
           if (!fresh) continue;
 
@@ -67,26 +73,43 @@ export default async function handler(req, res) {
           const bpCfg     = fresh.autopilot_blueprints?.config || {};
           const pauseMult = bpCfg.evaluation?.pause_cpr_multiplier || 2.5;
           const evalDays  = bpCfg.evaluation?.duration_days || 3;
-          const cpr       = fresh.cpr;
-          const spend     = fresh.spend_today || 0;
+          const adsetCpr  = fresh.cpr;
+          const adsetSpend = fresh.spend_today || 0;
           const startDate = fresh.phase_started_at ? new Date(fresh.phase_started_at) : new Date(fresh.created_at);
           const daysRunning = Math.floor((Date.now() - startDate.getTime()) / 86400000);
 
-          // Pause adset jika CPR terlalu tinggi
-          if (cpr && cpr > targetCpr * pauseMult && spend >= 10000) {
+          // Pause adset jika CPR adset terlalu tinggi
+          if (adsetCpr && adsetCpr > targetCpr * pauseMult && adsetSpend >= 10000) {
             await fetch(`${META_API}/${fresh.meta_adset_id}?access_token=${token}`, { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status: 'PAUSED' }) });
             await sb.from('campaigns').update({ status: 'PAUSED' }).eq('id', fresh.id);
-            await sb.from('action_logs').insert({ user_id: fresh.user_id, campaign_id: fresh.id, action: 'riset_pause', details: { cpr, target_cpr: targetCpr, pause_multiplier: pauseMult } });
-            logs.push(`[Riset] Pause adset "${fresh.name}": CPR ${cpr} > ${targetCpr} × ${pauseMult}`);
+            await sb.from('action_logs').insert({ user_id: fresh.user_id, campaign_id: fresh.id, action: 'riset_pause', details: { cpr: adsetCpr, target_cpr: targetCpr, pause_multiplier: pauseMult } });
+            logs.push(`[Riset] Pause adset "${fresh.name}": CPR ${adsetCpr} > ${targetCpr} × ${pauseMult}`);
             actionsTaken++;
+            continue; // adset di-pause, skip cek winner
           }
 
-          // Tandai winner setelah eval_days
-          if (daysRunning >= evalDays && cpr && cpr <= targetCpr && spend >= 30000 && !fresh.is_winner) {
-            await sb.from('campaigns').update({ is_winner: true, winner_at: new Date().toISOString() }).eq('id', fresh.id);
-            await sb.from('action_logs').insert({ user_id: fresh.user_id, campaign_id: fresh.id, action: 'riset_winner', details: { cpr, target_cpr: targetCpr } });
-            logs.push(`[Riset] Winner adset "${fresh.name}": CPR ${cpr} ≤ target ${targetCpr}`);
-            actionsTaken++;
+          // Deteksi winner per ad setelah eval_days
+          if (daysRunning >= evalDays) {
+            const { data: ads } = await sb.from('ad_copies')
+              .select('*').eq('campaign_id', fresh.id).eq('is_winner', false);
+
+            for (const ad of (ads || [])) {
+              if (!ad.cpr || !ad.spend) continue;
+              // Winner: CPR bagus + minimal spend Rp 10.000
+              if (ad.cpr <= targetCpr && ad.spend >= 10000) {
+                await sb.from('ad_copies').update({ is_winner: true }).eq('id', ad.id);
+                logs.push(`[Riset] Winner ad "${ad.file_name || ad.headline}" di "${fresh.name}": CPR ${ad.cpr} ≤ target ${targetCpr}`);
+                actionsTaken++;
+              }
+            }
+
+            // Tandai adset sebagai sudah dievaluasi (is_winner di campaigns = ada winner)
+            const { data: winnerAds } = await sb.from('ad_copies')
+              .select('id').eq('campaign_id', fresh.id).eq('is_winner', true);
+            if (winnerAds?.length && !fresh.is_winner) {
+              await sb.from('campaigns').update({ is_winner: true, winner_at: new Date().toISOString() }).eq('id', fresh.id);
+              await sb.from('action_logs').insert({ user_id: fresh.user_id, campaign_id: fresh.id, action: 'riset_winner', details: { winner_ads: winnerAds.length, target_cpr: targetCpr } });
+            }
           }
         } catch (e) { console.error('Riset eval error:', e); }
       }
@@ -100,8 +123,145 @@ export default async function handler(req, res) {
 
       for (const [metaCampaignId, groupAdsets] of Object.entries(risetGroups)) {
         try {
-          // Skip jika sudah pernah scale-up
-          if (groupAdsets.some(a => a.scale_up_campaign_id)) continue;
+          const existingScaleUpCampaignId = groupAdsets.find(a => a.scale_up_campaign_id)?.scale_up_campaign_id;
+
+          // Jika scale-up sudah pernah terjadi → cek adset baru yang belum masuk
+          if (existingScaleUpCampaignId) {
+            const { data: freshGroup2 } = await sb.from('campaigns')
+              .select('*, products(target_cpr), autopilot_blueprints(config)')
+              .eq('meta_campaign_id', metaCampaignId)
+              .eq('campaign_type', 'riset')
+              .is('scale_up_campaign_id', null); // adset baru yang belum di-scale-up
+
+            if (!freshGroup2?.length) continue;
+
+            const bpCfg2   = freshGroup2[0].autopilot_blueprints?.config || {};
+            const evalDays2 = bpCfg2.evaluation?.duration_days || 3;
+
+            // Cek apakah adset baru sudah dievaluasi semua
+            const allNewEvaluated = freshGroup2.every(a => {
+              const days = Math.floor((Date.now() - new Date(a.phase_started_at || a.created_at).getTime()) / 86400000);
+              return days >= evalDays2 || a.status === 'PAUSED';
+            });
+            if (!allNewEvaluated) continue;
+
+            // Ambil winning ads dari adset baru
+            const newAdsetIds = freshGroup2.map(a => a.id);
+            const { data: newWinnerAds } = await sb.from('ad_copies')
+              .select('*')
+              .in('campaign_id', newAdsetIds)
+              .eq('is_winner', true)
+              .not('meta_creative_id', 'is', null);
+
+            if (!newWinnerAds?.length) {
+              // Tandai adset baru sebagai sudah dievaluasi walau tidak ada winner
+              await sb.from('campaigns')
+                .update({ scale_up_campaign_id: existingScaleUpCampaignId })
+                .in('id', newAdsetIds);
+              continue;
+            }
+
+            // Ambil meta_adset_id dari scale-up campaign yang sudah ada
+            const { data: scaleUpCamp } = await sb.from('campaigns')
+              .select('meta_adset_id, ad_account_id, user_id')
+              .eq('meta_campaign_id', existingScaleUpCampaignId)
+              .eq('campaign_type', 'scale_up')
+              .single();
+            if (!scaleUpCamp) continue;
+
+            const ref2 = freshGroup2[0];
+            const { data: accData2 } = await sb.from('ad_accounts').select('account_id').eq('id', scaleUpCamp.ad_account_id).single();
+            const { data: cfgData2 } = await sb.from('app_config').select('meta_token').eq('user_id', scaleUpCamp.user_id).single();
+            const token2     = cfgData2?.meta_token || process.env.META_ACCESS_TOKEN;
+            const accountId2 = accData2.account_id;
+
+            // Cek berapa ads yang sudah ada di adset CBO saat ini
+            const { data: existingScaleAds } = await sb.from('ad_copies')
+              .select('id').eq('campaign_id', scaleUpCamp.id || null);
+            let currentAdCount = existingScaleAds?.length || 0;
+
+            const MAX_ADS_PER_ADSET = 7;
+            const bpCfgAppend = freshGroup2[0].autopilot_blueprints?.config || {};
+            const scaleUpIncrement = bpCfgAppend.scale_up_increment || 200000;
+
+            let activeAdsetId = scaleUpCamp.meta_adset_id;
+            let newAdsAdded = 0;
+
+            for (const ad of newWinnerAds) {
+              if (!ad.meta_creative_id) continue;
+
+              // Kalau adset sudah penuh (7 ads), buat adset baru + naikkan budget
+              if (currentAdCount > 0 && currentAdCount % MAX_ADS_PER_ADSET === 0) {
+                const newAdsetRes = await fetch(`${META_API}/${accountId2}/adsets`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    name: `${campName} — Adset ${Math.floor(currentAdCount / MAX_ADS_PER_ADSET) + 1}`,
+                    campaign_id: existingScaleUpCampaignId,
+                    billing_event: 'IMPRESSIONS',
+                    optimization_goal: 'LINK_CLICKS',
+                    bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+                    targeting: { geo_locations: { countries: ['ID'] }, age_min: 21, age_max: 65 },
+                    status: 'ACTIVE',
+                    access_token: token2
+                  })
+                });
+                const newAdsetData = await newAdsetRes.json();
+                if (newAdsetData.error) { console.error('New adset error:', newAdsetData.error); continue; }
+                activeAdsetId = newAdsetData.id;
+
+                // Naikkan base budget CBO
+                const { data: scaleUpFresh } = await sb.from('campaigns')
+                  .select('daily_budget, scale_base_budget')
+                  .eq('meta_campaign_id', existingScaleUpCampaignId)
+                  .eq('campaign_type', 'scale_up').single();
+                const oldBase = scaleUpFresh?.scale_base_budget || scaleUpFresh?.daily_budget || 300000;
+                const newBase = oldBase + scaleUpIncrement;
+                await fetch(`${META_API}/${existingScaleUpCampaignId}`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ daily_budget: String(newBase), access_token: token2 })
+                });
+                await sb.from('campaigns').update({
+                  daily_budget: newBase,
+                  scale_base_budget: newBase,
+                  scale_good_days: 0,
+                  meta_adset_id: activeAdsetId
+                }).eq('meta_campaign_id', existingScaleUpCampaignId).eq('campaign_type', 'scale_up');
+
+                logs.push(`[Scale-Up] Adset baru dibuat, budget naik +Rp ${scaleUpIncrement.toLocaleString('id-ID')} → Rp ${newBase.toLocaleString('id-ID')}`);
+              }
+
+              try {
+                const adRes = await fetch(`${META_API}/${accountId2}/ads`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    name: `Scale Up — ${ad.file_name || ad.headline || 'Ad'}`,
+                    adset_id: activeAdsetId,
+                    creative: { creative_id: ad.meta_creative_id },
+                    status: 'ACTIVE',
+                    access_token: token2
+                  })
+                });
+                const adData = await adRes.json();
+                if (!adData.error) { newAdsAdded++; currentAdCount++; }
+                else console.error('Add new ad to scale-up error:', adData.error);
+              } catch (e) { console.error('Add new ad error:', e); }
+            }
+
+            // Tandai adset baru sudah masuk scale-up
+            await sb.from('campaigns')
+              .update({ scale_up_campaign_id: existingScaleUpCampaignId })
+              .in('id', newAdsetIds);
+
+            await sb.from('action_logs').insert({
+              user_id: scaleUpCamp.user_id,
+              action: 'riset_scale_up_append',
+              details: { scale_up_campaign_id: existingScaleUpCampaignId, new_adsets: freshGroup2.length, ads_added: newAdsAdded }
+            });
+
+            logs.push(`[Scale-Up Append] ${newAdsAdded} ads baru ditambahkan ke CBO ${existingScaleUpCampaignId}`);
+            actionsTaken++;
+            continue;
+          }
 
           const bpCfg          = groupAdsets[0].autopilot_blueprints?.config || {};
           const evalDays       = bpCfg.evaluation?.duration_days || 3;
@@ -123,17 +283,21 @@ export default async function handler(req, res) {
           });
           if (!allEvaluated) continue;
 
-          // Kumpulkan adset winner
-          const winners = freshGroup.filter(a => a.is_winner === true && a.status === 'ACTIVE');
-          if (!winners.length) {
-            logs.push(`[Riset] Grup ${metaCampaignId}: semua adset sudah dievaluasi tapi tidak ada winner`);
+          // Ambil semua ad yang is_winner = true dari seluruh adset di grup ini
+          const allAdsetIds = freshGroup.map(a => a.id);
+          const { data: winnerAds } = await sb.from('ad_copies')
+            .select('*')
+            .in('campaign_id', allAdsetIds)
+            .eq('is_winner', true)
+            .not('meta_creative_id', 'is', null);
+
+          if (!winnerAds?.length) {
+            logs.push(`[Riset] Grup ${metaCampaignId}: semua adset sudah dievaluasi tapi tidak ada winning ad`);
             continue;
           }
 
-          // Ambil semua ad_copies dari adset winner
-          const winnerIds = winners.map(w => w.id);
-          const { data: winnerAds } = await sb.from('ad_copies').select('*').in('campaign_id', winnerIds);
-          if (!winnerAds?.length) continue;
+          // Untuk log: berapa adset yang punya winner
+          const winners = freshGroup.filter(a => a.is_winner === true);
 
           // Tentukan budget berdasarkan jumlah winning ads
           const scaleUpBudget = winnerAds.length > 5 ? scaleUpBudgetHigh : scaleUpBudgetLow;
@@ -239,10 +403,12 @@ export default async function handler(req, res) {
             meta_adset_id: cboMetaAdsetId,
             status: 'ACTIVE',
             daily_budget: scaleUpBudget,
+            scale_base_budget: scaleUpBudget,
+            scale_good_days: 0,
             campaign_type: 'scale_up',
             phase_type: 'scale_up',
             current_phase: null,
-            autopilot_enabled: false,
+            autopilot_enabled: true,
             phase_started_at: new Date().toISOString(),
           }).select('id').single();
 
@@ -277,6 +443,93 @@ export default async function handler(req, res) {
           logs.push(`[Scale-Up] "${campName}": ${winners.length} winner adset → ${adsCreated} ads di CBO Rp ${scaleUpBudget.toLocaleString('id-ID')}`);
           actionsTaken++;
         } catch (scaleErr) { console.error('Scale-up error:', scaleErr); }
+      }
+    }
+
+    // ── Evaluasi Scale Up CBO (budget scaling harian) ──
+    const { data: scaleUpCamps } = await sb.from('campaigns')
+      .select('*, products(target_cpr)')
+      .eq('campaign_type', 'scale_up')
+      .eq('status', 'ACTIVE');
+
+    if (scaleUpCamps?.length) {
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+
+      for (const camp of scaleUpCamps) {
+        try {
+          const { data: cfgData } = await sb.from('app_config').select('meta_token').eq('user_id', camp.user_id).single();
+          const token = cfgData?.meta_token || process.env.META_ACCESS_TOKEN;
+          await syncCampaignInsights(camp, token);
+
+          const { data: fresh } = await sb.from('campaigns').select('*,products(target_cpr)').eq('id', camp.id).single();
+          if (!fresh) continue;
+
+          const targetCpr   = fresh.products?.target_cpr;
+          if (!targetCpr) continue;
+
+          // Cegah cek lebih dari sekali per hari
+          if (fresh.scale_last_check_date === today) continue;
+
+          const cpr         = fresh.cpr;
+          const baseBudget  = fresh.scale_base_budget || fresh.daily_budget;
+          const goodDays    = fresh.scale_good_days || 0;
+
+          if (cpr && cpr <= targetCpr) {
+            // CPR bagus — increment good days
+            const newGoodDays = goodDays + 1;
+            if (newGoodDays >= 3) {
+              // Naik 30%
+              const newBudget = Math.round(fresh.daily_budget * 1.3);
+              await fetch(`${META_API}/${fresh.meta_campaign_id}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ daily_budget: String(newBudget), access_token: token })
+              });
+              await sb.from('campaigns').update({
+                daily_budget: newBudget,
+                scale_good_days: newGoodDays,
+                scale_last_check_date: today
+              }).eq('id', fresh.id);
+              await sb.from('action_logs').insert({
+                user_id: fresh.user_id, campaign_id: fresh.id,
+                action: 'scale_up_budget_increase',
+                details: { old_budget: fresh.daily_budget, new_budget: newBudget, good_days: newGoodDays, cpr, target_cpr: targetCpr }
+              });
+              logs.push(`[Scale-Up] "${fresh.name}" budget naik 30% → Rp ${newBudget.toLocaleString('id-ID')} (${newGoodDays} hari bagus)`);
+              actionsTaken++;
+            } else {
+              await sb.from('campaigns').update({
+                scale_good_days: newGoodDays,
+                scale_last_check_date: today
+              }).eq('id', fresh.id);
+              logs.push(`[Scale-Up] "${fresh.name}" CPR bagus hari ke-${newGoodDays}, belum 3 hari`);
+            }
+          } else if (cpr && cpr > targetCpr) {
+            // CPR jelek — balik ke base budget
+            if (fresh.daily_budget !== baseBudget) {
+              await fetch(`${META_API}/${fresh.meta_campaign_id}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ daily_budget: String(baseBudget), access_token: token })
+              });
+              await sb.from('campaigns').update({
+                daily_budget: baseBudget,
+                scale_good_days: 0,
+                scale_last_check_date: today
+              }).eq('id', fresh.id);
+              await sb.from('action_logs').insert({
+                user_id: fresh.user_id, campaign_id: fresh.id,
+                action: 'scale_up_budget_reset',
+                details: { reset_to: baseBudget, cpr, target_cpr: targetCpr }
+              });
+              logs.push(`[Scale-Up] "${fresh.name}" CPR jelek → budget reset ke Rp ${baseBudget.toLocaleString('id-ID')}`);
+              actionsTaken++;
+            } else {
+              await sb.from('campaigns').update({
+                scale_good_days: 0,
+                scale_last_check_date: today
+              }).eq('id', fresh.id);
+            }
+          }
+        } catch (e) { console.error('Scale-up eval error:', e); }
       }
     }
 
@@ -490,6 +743,51 @@ async function syncCampaignInsights(camp, token) {
 
   } catch (err) {
     console.error('syncInsights error:', err.message);
+  }
+}
+
+// ── Sync insights per-ad untuk riset evaluation ──
+async function syncRisetAdInsights(campaignId, metaAdsetId, token) {
+  if (!metaAdsetId || !token) return;
+  try {
+    // Ambil semua ads dalam adset ini dari Meta
+    const adsRes = await fetch(
+      `${META_API}/${metaAdsetId}/ads?fields=id,name&limit=50&access_token=${encodeURIComponent(token)}`
+    );
+    const adsData = await adsRes.json();
+    if (!adsData?.data?.length) return;
+
+    for (const metaAd of adsData.data) {
+      // Fetch lifetime insights per ad
+      const insightRes = await fetch(
+        `${META_API}/${metaAd.id}/insights?fields=spend,actions,impressions&date_preset=lifetime&access_token=${encodeURIComponent(token)}`
+      );
+      const insightData = await insightRes.json();
+      const insight = insightData?.data?.[0];
+      if (!insight) continue;
+
+      const spend       = parseFloat(insight.spend || 0);
+      const impressions = parseInt(insight.impressions || 0);
+      const actions     = insight.actions || [];
+      const result      = actions.find(x =>
+        x.action_type === 'offsite_conversion.fb_pixel_purchase' ||
+        x.action_type === 'lead' ||
+        x.action_type === 'onsite_conversion.messaging_conversation_started_7d'
+      );
+      const results = parseInt(result?.value || 0);
+      const cpr     = results > 0 ? Math.round(spend / results) : (spend > 0 ? null : undefined);
+
+      // Update ad_copies yang punya meta_ad_id ini
+      const updateData = { spend, impressions };
+      if (cpr !== undefined) updateData.cpr = cpr;
+
+      await sb.from('ad_copies')
+        .update(updateData)
+        .eq('campaign_id', campaignId)
+        .eq('meta_ad_id', metaAd.id);
+    }
+  } catch (err) {
+    console.error('syncRisetAdInsights error:', err.message);
   }
 }
 
