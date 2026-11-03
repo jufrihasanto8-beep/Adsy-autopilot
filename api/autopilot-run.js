@@ -103,9 +103,10 @@ export default async function handler(req, res) {
           // Skip jika sudah pernah scale-up
           if (groupAdsets.some(a => a.scale_up_campaign_id)) continue;
 
-          const bpCfg    = groupAdsets[0].autopilot_blueprints?.config || {};
-          const evalDays = bpCfg.evaluation?.duration_days || 3;
-          const scaleUpBudget = bpCfg.scale_up_budget || 300000;
+          const bpCfg          = groupAdsets[0].autopilot_blueprints?.config || {};
+          const evalDays       = bpCfg.evaluation?.duration_days || 3;
+          const scaleUpBudgetLow  = bpCfg.scale_up_budget      || 300000; // ≤5 ads
+          const scaleUpBudgetHigh = bpCfg.scale_up_budget_high || 500000; // >5 ads
 
           // Ambil data fresh semua adset di grup ini
           const { data: freshGroup } = await sb.from('campaigns')
@@ -133,6 +134,9 @@ export default async function handler(req, res) {
           const winnerIds = winners.map(w => w.id);
           const { data: winnerAds } = await sb.from('ad_copies').select('*').in('campaign_id', winnerIds);
           if (!winnerAds?.length) continue;
+
+          // Tentukan budget berdasarkan jumlah winning ads
+          const scaleUpBudget = winnerAds.length > 5 ? scaleUpBudgetHigh : scaleUpBudgetLow;
 
           // Setup Meta API
           const ref = freshGroup[0];
