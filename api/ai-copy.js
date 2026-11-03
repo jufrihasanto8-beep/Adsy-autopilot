@@ -242,6 +242,80 @@ PENTING: Output HANYA JSON, tanpa penjelasan tambahan.`;
     }
   }
 
+  // ── GENERATE SINGLE FIELD (headline / primary_text / description) ──
+  if (action === 'generate_field') {
+    const {
+      field, product, benefit, audience, tone, cta, promo,
+      restrictions, notes, extra_brief, content_type,
+      current_headline, current_primary_text, current_description
+    } = req.body;
+
+    if (!field) return res.status(400).json({ error: 'field wajib diisi' });
+    if (!product || !benefit) return res.status(400).json({ error: 'product dan benefit wajib diisi' });
+
+    const toneGuide = {
+      santai: 'bahasa santai, akrab, pakai kata "kamu"',
+      profesional: 'bahasa formal, profesional, terpercaya',
+      hype: 'energetik, excited, penuh urgensi',
+      emosional: 'menyentuh hati, empati, storytelling singkat',
+      informatif: 'faktual, jelas, to-the-point'
+    };
+
+    const mediaNote = content_type === 'video' ? ' (iklan VIDEO — teks harus kuat)' : '';
+    const contextNote = [
+      current_headline    ? `Judul saat ini: "${current_headline}"` : '',
+      current_primary_text ? `Teks utama saat ini: "${current_primary_text.slice(0, 100)}..."` : '',
+      current_description  ? `Deskripsi saat ini: "${current_description}"` : '',
+    ].filter(Boolean).join('\n');
+
+    const fieldInstructions = {
+      headline: `Buat 1 judul iklan (headline) yang BARU dan BERBEDA dari yang sudah ada.
+- Maksimal 40 karakter
+- Catchy, langsung ke benefit atau hook
+- Jangan terlalu mirip dengan yang sudah ada
+Output: hanya teks judul saja, tanpa tanda kutip, tanpa penjelasan.`,
+
+      primary_text: `Buat 1 teks utama (primary text) iklan yang BARU dan BERBEDA.
+- 150-300 karakter
+- Ada hook kuat di kalimat pertama
+- Gunakan emoji secukupnya
+- Sesuai tone: ${toneGuide[tone] || tone || 'santai'}
+${promo ? `- Sertakan promo: ${promo}` : ''}
+${restrictions ? `- Jangan sebut: ${restrictions}` : ''}
+Output: hanya teks utama saja, tanpa penjelasan.`,
+
+      description: `Buat 1 deskripsi iklan yang BARU dan BERBEDA.
+- Maksimal 30 karakter
+- Singkat, padat, jelas
+Output: hanya teks deskripsi saja, tanpa tanda kutip, tanpa penjelasan.`
+    };
+
+    const prompt = `Kamu adalah copywriter iklan Meta (Facebook/Instagram) terbaik di Indonesia${mediaNote}.
+
+Produk: ${product}
+Benefit: ${benefit}
+Target Audience: ${audience || 'umum'}
+CTA: ${cta || 'Hubungi Sekarang'}
+${extra_brief ? `Brief tambahan: ${extra_brief}` : ''}
+${notes ? `Catatan: ${notes}` : ''}
+${contextNote ? `\nKonteks copy lain:\n${contextNote}` : ''}
+
+${fieldInstructions[field] || fieldInstructions.headline}`;
+
+    try {
+      const message = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }]
+      });
+      const text = message.content[0].text.trim().replace(/^["']|["']$/g, '');
+      return res.status(200).json({ success: true, text });
+    } catch (err) {
+      console.error('generate_field error:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
   const { product, audience, benefit, tone, objective, cta, promo,
     restrictions, notes, extra_brief, content_type, single_variant } = req.body;
 
