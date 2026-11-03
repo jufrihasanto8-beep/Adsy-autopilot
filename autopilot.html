@@ -261,6 +261,11 @@
             <input type="text" inputmode="numeric" class="form-input" id="bp-riset-scaleup-high" value="500.000"
               oninput="bpInputRisetScaleUpHigh(this)" />
           </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Naik per Adset CBO (Rp)</label>
+            <input type="text" inputmode="numeric" class="form-input" id="bp-riset-increment" value="200.000"
+              oninput="bpInputRisetIncrement(this)" />
+          </div>
         </div>
       </div>
 
@@ -483,9 +488,10 @@
   let bpP1Adsets = [];
   let bpP2bAdsets = [];
   let bpType = 'standard';
-  let bpRisetBudgetRaw    = 50000;
-  let bpRisetScaleUpRaw  = 300000;
+  let bpRisetBudgetRaw      = 50000;
+  let bpRisetScaleUpRaw     = 300000;
   let bpRisetScaleUpHighRaw = 500000;
+  let bpRisetIncrementRaw   = 200000;
 
   window.setBpType = function(type) {
     bpType = type;
@@ -514,6 +520,12 @@
     const raw = el.value.replace(/[^0-9]/g, '');
     el.value = raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     bpRisetScaleUpHighRaw = parseInt(raw) || 0;
+  };
+
+  window.bpInputRisetIncrement = function(el) {
+    const raw = el.value.replace(/[^0-9]/g, '');
+    el.value = raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    bpRisetIncrementRaw = parseInt(raw) || 0;
   };
 
   const ADSET_TYPES = [
@@ -721,9 +733,10 @@
 
     // Set tipe blueprint
     const type = cfg.type || 'standard';
-    bpRisetBudgetRaw      = cfg.budget_per_adset    || 50000;
-    bpRisetScaleUpRaw     = cfg.scale_up_budget     || 300000;
-    bpRisetScaleUpHighRaw = cfg.scale_up_budget_high|| 500000;
+    bpRisetBudgetRaw      = cfg.budget_per_adset     || 50000;
+    bpRisetScaleUpRaw     = cfg.scale_up_budget      || 300000;
+    bpRisetScaleUpHighRaw = cfg.scale_up_budget_high || 500000;
+    bpRisetIncrementRaw   = cfg.scale_up_increment   || 200000;
     setBpType(type);
 
     // Riset fields
@@ -731,6 +744,7 @@
     document.getElementById('bp-riset-budget').value      = fmt(bpRisetBudgetRaw);
     document.getElementById('bp-riset-scaleup').value     = fmt(bpRisetScaleUpRaw);
     document.getElementById('bp-riset-scaleup-high').value= fmt(bpRisetScaleUpHighRaw);
+    document.getElementById('bp-riset-increment').value   = fmt(bpRisetIncrementRaw);
     document.getElementById('bp-riset-pause').value       = cfg.evaluation?.pause_cpr_multiplier ?? 2.5;
     document.getElementById('bp-riset-days').value        = cfg.evaluation?.duration_days ?? 3;
 
@@ -789,6 +803,7 @@
         budget_per_adset: bpRisetBudgetRaw,
         scale_up_budget: bpRisetScaleUpRaw,
         scale_up_budget_high: bpRisetScaleUpHighRaw,
+        scale_up_increment: bpRisetIncrementRaw,
         evaluation: {
           pause_cpr_multiplier: parseFloat(document.getElementById('bp-riset-pause').value) || 2.5,
           duration_days:        parseInt(document.getElementById('bp-riset-days').value)    || 3,
