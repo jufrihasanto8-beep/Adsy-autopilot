@@ -44,15 +44,61 @@ export default async function handler(req, res) {
     // ── Sync status kampanye dari Meta (pause/delete) sebelum rules engine jalan ──
     await syncAllCampaignsFromMeta();
 
+    // ── Evaluasi Riset campaigns (terpisah dari Phase 1/2/3) ──
+    const { data: risetCamps } = await sb.from('campaigns')
+      .select('*, products(target_cpr), autopilot_blueprints(config)')
+      .eq('campaign_type', 'riset').eq('status', 'ACTIVE').eq('autopilot_enabled', true);
+
+    if (risetCamps?.length) {
+      for (const camp of risetCamps) {
+        try {
+          const { data: cfgData } = await sb.from('app_config').select('meta_token').eq('user_id', camp.user_id).single();
+          const token = cfgData?.meta_token || process.env.META_ACCESS_TOKEN;
+          await syncCampaignInsights(camp, token);
+          const { data: fresh } = await sb.from('campaigns').select('*, products(target_cpr), autopilot_blueprints(config)').eq('id', camp.id).single();
+          if (!fresh) continue;
+
+          const targetCpr = fresh.products?.target_cpr;
+          if (!targetCpr) continue; // tidak bisa evaluasi tanpa target
+
+          const bpCfg     = fresh.autopilot_blueprints?.config || {};
+          const pauseMult = bpCfg.evaluation?.pause_cpr_multiplier || 2.5;
+          const evalDays  = bpCfg.evaluation?.duration_days || 3;
+          const cpr = fresh.cpr;
+          const spend = fresh.spend_today || 0;
+          const startDate = fresh.phase_started_at ? new Date(fresh.phase_started_at) : new Date(fresh.created_at);
+          const daysRunning = Math.floor((Date.now() - startDate.getTime()) / 86400000);
+
+          // Pause adset jika CPR terlalu tinggi (cek setiap 2 jam)
+          if (cpr && cpr > targetCpr * pauseMult && spend >= 10000) {
+            await fetch(`${META_API}/${fresh.meta_adset_id}?access_token=${token}`, { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status: 'PAUSED' }) });
+            await sb.from('campaigns').update({ status: 'PAUSED' }).eq('id', fresh.id);
+            await sb.from('action_logs').insert({ user_id: fresh.user_id, campaign_id: fresh.id, action: 'riset_pause', details: { cpr, target_cpr: targetCpr, pause_multiplier: pauseMult } });
+            logs.push(`[Riset] Pause adset "${fresh.name}": CPR ${cpr} > ${targetCpr} × ${pauseMult}`);
+            actionsTaken++;
+          }
+
+          // Deteksi winner setelah eval_days
+          if (daysRunning >= evalDays && cpr && cpr <= targetCpr && spend >= 30000 && !fresh.is_winner) {
+            await sb.from('campaigns').update({ is_winner: true, winner_at: new Date().toISOString() }).eq('id', fresh.id);
+            await sb.from('action_logs').insert({ user_id: fresh.user_id, campaign_id: fresh.id, action: 'riset_winner', details: { cpr, target_cpr: targetCpr } });
+            logs.push(`[Riset] Winner adset "${fresh.name}": CPR ${cpr} ≤ target ${targetCpr}`);
+            actionsTaken++;
+          }
+        } catch (e) { console.error('Riset eval error:', e); }
+      }
+    }
+
     // Ambil semua kampanye aktif dengan autopilot, join ke products untuk target CPR
     const { data: campaigns } = await sb.from('campaigns')
       .select('*, products(target_cpr, target_roas, target_cpr_ctwa)')
       .eq('status', 'ACTIVE')
       .eq('autopilot_enabled', true)
-      .neq('campaign_type', 'ctwa'); // CTWA autopilot belum dibangun, skip dulu
+      .neq('campaign_type', 'ctwa')  // CTWA autopilot belum dibangun
+      .neq('campaign_type', 'riset'); // Riset sudah ditangani di atas
 
     if (!campaigns?.length) {
-      return res.status(200).json({ success: true, actions_taken: 0, message: 'Tidak ada kampanye autopilot aktif' });
+      return res.status(200).json({ success: true, actions_taken: actionsTaken, message: 'Tidak ada kampanye autopilot aktif', logs });
     }
 
     for (const camp of campaigns) {

@@ -11,15 +11,17 @@ export const config = { api: { bodyParser: false } };
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Route JSON requests (boost-post action) — tidak pakai formidable
+  // Route JSON requests
   const contentType = req.headers['content-type'] || '';
   if (contentType.includes('application/json')) {
     try {
       const body = await readJsonBody(req);
-      if (body.action === 'boost-post') return await handleBoostPost(res, body);
+      if (body.action === 'boost-post')    return await handleBoostPost(res, body);
+      if (body.mode === 'riset')            return await handleRiset(res, body);
+      if (body.mode === 'add_riset_adset') return await handleAddRisetAdset(res, body);
       return res.status(400).json({ error: 'Unknown action' });
     } catch (err) {
-      console.error('boost-post error:', err);
+      console.error('json handler error:', err);
       return res.status(500).json({ error: err.message });
     }
   }
@@ -905,6 +907,295 @@ async function readJsonBody(req) {
   });
 }
 
+
+// ── Riset campaign handler ──
+async function handleRiset(res, body) {
+  const {
+    product_id, blueprint_id, ad_account_db_id, user_id,
+    objective = 'OUTCOME_TRAFFIC', campaign_name, auto_activate,
+    page_id: pageIdOverride, pixel_id: pixelIdOverride, url_id,
+    bid_strategy = 'LOWEST_COST_WITHOUT_CAP', bid_value,
+    start_time, end_time, adsets = []
+  } = body;
+
+  if (!adsets.length) throw new Error('Minimal 1 adset');
+  if (!ad_account_db_id) throw new Error('ad_account_db_id wajib');
+
+  const { data: accData } = await sb.from('ad_accounts').select('account_id, page_id, pixel_id').eq('id', ad_account_db_id).single();
+  if (!accData) throw new Error('Ad account tidak ditemukan');
+
+  const { data: cfgData } = await sb.from('app_config').select('meta_token').eq('user_id', user_id).single();
+  const { data: urlData } = url_id ? await sb.from('ad_urls').select('url').eq('id', url_id).single() : { data: null };
+  const { data: product } = product_id ? await sb.from('products').select('name, target_cpr').eq('id', product_id).single() : { data: null };
+
+  const token     = cfgData?.meta_token || process.env.META_ACCESS_TOKEN;
+  const accountId = accData.account_id;
+  const pageId    = pageIdOverride  || accData.page_id;
+  const pixelId   = pixelIdOverride || accData.pixel_id || null;
+  const destUrl   = urlData?.url || 'https://wa.me/';
+  const adStatus  = auto_activate ? 'ACTIVE' : 'PAUSED';
+  const finalCampaignName = campaign_name || `Riset ${product?.name || 'Iklan'} — ${new Date().toLocaleDateString('id-ID')}`;
+
+  if (!token) throw new Error('Meta access token belum dikonfigurasi');
+
+  // 1. Buat campaign ABO
+  const campRes = await fetch(`${META_API}/${accountId}/campaigns`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: finalCampaignName, objective, status: adStatus,
+      special_ad_categories: [],
+      is_adset_budget_sharing_enabled: false,
+      access_token: token
+    })
+  });
+  const campData = await campRes.json();
+  if (campData.error) throw new Error(`Meta campaign: ${campData.error.error_user_msg || campData.error.message}`);
+  const metaCampaignId = campData.id;
+
+  // Global settings (targeting & placement)
+  const SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
+  const { data: globalCfg } = await sb.from('global_settings').select('*').eq('id', SETTINGS_ID).single();
+  const { optimizationGoal, billingEvent } = objectiveConfig(objective);
+  const promotedObject = getPromotedObject(objective, pageId, pixelId);
+
+  const adsetResults = [];
+
+  // 2. Buat setiap adset + ads-nya
+  for (const adsetDef of adsets) {
+    const adsetName = `${finalCampaignName} — ${adsetDef.label || 'Adset'}`;
+    const adsetBudget = adsetDef.budget || 50000;
+
+    const adsetPayload = {
+      name: adsetName,
+      campaign_id: metaCampaignId,
+      daily_budget: adsetBudget,
+      billing_event: billingEvent,
+      optimization_goal: optimizationGoal,
+      bid_strategy,
+      targeting: { geo_locations: { countries: ['ID'] }, age_min: 21, age_max: 65 },
+      status: adStatus,
+      access_token: token
+    };
+    if (bid_value && bid_strategy !== 'LOWEST_COST_WITHOUT_CAP') {
+      adsetPayload.bid_amount = parseInt(bid_value);
+    }
+    if (promotedObject) adsetPayload.promoted_object = promotedObject;
+
+    const adsetRes = await fetch(`${META_API}/${accountId}/adsets`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(adsetPayload)
+    });
+    const adsetData = await adsetRes.json();
+    if (adsetData.error) throw new Error(`Meta adset (${adsetDef.label}): ${adsetData.error.error_user_msg || adsetData.error.message}`);
+    const metaAdsetId = adsetData.id;
+
+    // Simpan ke campaigns table
+    const { data: sbCampaign, error: sbErr } = await sb.from('campaigns').insert({
+      name: adsetName,
+      user_id,
+      ad_account_id: ad_account_db_id,
+      product_id: product_id || null,
+      blueprint_id: blueprint_id || null,
+      meta_campaign_id: metaCampaignId,
+      meta_adset_id: metaAdsetId,
+      status: adStatus,
+      daily_budget: adsetBudget,
+      current_phase: null,
+      phase_type: 'riset',
+      campaign_type: 'riset',
+      autopilot_enabled: true,
+      phase_started_at: new Date().toISOString(),
+    }).select('id').single();
+    if (sbErr) console.error('Supabase insert campaign:', sbErr);
+    const sbCampaignId = sbCampaign?.id;
+
+    // 3. Buat creative + ad per file dalam adset ini
+    for (const ad of adsetDef.ads || []) {
+      try {
+        let creative;
+        const baseCreativePayload = {
+          name: `${adsetName} — ${ad.file_name}`,
+          object_story_spec: {
+            page_id: pageId,
+            [ad.file_type === 'video' ? 'video_data' : 'link_data']: ad.file_type === 'video'
+              ? { video_id: ad.meta_video_id, thumbnail_hash: ad.thumbnail_hash || undefined, message: ad.primary_text, call_to_action: { type: ctaMap(ad.cta), value: { link: destUrl } }, image_hash: ad.thumbnail_hash || undefined }
+              : { image_hash: ad.meta_image_hash, message: ad.primary_text, link: destUrl, name: ad.headline, description: ad.description, call_to_action: { type: ctaMap(ad.cta) } }
+          },
+          access_token: token
+        };
+        if (ad.headline && ad.file_type !== 'video') baseCreativePayload.object_story_spec.link_data.name = ad.headline;
+
+        const creativeRes = await fetch(`${META_API}/${accountId}/adcreatives`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(baseCreativePayload)
+        });
+        creative = await creativeRes.json();
+
+        // Retry dengan use_page_actor_override jika IG error
+        if (creative.error && (creative.error.code === 200 || (creative.error.message||'').toLowerCase().includes('instagram'))) {
+          const retryPayload = { ...baseCreativePayload, use_page_actor_override: true };
+          const retryRes = await fetch(`${META_API}/${accountId}/adcreatives`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(retryPayload)
+          });
+          creative = await retryRes.json();
+        }
+        if (creative.error) { console.error('Creative error:', creative.error); continue; }
+
+        // Buat ad
+        const adRes = await fetch(`${META_API}/${accountId}/ads`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: `${adsetName} — ${ad.file_name}`,
+            adset_id: metaAdsetId,
+            creative: { creative_id: creative.id },
+            status: adStatus,
+            access_token: token
+          })
+        });
+        const adData = await adRes.json();
+        if (adData.error) { console.error('Ad error:', adData.error); continue; }
+
+        // Simpan ad_copies
+        await sb.from('ad_copies').insert({
+          campaign_id: sbCampaignId,
+          user_id,
+          headline: ad.headline,
+          primary_text: ad.primary_text,
+          description: ad.description || '',
+          cta: ad.cta,
+          file_name: ad.file_name,
+          meta_creative_id: creative.id,
+          meta_ad_id: adData.id,
+        });
+      } catch (adErr) {
+        console.error('Ad creation error:', adErr);
+      }
+    }
+
+    // Action log
+    await sb.from('action_logs').insert({
+      user_id, campaign_id: sbCampaignId,
+      action: 'create_riset_adset',
+      details: { adset_label: adsetDef.label, budget: adsetBudget, ads_count: adsetDef.ads?.length || 0 }
+    });
+
+    adsetResults.push({ label: adsetDef.label, meta_adset_id: metaAdsetId, campaign_id: sbCampaignId });
+  }
+
+  return res.status(200).json({
+    success: true,
+    meta_campaign_id: metaCampaignId,
+    adsets: adsetResults,
+    message: `Riset berhasil dibuat: ${adsets.length} adset`
+  });
+}
+
+// ── Tambah adset ke riset campaign yang sudah ada ──
+async function handleAddRisetAdset(res, body) {
+  const {
+    meta_campaign_id, sb_campaign_ref_id,
+    ad_account_db_id, user_id,
+    label = 'Adset Baru', budget = 50000, ads = [],
+    page_id: pageIdOverride, pixel_id: pixelIdOverride, url_id,
+    objective = 'OUTCOME_TRAFFIC', auto_activate
+  } = body;
+
+  if (!meta_campaign_id) throw new Error('meta_campaign_id wajib');
+  if (!ad_account_db_id) throw new Error('ad_account_db_id wajib');
+
+  const { data: accData } = await sb.from('ad_accounts').select('account_id, page_id, pixel_id').eq('id', ad_account_db_id).single();
+  const { data: cfgData } = await sb.from('app_config').select('meta_token').eq('user_id', user_id).single();
+  const { data: urlData } = url_id ? await sb.from('ad_urls').select('url').eq('id', url_id).single() : { data: null };
+
+  const token     = cfgData?.meta_token || process.env.META_ACCESS_TOKEN;
+  const accountId = accData.account_id;
+  const pageId    = pageIdOverride  || accData.page_id;
+  const pixelId   = pixelIdOverride || accData.pixel_id || null;
+  const destUrl   = urlData?.url || 'https://wa.me/';
+  const adStatus  = auto_activate ? 'ACTIVE' : 'PAUSED';
+
+  // Ambil nama kampanye dari DB (berdasarkan meta_campaign_id)
+  const { data: refCamp } = await sb.from('campaigns')
+    .select('name, product_id, blueprint_id').eq('meta_campaign_id', meta_campaign_id)
+    .limit(1).single();
+  const baseName = refCamp?.name?.replace(/ — Adset \d+$/, '').replace(/ — .+$/, '') || 'Riset';
+  const adsetName = `${baseName} — ${label}`;
+
+  const { optimizationGoal, billingEvent } = objectiveConfig(objective);
+  const promotedObject = getPromotedObject(objective, pageId, pixelId);
+
+  // Buat adset baru di Meta (di campaign yang sama)
+  const adsetRes = await fetch(`${META_API}/${accountId}/adsets`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: adsetName, campaign_id: meta_campaign_id,
+      daily_budget: budget, billing_event: billingEvent,
+      optimization_goal: optimizationGoal, bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+      targeting: { geo_locations: { countries: ['ID'] }, age_min: 21, age_max: 65 },
+      status: adStatus,
+      ...(promotedObject ? { promoted_object: promotedObject } : {}),
+      access_token: token
+    })
+  });
+  const adsetData = await adsetRes.json();
+  if (adsetData.error) throw new Error(`Meta adset: ${adsetData.error.error_user_msg || adsetData.error.message}`);
+  const metaAdsetId = adsetData.id;
+
+  // Simpan ke campaigns
+  const { data: sbCampaign } = await sb.from('campaigns').insert({
+    name: adsetName, user_id,
+    ad_account_id: ad_account_db_id,
+    product_id: refCamp?.product_id || null,
+    blueprint_id: refCamp?.blueprint_id || null,
+    meta_campaign_id, meta_adset_id: metaAdsetId,
+    status: adStatus, daily_budget: budget,
+    current_phase: null, phase_type: 'riset', campaign_type: 'riset',
+    autopilot_enabled: true, phase_started_at: new Date().toISOString(),
+  }).select('id').single();
+  const sbCampaignId = sbCampaign?.id;
+
+  // Buat ads
+  for (const ad of ads) {
+    try {
+      const creativePayload = {
+        name: `${adsetName} — ${ad.file_name}`,
+        object_story_spec: {
+          page_id: pageId,
+          [ad.file_type === 'video' ? 'video_data' : 'link_data']: ad.file_type === 'video'
+            ? { video_id: ad.meta_video_id, message: ad.primary_text, call_to_action: { type: ctaMap(ad.cta), value: { link: destUrl } } }
+            : { image_hash: ad.meta_image_hash, message: ad.primary_text, link: destUrl, name: ad.headline, call_to_action: { type: ctaMap(ad.cta) } }
+        },
+        access_token: token
+      };
+      const creativeRes = await fetch(`${META_API}/${accountId}/adcreatives`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(creativePayload)
+      });
+      let creative = await creativeRes.json();
+      if (creative.error && (creative.error.code === 200 || (creative.error.message||'').toLowerCase().includes('instagram'))) {
+        const rr = await fetch(`${META_API}/${accountId}/adcreatives`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...creativePayload, use_page_actor_override: true })
+        });
+        creative = await rr.json();
+      }
+      if (creative.error) { console.error('Creative error:', creative.error); continue; }
+      const adRes = await fetch(`${META_API}/${accountId}/ads`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: `${adsetName} — ${ad.file_name}`, adset_id: metaAdsetId, creative: { creative_id: creative.id }, status: adStatus, access_token: token })
+      });
+      const adData = await adRes.json();
+      if (!adData.error) {
+        await sb.from('ad_copies').insert({ campaign_id: sbCampaignId, user_id, headline: ad.headline, primary_text: ad.primary_text, description: ad.description||'', cta: ad.cta, file_name: ad.file_name, meta_creative_id: creative.id, meta_ad_id: adData.id });
+      }
+    } catch (e) { console.error('Ad error:', e); }
+  }
+
+  await sb.from('action_logs').insert({ user_id, campaign_id: sbCampaignId, action: 'add_riset_adset', details: { label, budget, ads_count: ads.length } });
+
+  return res.status(200).json({ success: true, meta_adset_id: metaAdsetId, campaign_id: sbCampaignId });
+}
 
 function ctaMap(cta) {
   const metaEnums = ['LEARN_MORE','SHOP_NOW','ORDER_NOW','GET_OFFER','CONTACT_US',
