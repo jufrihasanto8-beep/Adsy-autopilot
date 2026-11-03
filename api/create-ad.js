@@ -1035,7 +1035,7 @@ async function handleRiset(res, body) {
                   link: destUrl,
                   name: ad.headline || '',
                   description: ad.description || '',
-                  call_to_action: { type: ctaMap(ad.cta) }
+                  call_to_action: { type: ctaMap(ad.cta), value: { link: destUrl } }
                 }
           },
           access_token: token
@@ -1192,7 +1192,7 @@ async function handleAddRisetAdset(res, body) {
                 link: destUrl,
                 name: ad.headline || '',
                 description: ad.description || '',
-                call_to_action: { type: ctaMap(ad.cta) }
+                call_to_action: { type: ctaMap(ad.cta), value: { link: destUrl } }
               }
         },
         access_token: token
