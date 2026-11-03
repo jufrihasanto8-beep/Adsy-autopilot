@@ -62,7 +62,7 @@ export default async function handler(req, res) {
           await syncCampaignInsights(camp, token);
 
           // Sync per-ad insights (untuk winner detection)
-          await syncRisetAdInsights(camp.id, camp.meta_adset_id, token);
+          await syncRisetAdInsights(camp.id, camp.meta_adset_id, token, camp.kpi_type || 'purchase');
 
           const { data: fresh } = await sb.from('campaigns').select('*, products(target_cpr), autopilot_blueprints(config)').eq('id', camp.id).single();
           if (!fresh) continue;
@@ -751,7 +751,7 @@ async function syncCampaignInsights(camp, token) {
 }
 
 // ── Sync insights per-ad untuk riset evaluation ──
-async function syncRisetAdInsights(campaignId, metaAdsetId, token) {
+async function syncRisetAdInsights(campaignId, metaAdsetId, token, kpiType = 'purchase') {
   if (!metaAdsetId || !token) return;
   try {
     // Ambil semua ads dalam adset ini dari Meta
@@ -773,11 +773,9 @@ async function syncRisetAdInsights(campaignId, metaAdsetId, token) {
       const spend       = parseFloat(insight.spend || 0);
       const impressions = parseInt(insight.impressions || 0);
       const actions     = insight.actions || [];
-      const result      = actions.find(x =>
-        x.action_type === 'offsite_conversion.fb_pixel_purchase' ||
-        x.action_type === 'lead' ||
-        x.action_type === 'onsite_conversion.messaging_conversation_started_7d'
-      );
+      const result      = kpiType === 'prospek'
+        ? actions.find(x => x.action_type === 'lead' || x.action_type === 'onsite_conversion.messaging_conversation_started_7d')
+        : actions.find(x => x.action_type === 'offsite_conversion.fb_pixel_purchase' || x.action_type === 'lead' || x.action_type === 'onsite_conversion.messaging_conversation_started_7d');
       const results = parseInt(result?.value || 0);
       const cpr     = results > 0 ? Math.round(spend / results) : (spend > 0 ? null : undefined);
 
