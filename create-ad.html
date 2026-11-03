@@ -35,6 +35,7 @@
       overflow: hidden;
       margin-bottom: 16px;
       transition: var(--transition);
+      min-width: 0;
     }
     .content-item.generating { border-color: var(--primary); }
     .content-item.ready { border-color: var(--success); }
@@ -87,8 +88,9 @@
 
     .content-item-body {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 0;
+      min-width: 0;
     }
 
     .copy-fields { padding: 16px; border-right: 1px solid var(--gray-3); }
@@ -168,6 +170,7 @@
       overflow: hidden;
       margin-bottom: 16px;
       background: white;
+      min-width: 0;
     }
     .riset-adset-header {
       display: flex; align-items: center; gap: 10px;
@@ -179,7 +182,7 @@
       font-size: 14px; font-weight: 700; border: none;
       background: transparent; flex: 1; outline: none; color: var(--text);
     }
-    .riset-adset-body { padding: 16px; }
+    .riset-adset-body { padding: 16px; min-width: 0; overflow: hidden; }
     /* Upload zone riset — sama persis dengan standard */
     .riset-upload-zone {
       border: 2px dashed var(--gray-4);
