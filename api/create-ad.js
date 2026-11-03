@@ -1018,12 +1018,24 @@ async function handleRiset(res, body) {
           object_story_spec: {
             page_id: pageId,
             [ad.file_type === 'video' ? 'video_data' : 'link_data']: ad.file_type === 'video'
-              ? { video_id: ad.meta_video_id, thumbnail_hash: ad.thumbnail_hash || undefined, message: ad.primary_text, call_to_action: { type: ctaMap(ad.cta), value: { link: destUrl } }, image_hash: ad.thumbnail_hash || undefined }
-              : { image_hash: ad.meta_image_hash, message: ad.primary_text, link: destUrl, name: ad.headline, description: ad.description, call_to_action: { type: ctaMap(ad.cta) } }
+              ? {
+                  video_id: ad.meta_video_id,
+                  ...(ad.thumbnail_hash ? { thumbnail_hash: ad.thumbnail_hash } : {}),
+                  message: ad.primary_text || '',
+                  title: ad.headline || '',
+                  call_to_action: { type: ctaMap(ad.cta), value: { link: destUrl } }
+                }
+              : {
+                  image_hash: ad.meta_image_hash,
+                  message: ad.primary_text || '',
+                  link: destUrl,
+                  name: ad.headline || '',
+                  description: ad.description || '',
+                  call_to_action: { type: ctaMap(ad.cta) }
+                }
           },
           access_token: token
         };
-        if (ad.headline && ad.file_type !== 'video') baseCreativePayload.object_story_spec.link_data.name = ad.headline;
 
         const creativeRes = await fetch(`${META_API}/${accountId}/adcreatives`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1163,8 +1175,21 @@ async function handleAddRisetAdset(res, body) {
         object_story_spec: {
           page_id: pageId,
           [ad.file_type === 'video' ? 'video_data' : 'link_data']: ad.file_type === 'video'
-            ? { video_id: ad.meta_video_id, message: ad.primary_text, call_to_action: { type: ctaMap(ad.cta), value: { link: destUrl } } }
-            : { image_hash: ad.meta_image_hash, message: ad.primary_text, link: destUrl, name: ad.headline, call_to_action: { type: ctaMap(ad.cta) } }
+            ? {
+                video_id: ad.meta_video_id,
+                ...(ad.thumbnail_hash ? { thumbnail_hash: ad.thumbnail_hash } : {}),
+                message: ad.primary_text || '',
+                title: ad.headline || '',
+                call_to_action: { type: ctaMap(ad.cta), value: { link: destUrl } }
+              }
+            : {
+                image_hash: ad.meta_image_hash,
+                message: ad.primary_text || '',
+                link: destUrl,
+                name: ad.headline || '',
+                description: ad.description || '',
+                call_to_action: { type: ctaMap(ad.cta) }
+              }
         },
         access_token: token
       };
