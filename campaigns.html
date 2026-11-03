@@ -279,6 +279,45 @@
   </div>
 </div>
 
+<!-- MODAL TAMBAH ADSET RISET -->
+<div class="modal-overlay hidden" id="modal-add-adset">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <h3>+ Tambah Adset</h3>
+      <div class="modal-close" onclick="closeModal('modal-add-adset')">✕</div>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div style="font-size:12px;color:var(--text-sub);" id="add-adset-camp-name"></div>
+      <div class="form-row" style="margin:0;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Label Adset</label>
+          <input type="text" class="form-input" id="add-adset-label" placeholder="Misal: Adset 3" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Budget/hari (Rp)</label>
+          <input type="number" class="form-input" id="add-adset-budget" value="50000" min="10000" step="5000" />
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Upload Konten</label>
+        <div style="border:2px dashed var(--gray-4);border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:var(--gray-1);"
+          onclick="document.getElementById('add-adset-file-input').click()">
+          📁 Drop file atau klik pilih · Gambar & video
+        </div>
+        <input type="file" id="add-adset-file-input" multiple accept="image/*,video/*" style="display:none;" />
+        <div id="add-adset-files-list"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-sub);background:var(--gray-1);padding:10px;border-radius:6px;">
+        ℹ️ Copy (headline, primary text) bisa diisi nanti langsung di Meta Ads Manager, atau akan di-generate otomatis jika kosong.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-add-adset')">Batal</button>
+      <button class="btn btn-primary" id="btn-submit-add-adset" onclick="submitAddAdset()">Tambah Adset</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL ADVANCE PHASE -->
 <div class="modal-overlay hidden" id="modal-advance">
   <div class="modal" style="max-width:480px;">
@@ -502,10 +541,27 @@ function drpRender(){const y=drpViewYear,m=drpViewMonth,firstDay=new Date(y,m,1)
     const phaseLabel = { 1: 'Testing', 2: 'Evaluasi', 3: 'Scale' };
     const phaseBadge = { 1: 'badge-warning', 2: 'badge-primary', 3: 'badge-success' };
 
-    // Group Phase 2b adsets (same meta_campaign_id) jadi 1 baris
+    // Group Phase 2b & riset adsets (same meta_campaign_id) jadi 1 baris
     const rows = [];
-    const seen2b = new Set();
+    const seen2b   = new Set();
+    const seenRiset = new Set();
     for (const c of data) {
+      // Riset grouping
+      if (c.campaign_type === 'riset') {
+        if (seenRiset.has(c.meta_campaign_id)) continue;
+        seenRiset.add(c.meta_campaign_id);
+        const group = data.filter(x => x.campaign_type === 'riset' && x.meta_campaign_id === c.meta_campaign_id);
+        const totalSpend  = group.reduce((s,x) => s + ((x.id in insightsMap) ? (insightsMap[x.id]?.spend??0) : (x.spend_today??0)), 0);
+        const totalBudget = group.reduce((s,x) => s + (x.daily_budget||0), 0);
+        const cprs = group.map(x => (x.id in insightsMap) ? insightsMap[x.id]?.cpr : x.cpr).filter(v=>v!=null);
+        const avgCpr = cprs.length ? cprs.reduce((a,b)=>a+b,0)/cprs.length : null;
+        const anyActive = group.some(x => x.status==='ACTIVE');
+        const totalResults = group.reduce((s,x) => s + ((x.id in insightsMap) ? (insightsMap[x.id]?.results_count??0) : (x.results_today??0)), 0);
+        const parentName = c.name.replace(/ — Adset \d+$/, '').replace(/ — .+$/, '');
+        rows.push({ ...c, _group: group, _isRiset: true, _parentName: parentName, _totalSpend: totalSpend, _totalBudget: totalBudget, _avgCpr: avgCpr, _anyActive: anyActive, _totalResults: totalResults });
+        continue;
+      }
+
       if (c.phase_type === '2b') {
         if (seen2b.has(c.meta_campaign_id)) continue; // skip adset duplikat
         seen2b.add(c.meta_campaign_id);
@@ -534,6 +590,39 @@ function drpRender(){const y=drpViewYear,m=drpViewMonth,firstDay=new Date(y,m,1)
     }
 
     tbody.innerHTML = rows.map(c => {
+      // Riset group row
+      if (c._isRiset) {
+        const g = c._group;
+        const adsetLabels = g.map(x => x.name.replace(/.*— /, '')).join(', ');
+        const statusBadge = c._anyActive
+          ? `<span class="badge badge-success"><span class="badge-dot"></span>Aktif</span>`
+          : `<span class="badge badge-warning"><span class="badge-dot"></span>Paused</span>`;
+        return `
+        <tr>
+          <td><input type="checkbox" class="row-check" data-id="${g[0].id}" data-meta="${c.meta_campaign_id}" data-status="${c._anyActive?'ACTIVE':'PAUSED'}" style="cursor:pointer;" onchange="onRowCheck(this)" /></td>
+          <td>
+            <strong>${c._parentName}</strong>
+            <div style="font-size:11px;color:var(--gray-5);margin-top:2px;">🔬 Riset · ABO Broad · ${g.length} adset: ${adsetLabels}</div>
+          </td>
+          <td><span class="badge" style="background:#E0F2FE;color:#0369A1;">Riset</span></td>
+          <td>${formatRupiah(c._totalBudget)}</td>
+          <td>${formatRupiah(c._totalSpend)}</td>
+          <td>${c._totalResults > 0 ? c._totalResults : '-'}</td>
+          <td>${c._avgCpr ? formatRupiah(Math.round(c._avgCpr)) : '-'}</td>
+          <td>-</td>
+          <td>${statusBadge}</td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              ${c._anyActive
+                ? `<button class="btn btn-outline btn-sm" onclick="toggleRisetGroup('${c.meta_campaign_id}','PAUSED')">⏸ Pause</button>`
+                : `<button class="btn btn-success btn-sm" onclick="toggleRisetGroup('${c.meta_campaign_id}','ACTIVE')">▶ Aktifkan</button>`}
+              <button class="btn btn-primary btn-sm" onclick="openAddAdsetModal('${c.meta_campaign_id}','${c._parentName.replace(/'/g,"\\'")}','${g[0].ad_account_id}','${g[0].user_id}')">+ Adset</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteRisetGroup('${c.meta_campaign_id}','${c._parentName.replace(/'/g,"\\'")}')">Hapus</button>
+            </div>
+          </td>
+        </tr>`;
+      }
+
       if (c._isGroup) {
         const g = c._group;
         const adsetLabels = g.map(x => x.name.replace(/.*— Phase 2[A-Za-z] /, '')).join(', ');
@@ -752,6 +841,134 @@ function drpRender(){const y=drpViewYear,m=drpViewMonth,firstDay=new Date(y,m,1)
     } catch (err) {
       showToast('Gagal hapus: ' + err.message, 'error');
     }
+  };
+
+  // ── Riset group controls ──
+  window.toggleRisetGroup = async function(metaCampaignId, status) {
+    const group = allCampaigns.filter(c => c.campaign_type === 'riset' && c.meta_campaign_id === metaCampaignId);
+    try {
+      await Promise.all(group.map(c =>
+        fetch('/api/meta-campaigns', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: c.id, meta_campaign_id: c.meta_campaign_id, status, user_id: currentProfile.id }) })
+      ));
+      showToast(`Riset group ${status === 'ACTIVE' ? 'diaktifkan' : 'di-pause'}`, 'success');
+      await loadCampaigns();
+    } catch (err) { showToast('Gagal: ' + err.message, 'error'); }
+  };
+
+  window.deleteRisetGroup = async function(metaCampaignId, name) {
+    const group = allCampaigns.filter(c => c.campaign_type === 'riset' && c.meta_campaign_id === metaCampaignId);
+    if (!confirm(`Hapus Riset "${name}" (${group.length} adset)?\n\nIni akan menghapus dari Meta Ads Manager dan tidak bisa dibatalkan.`)) return;
+    try {
+      const res = await fetch('/api/meta-campaigns', { method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: group[0].id, meta_campaign_id: metaCampaignId, user_id: currentProfile.id }) });
+      if (!res.ok) throw new Error((await res.json()).error || 'Gagal');
+      showToast(`Riset dihapus (${group.length} adset)`, 'success');
+      await loadCampaigns();
+    } catch (err) { showToast('Gagal hapus: ' + err.message, 'error'); }
+  };
+
+  let addAdsetMetaCampaignId = null, addAdsetAdAccountId = null, addAdsetUserId = null;
+  let addAdsetItems = []; // files to upload
+
+  window.openAddAdsetModal = function(metaCampaignId, campName, adAccountId, userId) {
+    addAdsetMetaCampaignId = metaCampaignId;
+    addAdsetAdAccountId    = adAccountId;
+    addAdsetUserId         = userId;
+    addAdsetItems = [];
+    document.getElementById('add-adset-camp-name').textContent = campName;
+    document.getElementById('add-adset-label').value = `Adset ${allCampaigns.filter(c=>c.meta_campaign_id===metaCampaignId).length + 1}`;
+    document.getElementById('add-adset-budget').value = 50000;
+    document.getElementById('add-adset-files-list').innerHTML = '';
+    openModal('modal-add-adset');
+  };
+
+  document.getElementById('add-adset-file-input').addEventListener('change', function() {
+    for (const f of this.files) {
+      addAdsetItems.push({ file: f, previewUrl: URL.createObjectURL(f), id: crypto.randomUUID() });
+    }
+    renderAddAdsetFiles();
+  });
+
+  function renderAddAdsetFiles() {
+    document.getElementById('add-adset-files-list').innerHTML = addAdsetItems.map(item => `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px;border:1px solid var(--gray-3);border-radius:6px;margin-top:6px;">
+        <div style="width:40px;height:30px;border-radius:4px;overflow:hidden;background:var(--gray-3);flex-shrink:0;">
+          ${item.file.type.startsWith('video/')
+            ? `<video src="${item.previewUrl}" style="width:100%;height:100%;object-fit:cover;" muted></video>`
+            : `<img src="${item.previewUrl}" style="width:100%;height:100%;object-fit:cover;" />`}
+        </div>
+        <span style="font-size:12px;flex:1;">${item.file.name}</span>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger);padding:2px 6px;" onclick="removeAddAdsetFile('${item.id}')">✕</button>
+      </div>`).join('');
+  }
+
+  window.removeAddAdsetFile = function(id) {
+    addAdsetItems = addAdsetItems.filter(i => i.id !== id);
+    renderAddAdsetFiles();
+  };
+
+  window.submitAddAdset = async function() {
+    if (!addAdsetItems.length) return showToast('Upload minimal 1 konten', 'warning');
+    const label  = document.getElementById('add-adset-label').value.trim() || 'Adset Baru';
+    const budget = parseInt(document.getElementById('add-adset-budget').value) || 50000;
+
+    const btn = document.getElementById('btn-submit-add-adset');
+    btn.disabled = true; btn.textContent = 'Mengupload...';
+
+    // Get meta token + account
+    const { data: accRec } = await sb.from('ad_accounts').select('account_id, page_id').eq('id', addAdsetAdAccountId).single();
+    const { data: cfgRec } = await sb.from('app_config').select('meta_token').eq('user_id', addAdsetUserId).single();
+    const metaToken     = cfgRec?.meta_token;
+    const metaAccountId = accRec?.account_id;
+    if (!metaToken) { btn.disabled=false; btn.textContent='Tambah Adset'; return showToast('Meta token tidak ditemukan', 'error'); }
+
+    // Get URL & objective dari kampanye referensi
+    const refCamp = allCampaigns.find(c => c.meta_campaign_id === addAdsetMetaCampaignId);
+    const { data: urlRec } = refCamp?.url_id ? await sb.from('ad_urls').select('url').eq('id', refCamp.url_id).limit(1).single() : { data: null };
+
+    const ads = [];
+    for (const item of addAdsetItems) {
+      btn.textContent = `Upload ${item.file.name}...`;
+      try {
+        if (item.file.type.startsWith('video/')) {
+          const vf = new FormData(); vf.append('file', item.file, item.file.name);
+          const vd = await fetch(`https://graph.facebook.com/v18.0/${metaAccountId}/advideos?access_token=${encodeURIComponent(metaToken)}`, { method:'POST', body:vf }).then(r=>r.json());
+          if (vd.error) throw new Error(vd.error.message);
+          ads.push({ file_type:'video', file_name:item.file.name, meta_video_id:vd.id, headline:'', primary_text:'', cta:'LEARN_MORE' });
+        } else {
+          const imgF = new FormData(); imgF.append(item.file.name, item.file, item.file.name);
+          const imgD = await fetch(`https://graph.facebook.com/v18.0/${metaAccountId}/adimages?access_token=${encodeURIComponent(metaToken)}`, { method:'POST', body:imgF }).then(r=>r.json());
+          if (imgD.error) throw new Error(imgD.error.message);
+          const hash = Object.values(imgD.images||{})[0]?.hash;
+          if (!hash) throw new Error('Hash tidak ditemukan');
+          ads.push({ file_type:'image', file_name:item.file.name, meta_image_hash:hash, headline:'', primary_text:'', cta:'LEARN_MORE' });
+        }
+      } catch(e) { showToast(`Upload ${item.file.name} gagal: ${e.message}`, 'error'); btn.disabled=false; btn.textContent='Tambah Adset'; return; }
+    }
+
+    btn.textContent = 'Membuat adset...';
+    const payload = {
+      mode: 'add_riset_adset',
+      meta_campaign_id: addAdsetMetaCampaignId,
+      ad_account_db_id: addAdsetAdAccountId,
+      user_id: addAdsetUserId,
+      label, budget, ads,
+      auto_activate: refCamp?.status === 'ACTIVE',
+      objective: refCamp?.objective || 'OUTCOME_TRAFFIC',
+      url_id: refCamp?.url_id || null,
+      page_id: accRec?.page_id || null
+    };
+
+    try {
+      const res = await fetch('/api/create-ad', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal');
+      showToast(`Adset "${label}" berhasil ditambahkan!`, 'success');
+      closeModal('modal-add-adset');
+      await loadCampaigns();
+    } catch(e) { showToast('Gagal: ' + e.message, 'error'); }
+    btn.disabled=false; btn.textContent='Tambah Adset';
   };
 
   window.advancePhase = async function(id, name) {

@@ -215,6 +215,48 @@
         </div>
       </div>
 
+      <!-- Tipe Blueprint -->
+      <div>
+        <label class="form-label" style="margin-bottom:8px;">Tipe Blueprint</label>
+        <div style="display:flex;gap:0;border:1.5px solid var(--gray-3);border-radius:8px;overflow:hidden;width:fit-content;">
+          <button type="button" id="bp-type-standard" onclick="setBpType('standard')"
+            style="padding:8px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:var(--primary);color:white;transition:.15s;">
+            Standard (Phase 1→2→3)
+          </button>
+          <button type="button" id="bp-type-riset" onclick="setBpType('riset')"
+            style="padding:8px 20px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:white;color:var(--text-sub);transition:.15s;">
+            🔬 Riset
+          </button>
+        </div>
+      </div>
+
+      <!-- Riset Config (hanya muncul saat tipe Riset) -->
+      <div id="bp-riset-section" style="display:none;background:#F0F9FF;border-radius:8px;padding:16px;border-left:3px solid #0EA5E9;">
+        <div style="font-size:12px;font-weight:700;color:#0369A1;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px;">RISET — Multi Adset ABO · Broad Targeting</div>
+        <div style="font-size:12px;color:#0369A1;margin-bottom:14px;line-height:1.6;background:rgba(3,105,161,0.08);padding:10px;border-radius:6px;">
+          Kampanye ABO dengan N adset bebas. Tiap adset diisi konten sendiri saat buat iklan.<br>
+          Targeting semua broad — pembeda antar adset adalah group konten yang diuji.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Budget default per Adset (Rp)</label>
+            <input type="text" inputmode="numeric" class="form-input" id="bp-riset-budget" value="50.000"
+              oninput="bpInputRisetBudget(this)" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Pause jika CPR > …× target</label>
+            <input type="number" class="form-input" id="bp-riset-pause" value="2.5" step="0.1" min="1" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Evaluasi setelah (hari)</label>
+            <input type="number" class="form-input" id="bp-riset-days" value="3" min="1" max="14" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Standard Phase sections (Phase 1, 2, 3) -->
+      <div id="bp-standard-sections" style="display:flex;flex-direction:column;gap:16px;">
+
       <!-- Phase 1 -->
       <div style="background:var(--primary-light);border-radius:8px;padding:16px;border-left:3px solid var(--primary);">
         <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px;">PHASE 1 — Testing</div>
@@ -274,6 +316,7 @@
         </div>
       </div>
 
+      </div><!-- end bp-standard-sections -->
     </div>
     <div class="modal-footer" style="flex-shrink:0;border-top:1px solid var(--gray-3);padding:16px 24px;display:flex;justify-content:flex-end;gap:8px;">
       <button class="btn btn-outline modal-close">Batal</button>
@@ -429,6 +472,25 @@
   let bpEditId = null;
   let bpP1Adsets = [];
   let bpP2bAdsets = [];
+  let bpType = 'standard';
+  let bpRisetBudgetRaw = 50000;
+
+  window.setBpType = function(type) {
+    bpType = type;
+    const isRiset = type === 'riset';
+    document.getElementById('bp-standard-sections').style.display = isRiset ? 'none' : '';
+    document.getElementById('bp-riset-section').style.display     = isRiset ? '' : 'none';
+    document.getElementById('bp-type-standard').style.background  = isRiset ? 'white' : 'var(--primary)';
+    document.getElementById('bp-type-standard').style.color       = isRiset ? 'var(--text-sub)' : 'white';
+    document.getElementById('bp-type-riset').style.background     = isRiset ? '#0EA5E9' : 'white';
+    document.getElementById('bp-type-riset').style.color          = isRiset ? 'white' : 'var(--text-sub)';
+  };
+
+  window.bpInputRisetBudget = function(el) {
+    const raw = el.value.replace(/[^0-9]/g, '');
+    el.value = raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    bpRisetBudgetRaw = parseInt(raw) || 0;
+  };
 
   const ADSET_TYPES = [
     { value: 'interest', label: 'Interest (AI otomatis)' },
@@ -632,6 +694,19 @@
 
     document.getElementById('bp-name').value = bp?.name || '';
     document.getElementById('bp-desc').value = bp?.description || '';
+
+    // Set tipe blueprint
+    const type = cfg.type || 'standard';
+    bpRisetBudgetRaw = cfg.budget_per_adset || 50000;
+    setBpType(type);
+
+    // Riset fields
+    const risetBudgetStr = bpRisetBudgetRaw.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    document.getElementById('bp-riset-budget').value = risetBudgetStr;
+    document.getElementById('bp-riset-pause').value  = cfg.evaluation?.pause_cpr_multiplier ?? 2.5;
+    document.getElementById('bp-riset-days').value   = cfg.evaluation?.duration_days ?? 3;
+
+    // Standard fields
     document.getElementById('bp-p1-days').value    = p1.evaluation?.duration_days ?? 3;
     document.getElementById('bp-p1-pause').value   = p1.evaluation?.pause_cpr_multiplier ?? 2.5;
     document.getElementById('bp-p1-advance').value = Math.round(((p1.evaluation?.advance_cpr_multiplier ?? 1.1) - 1) * 100);
@@ -674,29 +749,42 @@
   async function saveBlueprintHandler() {
     const name = document.getElementById('bp-name').value.trim();
     if (!name) return showToast('Nama blueprint wajib diisi', 'warning');
-    if (!bpP1Adsets.length) return showToast('Minimal 1 adset di Phase 1', 'warning');
 
-    // Validate Phase 2 sub-phases
-    for (const sp of bpP2SubPhases) {
-      if (!sp.strategy) return showToast('Ada sub-phase Phase 2 yang belum dipilih strateginya', 'warning');
-    }
+    let config;
 
-    const config = {
-      phase1: {
-        adsets: bpP1Adsets,
+    if (bpType === 'riset') {
+      if (!bpRisetBudgetRaw || bpRisetBudgetRaw < 10000) return showToast('Budget per adset minimal Rp 10.000', 'warning');
+      config = {
+        type: 'riset',
+        budget_per_adset: bpRisetBudgetRaw,
         evaluation: {
-          duration_days:          parseInt(document.getElementById('bp-p1-days').value)      || 3,
-          pause_cpr_multiplier:   parseFloat(document.getElementById('bp-p1-pause').value)   || 2.5,
-          advance_cpr_multiplier: 1 + (parseFloat(document.getElementById('bp-p1-advance').value) || 10) / 100,
+          pause_cpr_multiplier: parseFloat(document.getElementById('bp-riset-pause').value) || 2.5,
+          duration_days:        parseInt(document.getElementById('bp-riset-days').value)    || 3,
         }
-      },
-      phase2: bpP2SubPhases,
-      phase3: {
-        scale_pct:            parseInt(document.getElementById('bp-p3-scale').value)    || 3,
-        max_scale_pct:        parseInt(document.getElementById('bp-p3-maxscale').value) || 30,
-        pause_cpr_multiplier: parseFloat(document.getElementById('bp-p3-pause').value)  || 2.0,
+      };
+    } else {
+      if (!bpP1Adsets.length) return showToast('Minimal 1 adset di Phase 1', 'warning');
+      for (const sp of bpP2SubPhases) {
+        if (!sp.strategy) return showToast('Ada sub-phase Phase 2 yang belum dipilih strateginya', 'warning');
       }
-    };
+      config = {
+        type: 'standard',
+        phase1: {
+          adsets: bpP1Adsets,
+          evaluation: {
+            duration_days:          parseInt(document.getElementById('bp-p1-days').value)      || 3,
+            pause_cpr_multiplier:   parseFloat(document.getElementById('bp-p1-pause').value)   || 2.5,
+            advance_cpr_multiplier: 1 + (parseFloat(document.getElementById('bp-p1-advance').value) || 10) / 100,
+          }
+        },
+        phase2: bpP2SubPhases,
+        phase3: {
+          scale_pct:            parseInt(document.getElementById('bp-p3-scale').value)    || 3,
+          max_scale_pct:        parseInt(document.getElementById('bp-p3-maxscale').value) || 30,
+          pause_cpr_multiplier: parseFloat(document.getElementById('bp-p3-pause').value)  || 2.0,
+        }
+      };
+    }
 
     const payload = {
       name,
@@ -750,27 +838,29 @@
 
     el.innerHTML = data.map(bp => {
       const cfg = bp.config || {};
-      const p1adsets = cfg.phase1?.adsets?.length || 1;
-      const scale = cfg.phase3?.scale_pct || 3;
 
-      // Support new array format + old formats
-      const LABELS = { cost_cap:'Cost Cap', cbo_interest:'CBO Interest', abo_interest:'ABO', lookalike:'Lookalike', broad:'Broad', cost_cap_abo:'Cost Cap+ABO', cost_cap_only:'Cost Cap', skip:'Skip' };
-      let p2label = '';
-      if (Array.isArray(cfg.phase2) && cfg.phase2.length) {
-        p2label = cfg.phase2.map((sp,i) => `2${String.fromCharCode(65+i)}: ${LABELS[sp.strategy]||sp.strategy}`).join(' · ');
-      } else if (cfg.phase2?.strategy) {
-        p2label = LABELS[cfg.phase2.strategy] || cfg.phase2.strategy;
-      } else if (cfg.phase2a || cfg.phase2b) {
-        const hasCostCap = cfg.phase2a?.enabled !== false;
-        const hasAbo     = cfg.phase2b?.enabled !== false;
-        p2label = hasCostCap && hasAbo ? 'Cost Cap + ABO' : hasCostCap ? 'Cost Cap' : hasAbo ? 'ABO' : 'Skip';
+      let summary;
+      if (cfg.type === 'riset') {
+        const budget = (cfg.budget_per_adset || 50000).toLocaleString('id-ID');
+        const days   = cfg.evaluation?.duration_days || 3;
+        const pause  = cfg.evaluation?.pause_cpr_multiplier || 2.5;
+        summary = `🔬 Riset · Budget/adset: Rp ${budget} · Evaluasi ${days} hari · Pause jika CPR > ${pause}× target`;
+      } else {
+        const p1adsets = cfg.phase1?.adsets?.length || 1;
+        const scale = cfg.phase3?.scale_pct || 3;
+        const LABELS = { cost_cap:'Cost Cap', cbo_interest:'CBO Interest', abo_interest:'ABO', lookalike:'Lookalike', broad:'Broad', cost_cap_abo:'Cost Cap+ABO', cost_cap_only:'Cost Cap', skip:'Skip' };
+        let p2label = '';
+        if (Array.isArray(cfg.phase2) && cfg.phase2.length) {
+          p2label = cfg.phase2.map((sp,i) => `2${String.fromCharCode(65+i)}: ${LABELS[sp.strategy]||sp.strategy}`).join(' · ');
+        } else if (cfg.phase2?.strategy) {
+          p2label = LABELS[cfg.phase2.strategy] || cfg.phase2.strategy;
+        } else if (cfg.phase2a || cfg.phase2b) {
+          const hasCostCap = cfg.phase2a?.enabled !== false;
+          const hasAbo     = cfg.phase2b?.enabled !== false;
+          p2label = hasCostCap && hasAbo ? 'Cost Cap + ABO' : hasCostCap ? 'Cost Cap' : hasAbo ? 'ABO' : 'Skip';
+        }
+        summary = [`P1: ${p1adsets} adset`, p2label ? `P2: ${p2label}` : '', `P3: Scale ${scale}%`].filter(Boolean).join(' · ');
       }
-
-      const summary = [
-        `P1: ${p1adsets} adset`,
-        p2label ? `P2: ${p2label}` : '',
-        `P3: Scale ${scale}%`
-      ].filter(Boolean).join(' · ');
 
       return `
       <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--gray-1);border-radius:8px;border:1px solid var(--gray-3);">
