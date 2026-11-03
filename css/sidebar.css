@@ -240,6 +240,115 @@
   margin-bottom: 2px;
 }
 
+/* ── SIDEBAR COLLAPSE BUTTON ── */
+.sidebar-collapse-btn {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--gray-2);
+  border: none;
+  color: var(--text-sub);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+  flex-shrink: 0;
+  line-height: 1;
+}
+.sidebar-collapse-btn:hover { background: var(--gray-3); color: var(--text); }
+
+/* ── COLLAPSED STATE ── */
+body.sidebar-collapsed {
+  --sidebar-w: 64px;
+}
+
+body.sidebar-collapsed .sidebar-logo {
+  justify-content: center;
+  padding: 18px 0;
+  gap: 0;
+}
+body.sidebar-collapsed .sidebar-logo-text { display: none; }
+body.sidebar-collapsed .sidebar-collapse-btn {
+  display: none;
+}
+/* Expand button — appears as a small tab on right edge when collapsed */
+body.sidebar-collapsed .sidebar-expand-btn {
+  display: flex !important;
+}
+
+body.sidebar-collapsed .nav-section-label { display: none; }
+body.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 11px 0;
+  font-size: 0; /* hides text nodes */
+  position: relative;
+}
+body.sidebar-collapsed .nav-item .nav-icon {
+  font-size: 18px;
+  margin: 0;
+  width: 24px;
+  height: 24px;
+}
+body.sidebar-collapsed .nav-item.active::before {
+  height: 24px;
+}
+body.sidebar-collapsed .nav-badge { display: none; }
+
+/* Tooltip on hover when collapsed */
+body.sidebar-collapsed .nav-item[data-label]:hover::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--text);
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 6px 10px;
+  border-radius: 7px;
+  z-index: 300;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+body.sidebar-collapsed .nav-item[data-label]:hover::before {
+  /* Override the active left-bar pseudo — tooltip takes priority */
+  z-index: 1;
+}
+
+body.sidebar-collapsed .sidebar-user-info { display: none; }
+body.sidebar-collapsed .sidebar-user-more { display: none; }
+body.sidebar-collapsed .sidebar-user { justify-content: center; padding: 10px 0; }
+body.sidebar-collapsed .autopilot-status { display: none; }
+
+/* Expand tab — fixed on right edge of collapsed sidebar */
+.sidebar-expand-btn {
+  display: none;
+  position: absolute;
+  right: -13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 40px;
+  background: var(--white);
+  border: 1px solid var(--gray-3);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  color: var(--text-sub);
+  font-size: 13px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 201;
+  transition: var(--transition);
+  box-shadow: 3px 0 8px rgba(0,0,0,0.07);
+}
+.sidebar-expand-btn:hover { background: var(--gray-1); color: var(--text); }
+
 /* ── SIDEBAR OVERLAY (mobile) ── */
 .sidebar-overlay {
   display: none;
@@ -274,6 +383,22 @@
 /* ── MOBILE SIDEBAR ── */
 @media (max-width: 768px) {
   .mob-menu-btn { display: flex; }
+  .sidebar-collapse-btn { display: none !important; }
+  .sidebar-expand-btn { display: none !important; }
+
+  /* Reset collapsed state on mobile */
+  body.sidebar-collapsed {
+    --sidebar-w: 260px;
+  }
+  body.sidebar-collapsed .sidebar-logo { justify-content: flex-start; padding: 24px 20px 20px; gap: 10px; }
+  body.sidebar-collapsed .sidebar-logo-text { display: block; }
+  body.sidebar-collapsed .nav-section-label { display: block; }
+  body.sidebar-collapsed .nav-item { justify-content: flex-start; padding: 11px 12px; font-size: 13px; }
+  body.sidebar-collapsed .nav-badge { display: inline-flex; }
+  body.sidebar-collapsed .autopilot-status { display: block; }
+  body.sidebar-collapsed .sidebar-user-info { display: block; }
+  body.sidebar-collapsed .sidebar-user-more { display: block; }
+  body.sidebar-collapsed .sidebar-user { justify-content: flex-start; padding: 10px 12px; }
 
   .sidebar {
     transform: translateX(-100%);
