@@ -156,6 +156,19 @@
       flex-shrink: 0;
       margin-left: 10px;
     }
+    .btn-ai-field {
+      background: none;
+      border: none;
+      padding: 0 2px;
+      font-size: 13px;
+      cursor: pointer;
+      opacity: 0.5;
+      line-height: 1;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-ai-field:hover:not(:disabled) { opacity: 1; }
+    .btn-ai-field:disabled { cursor: default; }
 
     .generating-overlay {
       display: flex; align-items: center; justify-content: center;
@@ -741,21 +754,33 @@
         <div class="content-item-body">
           <div class="copy-fields">
             <div class="form-group">
-              <label class="form-label" style="font-size:11px;">Judul (Headline)</label>
+              <label class="form-label" style="font-size:11px;display:flex;align-items:center;justify-content:space-between;">
+                Judul (Headline)
+                <button class="btn-ai-field" id="ai-hl-${item.id}" onclick="genFieldRiset('${adset.id}','${item.id}','headline')" title="Generate judul baru">✨</button>
+              </label>
               <input type="text" class="form-input" placeholder="Judul iklan yang menarik..."
+                id="inp-hl-${item.id}"
                 value="${escHtml(item.headline||'')}"
                 oninput="updateRisetItemLive('${adset.id}','${item.id}','headline',this.value)" />
             </div>
             <div class="form-group">
-              <label class="form-label" style="font-size:11px;">Teks Utama (Primary Text)</label>
+              <label class="form-label" style="font-size:11px;display:flex;align-items:center;justify-content:space-between;">
+                Teks Utama (Primary Text)
+                <button class="btn-ai-field" id="ai-pt-${item.id}" onclick="genFieldRiset('${adset.id}','${item.id}','primaryText')" title="Generate teks utama baru">✨</button>
+              </label>
               <textarea class="form-input form-textarea" style="min-height:110px;"
+                id="inp-pt-${item.id}"
                 placeholder="Body copy iklan..."
                 oninput="updateRisetItemLive('${adset.id}','${item.id}','primaryText',this.value)">${escHtml(item.primaryText||'')}</textarea>
             </div>
             <div class="form-row" style="margin-bottom:0;">
               <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="font-size:11px;">Deskripsi</label>
+                <label class="form-label" style="font-size:11px;display:flex;align-items:center;justify-content:space-between;">
+                  Deskripsi
+                  <button class="btn-ai-field" id="ai-desc-${item.id}" onclick="genFieldRiset('${adset.id}','${item.id}','description')" title="Generate deskripsi baru">✨</button>
+                </label>
                 <input type="text" class="form-input" placeholder="Deskripsi singkat..."
+                  id="inp-desc-${item.id}"
                   value="${escHtml(item.description||'')}"
                   oninput="updateRisetItem('${adset.id}','${item.id}','description',this.value)" />
               </div>
@@ -1116,21 +1141,33 @@
         <div class="content-item-body">
           <div class="copy-fields">
             <div class="form-group">
-              <label class="form-label" style="font-size:11px;">Judul (Headline)</label>
+              <label class="form-label" style="font-size:11px;display:flex;align-items:center;justify-content:space-between;">
+                Judul (Headline)
+                <button class="btn-ai-field" id="ai-hl-${item.id}" onclick="genField('${item.id}','headline')" title="Generate judul baru">✨</button>
+              </label>
               <input type="text" class="form-input" value="${escHtml(item.headline)}"
+                id="inp-hl-${item.id}"
                 oninput="updateField('${item.id}','headline',this.value)"
                 placeholder="Judul iklan yang menarik..." />
             </div>
             <div class="form-group">
-              <label class="form-label" style="font-size:11px;">Teks Utama (Primary Text)</label>
+              <label class="form-label" style="font-size:11px;display:flex;align-items:center;justify-content:space-between;">
+                Teks Utama (Primary Text)
+                <button class="btn-ai-field" id="ai-pt-${item.id}" onclick="genField('${item.id}','primaryText')" title="Generate teks utama baru">✨</button>
+              </label>
               <textarea class="form-input form-textarea" style="min-height:110px;"
+                id="inp-pt-${item.id}"
                 oninput="updateField('${item.id}','primaryText',this.value)"
                 placeholder="Body copy iklan...">${escHtml(item.primaryText)}</textarea>
             </div>
             <div class="form-row" style="margin-bottom:0;">
               <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="font-size:11px;">Deskripsi</label>
+                <label class="form-label" style="font-size:11px;display:flex;align-items:center;justify-content:space-between;">
+                  Deskripsi
+                  <button class="btn-ai-field" id="ai-desc-${item.id}" onclick="genField('${item.id}','description')" title="Generate deskripsi baru">✨</button>
+                </label>
                 <input type="text" class="form-input" value="${escHtml(item.description)}"
+                  id="inp-desc-${item.id}"
                   oninput="updateField('${item.id}','description',this.value)"
                   placeholder="Deskripsi singkat..." />
               </div>
@@ -1245,6 +1282,110 @@
       const btn = document.getElementById(`cta-btn-${id}`);
       const label = CTA_OPTIONS.find(o => o.value === value)?.label || value;
       if (btn) btn.textContent = label;
+    }
+  };
+
+  // ── AI per-field generate (standard mode) ──
+  async function _callGenField(field, item) {
+    if (!selectedProduct) { showToast('Pilih produk dulu', 'warning'); return null; }
+    const apiField = field === 'primaryText' ? 'primary_text' : field;
+    const res = await fetch('/api/ai-copy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'generate_field',
+        field: apiField,
+        product: selectedProduct.name,
+        benefit: selectedProduct.benefits,
+        audience: selectedProduct.target_audience,
+        tone: selectedProduct.tone,
+        cta: selectedProduct.cta,
+        promo: selectedProduct.promo,
+        restrictions: selectedProduct.restrictions,
+        notes: selectedProduct.notes,
+        extra_brief: document.getElementById('input-brief')?.value || '',
+        content_type: item.type,
+        current_headline: item.headline,
+        current_primary_text: item.primaryText,
+        current_description: item.description
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data.text;
+  }
+
+  window.genField = async function(id, field) {
+    const item = adItems.find(i => i.id === id);
+    if (!item) return;
+    const btnId = field === 'headline' ? `ai-hl-${id}` : field === 'primaryText' ? `ai-pt-${id}` : `ai-desc-${id}`;
+    const inpId = field === 'headline' ? `inp-hl-${id}` : field === 'primaryText' ? `inp-pt-${id}` : `inp-desc-${id}`;
+    const btn = document.getElementById(btnId);
+    const inp = document.getElementById(inpId);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    try {
+      const text = await _callGenField(field, item);
+      if (!text) return;
+      item[field] = text;
+      if (inp) { inp.value = text; }
+      updateField(id, field, text);
+    } catch (err) {
+      showToast('Gagal generate: ' + err.message, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '✨'; }
+    }
+  };
+
+  // ── AI per-field generate (riset mode) ──
+  async function _callGenFieldRiset(adsetId, itemId, field) {
+    if (!selectedProduct) { showToast('Pilih produk dulu', 'warning'); return null; }
+    const adset = risetAdsets.find(a => a.id === adsetId);
+    const item = adset?.items.find(i => i.id === itemId);
+    if (!item) return null;
+    const apiField = field === 'primaryText' ? 'primary_text' : field;
+    const res = await fetch('/api/ai-copy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'generate_field',
+        field: apiField,
+        product: selectedProduct.name,
+        benefit: selectedProduct.benefits,
+        audience: selectedProduct.target_audience,
+        tone: selectedProduct.tone,
+        cta: selectedProduct.cta,
+        promo: selectedProduct.promo,
+        restrictions: selectedProduct.restrictions,
+        notes: selectedProduct.notes,
+        extra_brief: document.getElementById('input-brief')?.value || '',
+        content_type: item.type,
+        current_headline: item.headline,
+        current_primary_text: item.primaryText,
+        current_description: item.description
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return { text: data.text, item };
+  }
+
+  window.genFieldRiset = async function(adsetId, itemId, field) {
+    const btnId = field === 'headline' ? `ai-hl-${itemId}` : field === 'primaryText' ? `ai-pt-${itemId}` : `ai-desc-${itemId}`;
+    const inpId = field === 'headline' ? `inp-hl-${itemId}` : field === 'primaryText' ? `inp-pt-${itemId}` : `inp-desc-${itemId}`;
+    const btn = document.getElementById(btnId);
+    const inp = document.getElementById(inpId);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    try {
+      const result = await _callGenFieldRiset(adsetId, itemId, field);
+      if (!result) return;
+      const { text, item } = result;
+      item[field] = text;
+      if (inp) { inp.value = text; }
+      updateRisetItemLive(adsetId, itemId, field, text);
+    } catch (err) {
+      showToast('Gagal generate: ' + err.message, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '✨'; }
     }
   };
 
