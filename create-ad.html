@@ -603,8 +603,15 @@
       const bp = allBlueprintsData.find(b => b.id === document.getElementById('pub-blueprint').value);
       return bp?.config?.budget_per_adset || 50000;
     })();
-    risetAdsets.push({ id: crypto.randomUUID(), label: `Adset ${risetAdsets.length + 1}`, budget, items: [] });
+    // Collapse semua adset yang sudah ada
+    risetAdsets.forEach(a => { a.collapsed = true; });
+    risetAdsets.push({ id: crypto.randomUUID(), label: `Adset ${risetAdsets.length + 1}`, budget, items: [], collapsed: false });
     renderRisetAdsets();
+  };
+
+  window.toggleRisetAdsetCollapse = function(id) {
+    const a = risetAdsets.find(x => x.id === id);
+    if (a) { a.collapsed = !a.collapsed; renderRisetAdsets(); }
   };
 
   window.removeRisetAdset = function(id) {
@@ -630,19 +637,28 @@
 
   function renderRisetAdsets() {
     const container = document.getElementById('riset-adsets-container');
-    container.innerHTML = risetAdsets.map(adset => `
+    container.innerHTML = risetAdsets.map((adset, idx) => {
+      const readyCount = adset.items.filter(i => i.status === 'ready').length;
+      const summaryText = adset.items.length
+        ? `${adset.items.length} konten · ${readyCount} siap · Rp ${adset.budget.toLocaleString('id-ID')}/hari`
+        : `Rp ${adset.budget.toLocaleString('id-ID')}/hari · Belum ada konten`;
+      return `
       <div class="riset-adset-card" id="riset-adset-${adset.id}">
-        <div class="riset-adset-header">
-          <input type="text" value="${escHtml(adset.label)}" oninput="updateRisetLabel('${adset.id}', this.value)" />
-          <span style="font-size:12px;color:var(--text-sub);white-space:nowrap;">Budget/hari: Rp</span>
-          <input type="text" inputmode="numeric" value="${adset.budget.toLocaleString('id-ID')}"
-            oninput="updateRisetBudgetInput('${adset.id}', this)"
-            style="width:100px;padding:4px 8px;font-size:13px;font-weight:600;border:1.5px solid var(--gray-3);border-radius:6px;text-align:right;" />
-          ${risetAdsets.length > 1 ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);padding:4px 8px;" onclick="removeRisetAdset('${adset.id}')">🗑</button>` : ''}
+        <div class="riset-adset-header" onclick="toggleRisetAdsetCollapse('${adset.id}')" style="cursor:pointer;">
+          <span style="font-size:13px;color:var(--text-sub);flex-shrink:0;transition:transform .2s;${adset.collapsed ? 'transform:rotate(-90deg);' : ''}">▼</span>
+          <input type="text" value="${escHtml(adset.label)}" onclick="event.stopPropagation()"
+            oninput="updateRisetLabel('${adset.id}', this.value)"
+            style="cursor:text;" />
+          <span style="font-size:12px;color:var(--text-sub);white-space:nowrap;flex-shrink:0;">${adset.collapsed ? summaryText : 'Budget/hari: Rp'}</span>
+          ${!adset.collapsed ? `<input type="text" inputmode="numeric" value="${adset.budget.toLocaleString('id-ID')}"
+            oninput="updateRisetBudgetInput('${adset.id}', this)" onclick="event.stopPropagation()"
+            style="width:100px;padding:4px 8px;font-size:13px;font-weight:600;border:1.5px solid var(--gray-3);border-radius:6px;text-align:right;cursor:text;" />` : ''}
+          ${risetAdsets.length > 1 ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);padding:4px 8px;flex-shrink:0;" onclick="event.stopPropagation();removeRisetAdset('${adset.id}')">🗑</button>` : ''}
         </div>
+        ${adset.collapsed ? '' : `
         <div class="riset-adset-body">
+          ${!adset.items.length ? `
           <div class="riset-upload-zone" id="riset-zone-${adset.id}"
-            style="${adset.items.length ? 'display:none;' : ''}"
             onclick="triggerRisetUpload('${adset.id}')"
             ondragover="event.preventDefault();this.classList.add('dragover')"
             ondragleave="this.classList.remove('dragover')"
@@ -650,65 +666,123 @@
             <div class="upload-icon">📁</div>
             <h3>Drop file di sini atau klik untuk pilih</h3>
             <p>Gambar & video bisa sekaligus · Max 200MB per file</p>
-          </div>
-          ${adset.items.length ? `<div style="text-align:right;margin-bottom:8px;"><button class="btn btn-outline btn-sm" onclick="triggerRisetUpload('${adset.id}')">+ Tambah File</button></div>` : ''}
+          </div>` : `
+          <div style="text-align:right;margin-bottom:10px;">
+            <button class="btn btn-outline btn-sm" onclick="triggerRisetUpload('${adset.id}')">+ Tambah File</button>
+          </div>`}
           <input type="file" id="riset-input-${adset.id}" multiple accept="image/*,video/*" style="display:none;"
             onchange="handleRisetFiles('${adset.id}', [...this.files])" />
           <div id="riset-items-${adset.id}">
             ${renderRisetItems(adset)}
           </div>
-        </div>
-      </div>`).join('');
+        </div>`}
+      </div>`;
+    }).join('');
   }
 
   function renderRisetItems(adset) {
     if (!adset.items.length) return '';
+    const ctaLabel = (cta) => CTA_OPTIONS.find(o => o.value === cta)?.label || cta;
     return adset.items.map(item => `
-      <div class="riset-file-item ${item.status==='ready'?'ready':''}" id="riset-item-${item.id}">
-        <div class="riset-file-preview">
-          ${item.type === 'video'
-            ? `<video src="${item.previewUrl}" style="width:100%;height:100%;object-fit:cover;" muted></video>`
-            : `<img src="${item.previewUrl}" alt="preview" />`}
-        </div>
-        <div class="riset-copy-fields">
-          <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:4px;">
-            ${item.type==='video'?'🎬':'🖼️'} ${escHtml(item.fileName||'')}
-            ${item.status==='ready'?'<span class="badge badge-success" style="font-size:10px;margin-left:6px;">✓ Siap</span>':''}
-            ${item.status==='generating'?'<span class="badge badge-warning" style="font-size:10px;margin-left:6px;">✨ AI generating...</span>':''}
+      <div class="content-item ${item.status}" id="riset-item-${item.id}" style="margin-top:12px;">
+        <!-- Header row: thumbnail + nama + status + actions -->
+        <div class="content-item-header" style="cursor:default;">
+          <div class="content-preview">
+            ${item.type === 'video'
+              ? `<video src="${item.previewUrl}" style="width:100%;height:100%;object-fit:cover;"></video>`
+              : `<img src="${item.previewUrl}" alt="preview" />`}
           </div>
-          <div class="form-group" style="margin-bottom:6px;">
-            <label class="form-label">Headline</label>
-            <input type="text" class="form-input" placeholder="Judul iklan yang menarik..." value="${escHtml(item.headline||'')}"
-              oninput="updateRisetItem('${adset.id}','${item.id}','headline',this.value)" />
+          <div class="content-item-info">
+            <div class="content-item-name">${escHtml(item.fileName||'')}</div>
+            <div class="content-item-meta">${item.type==='video'?'🎬 Video':'🖼️ Gambar'}</div>
           </div>
-          <div class="form-group" style="margin-bottom:6px;">
-            <label class="form-label">Primary Text</label>
-            <textarea class="form-input form-textarea" style="min-height:80px;"
-              placeholder="Teks utama iklan..."
-              oninput="updateRisetItem('${adset.id}','${item.id}','primaryText',this.value)">${escHtml(item.primaryText||'')}</textarea>
-          </div>
-          <div class="riset-copy-row2">
-            <div class="form-group" style="margin:0;">
-              <label class="form-label">Deskripsi</label>
-              <input type="text" class="form-input" placeholder="Deskripsi singkat..." value="${escHtml(item.description||'')}"
-                oninput="updateRisetItem('${adset.id}','${item.id}','description',this.value)" />
-            </div>
-            <div class="form-group" style="margin:0;">
-              <label class="form-label">Tombol CTA</label>
-              <select class="form-input form-select" onchange="updateRisetItem('${adset.id}','${item.id}','cta',this.value)">
-                ${CTA_OPTIONS.map(o=>`<option value="${o.value}"${o.value===item.cta?' selected':''}>${o.label}</option>`).join('')}
-              </select>
-            </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            ${item.status==='ready'   ? '<span class="badge badge-success">✓ Siap</span>' : ''}
+            ${item.status==='generating' ? '<span class="badge badge-warning">✨ Generating...</span>' : ''}
+            ${item.status==='pending' ? '<span class="badge badge-gray">Menunggu</span>' : ''}
+            ${item.status==='generating'
+              ? `<button class="btn btn-outline btn-sm" disabled>✨ AI Copy</button>`
+              : `<button class="btn btn-outline btn-sm" onclick="generateRisetCopy('${adset.id}','${item.id}')">✨ AI Copy</button>`}
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeRisetItem('${adset.id}','${item.id}')">✕</button>
           </div>
         </div>
-        <div class="riset-item-actions">
-          ${item.status==='generating'
-            ? `<button class="btn btn-outline btn-sm" disabled style="font-size:11px;">✨ AI...</button>`
-            : `<button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="generateRisetCopy('${adset.id}','${item.id}')">✨ AI Copy</button>`}
-          <button class="btn btn-ghost btn-sm" style="color:var(--danger);font-size:11px;" onclick="removeRisetItem('${adset.id}','${item.id}')">✕ Hapus</button>
+        <!-- Body: copy fields (kiri) + ad preview (kanan) -->
+        <div class="content-item-body">
+          <div class="copy-fields">
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px;">Judul (Headline)</label>
+              <input type="text" class="form-input" placeholder="Judul iklan yang menarik..."
+                value="${escHtml(item.headline||'')}"
+                oninput="updateRisetItemLive('${adset.id}','${item.id}','headline',this.value)" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px;">Teks Utama (Primary Text)</label>
+              <textarea class="form-input form-textarea" style="min-height:110px;"
+                placeholder="Body copy iklan..."
+                oninput="updateRisetItemLive('${adset.id}','${item.id}','primaryText',this.value)">${escHtml(item.primaryText||'')}</textarea>
+            </div>
+            <div class="form-row" style="margin-bottom:0;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="font-size:11px;">Deskripsi</label>
+                <input type="text" class="form-input" placeholder="Deskripsi singkat..."
+                  value="${escHtml(item.description||'')}"
+                  oninput="updateRisetItem('${adset.id}','${item.id}','description',this.value)" />
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="font-size:11px;">Tombol CTA</label>
+                <select class="form-input form-select"
+                  onchange="updateRisetItemLive('${adset.id}','${item.id}','cta',this.value)">
+                  ${CTA_OPTIONS.map(o=>`<option value="${o.value}"${o.value===item.cta?' selected':''}>${o.label}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="ad-preview-wrap">
+            <div style="font-size:11px;font-weight:600;color:var(--text-sub);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Preview Iklan</div>
+            <div class="fb-preview" id="riset-preview-${item.id}">
+              <div class="fb-preview-header">
+                <div class="fb-page-avatar">A</div>
+                <div>
+                  <div class="fb-page-name">${selectedProduct?.name || 'Nama Page'}</div>
+                  <div class="fb-sponsored">Iklan · <span style="color:#1877F2;">ℹ</span></div>
+                </div>
+              </div>
+              <div class="fb-primary-text" id="riset-pt-${item.id}">${escHtml(item.primaryText)||'<span style="color:#aaa;">Teks utama iklan...</span>'}</div>
+              <div class="fb-media">
+                ${item.type==='video'
+                  ? `<video src="${item.previewUrl}" style="width:100%;height:100%;object-fit:cover;" muted></video>`
+                  : `<img src="${item.previewUrl}" alt="ad" style="width:100%;height:100%;object-fit:cover;" />`}
+              </div>
+              <div class="fb-caption-bar">
+                <div class="fb-caption-text">
+                  <div class="fb-headline" id="riset-hl-${item.id}">${escHtml(item.headline)||'Judul iklan...'}</div>
+                  <div class="fb-description" id="riset-desc-${item.id}">${escHtml(item.description)||''}</div>
+                </div>
+                <button class="fb-cta-btn" id="riset-cta-${item.id}">${ctaLabel(item.cta)}</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>`).join('');
   }
+
+  // Update item + live preview tanpa re-render seluruh adset
+  window.updateRisetItemLive = function(adsetId, itemId, field, value) {
+    updateRisetItem(adsetId, itemId, field, value);
+    if (field === 'primaryText') {
+      const el = document.getElementById(`riset-pt-${itemId}`);
+      if (el) el.textContent = value || 'Teks utama iklan...';
+    }
+    if (field === 'headline') {
+      const el = document.getElementById(`riset-hl-${itemId}`);
+      if (el) el.textContent = value || 'Judul iklan...';
+    }
+    if (field === 'cta') {
+      const btn = document.getElementById(`riset-cta-${itemId}`);
+      const label = CTA_OPTIONS.find(o => o.value === value)?.label || value;
+      if (btn) btn.textContent = label;
+    }
+  };
 
   window.handleRisetDrop = function(adsetId, event) {
     handleRisetFiles(adsetId, [...event.dataTransfer.files]);
