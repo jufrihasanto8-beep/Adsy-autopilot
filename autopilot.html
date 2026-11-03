@@ -237,7 +237,7 @@
           Kampanye ABO dengan N adset bebas. Tiap adset diisi konten sendiri saat buat iklan.<br>
           Targeting semua broad — pembeda antar adset adalah group konten yang diuji.
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
           <div class="form-group" style="margin:0;">
             <label class="form-label" style="font-size:11px;">Budget default per Adset (Rp)</label>
             <input type="text" inputmode="numeric" class="form-input" id="bp-riset-budget" value="50.000"
@@ -250,6 +250,11 @@
           <div class="form-group" style="margin:0;">
             <label class="form-label" style="font-size:11px;">Evaluasi setelah (hari)</label>
             <input type="number" class="form-input" id="bp-riset-days" value="3" min="1" max="14" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Budget Scale Up CBO (Rp)</label>
+            <input type="text" inputmode="numeric" class="form-input" id="bp-riset-scaleup" value="300.000"
+              oninput="bpInputRisetScaleUp(this)" />
           </div>
         </div>
       </div>
@@ -474,6 +479,7 @@
   let bpP2bAdsets = [];
   let bpType = 'standard';
   let bpRisetBudgetRaw = 50000;
+  let bpRisetScaleUpRaw = 300000;
 
   window.setBpType = function(type) {
     bpType = type;
@@ -490,6 +496,12 @@
     const raw = el.value.replace(/[^0-9]/g, '');
     el.value = raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     bpRisetBudgetRaw = parseInt(raw) || 0;
+  };
+
+  window.bpInputRisetScaleUp = function(el) {
+    const raw = el.value.replace(/[^0-9]/g, '');
+    el.value = raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    bpRisetScaleUpRaw = parseInt(raw) || 0;
   };
 
   const ADSET_TYPES = [
@@ -697,14 +709,17 @@
 
     // Set tipe blueprint
     const type = cfg.type || 'standard';
-    bpRisetBudgetRaw = cfg.budget_per_adset || 50000;
+    bpRisetBudgetRaw  = cfg.budget_per_adset || 50000;
+    bpRisetScaleUpRaw = cfg.scale_up_budget  || 300000;
     setBpType(type);
 
     // Riset fields
-    const risetBudgetStr = bpRisetBudgetRaw.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    document.getElementById('bp-riset-budget').value = risetBudgetStr;
-    document.getElementById('bp-riset-pause').value  = cfg.evaluation?.pause_cpr_multiplier ?? 2.5;
-    document.getElementById('bp-riset-days').value   = cfg.evaluation?.duration_days ?? 3;
+    const risetBudgetStr  = bpRisetBudgetRaw.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const risetScaleUpStr = bpRisetScaleUpRaw.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    document.getElementById('bp-riset-budget').value  = risetBudgetStr;
+    document.getElementById('bp-riset-scaleup').value = risetScaleUpStr;
+    document.getElementById('bp-riset-pause').value   = cfg.evaluation?.pause_cpr_multiplier ?? 2.5;
+    document.getElementById('bp-riset-days').value    = cfg.evaluation?.duration_days ?? 3;
 
     // Standard fields
     document.getElementById('bp-p1-days').value    = p1.evaluation?.duration_days ?? 3;
@@ -754,9 +769,11 @@
 
     if (bpType === 'riset') {
       if (!bpRisetBudgetRaw || bpRisetBudgetRaw < 10000) return showToast('Budget per adset minimal Rp 10.000', 'warning');
+      if (!bpRisetScaleUpRaw || bpRisetScaleUpRaw < 50000) return showToast('Budget scale up minimal Rp 50.000', 'warning');
       config = {
         type: 'riset',
         budget_per_adset: bpRisetBudgetRaw,
+        scale_up_budget: bpRisetScaleUpRaw,
         evaluation: {
           pause_cpr_multiplier: parseFloat(document.getElementById('bp-riset-pause').value) || 2.5,
           duration_days:        parseInt(document.getElementById('bp-riset-days').value)    || 3,
@@ -841,10 +858,11 @@
 
       let summary;
       if (cfg.type === 'riset') {
-        const budget = (cfg.budget_per_adset || 50000).toLocaleString('id-ID');
-        const days   = cfg.evaluation?.duration_days || 3;
-        const pause  = cfg.evaluation?.pause_cpr_multiplier || 2.5;
-        summary = `🔬 Riset · Budget/adset: Rp ${budget} · Evaluasi ${days} hari · Pause jika CPR > ${pause}× target`;
+        const budget   = (cfg.budget_per_adset || 50000).toLocaleString('id-ID');
+        const scaleUp  = (cfg.scale_up_budget  || 300000).toLocaleString('id-ID');
+        const days     = cfg.evaluation?.duration_days || 3;
+        const pause    = cfg.evaluation?.pause_cpr_multiplier || 2.5;
+        summary = `🔬 Riset · Budget/adset: Rp ${budget} · Evaluasi ${days} hari · Scale Up: Rp ${scaleUp} CBO`;
       } else {
         const p1adsets = cfg.phase1?.adsets?.length || 1;
         const scale = cfg.phase3?.scale_pct || 3;
