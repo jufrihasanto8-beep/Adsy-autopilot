@@ -706,7 +706,9 @@ async function syncCampaignInsights(camp, token) {
     const todayActions  = insight.actions || [];
     const todayResult   = camp.campaign_type === 'ctwa'
       ? todayActions.find(x => x.action_type === 'onsite_conversion.messaging_conversation_started_7d')
-      : todayActions.find(x => x.action_type === 'offsite_conversion.fb_pixel_purchase' || x.action_type === 'lead');
+      : camp.kpi_type === 'prospek'
+        ? todayActions.find(x => x.action_type === 'lead' || x.action_type === 'onsite_conversion.messaging_conversation_started_7d')
+        : todayActions.find(x => x.action_type === 'offsite_conversion.fb_pixel_purchase' || x.action_type === 'lead');
     const results_today = parseInt(todayResult?.value || 0);
 
     // Fetch lifetime data untuk CPR — lebih akurat untuk keputusan autopilot
@@ -722,7 +724,9 @@ async function syncCampaignInsights(camp, token) {
         const ltActions = lt.actions || [];
         const ltResult  = camp.campaign_type === 'ctwa'
           ? ltActions.find(x => x.action_type === 'onsite_conversion.messaging_conversation_started_7d')
-          : ltActions.find(x => x.action_type === 'offsite_conversion.fb_pixel_purchase' || x.action_type === 'lead');
+          : camp.kpi_type === 'prospek'
+            ? ltActions.find(x => x.action_type === 'lead' || x.action_type === 'onsite_conversion.messaging_conversation_started_7d')
+            : ltActions.find(x => x.action_type === 'offsite_conversion.fb_pixel_purchase' || x.action_type === 'lead');
         const ltResults = parseInt(ltResult?.value || 0);
         const ltSpend   = parseFloat(lt.spend || 0);
         // null = ada spend tapi 0 konversi (indikasi jelek), undefined = belum ada data sama sekali

@@ -57,6 +57,7 @@ export default async function handler(req, res) {
     const endTime      = fields.end_time?.[0];
     const adStatus     = fields.auto_activate?.[0] === '1' ? 'ACTIVE' : 'PAUSED';
     const blueprintId  = fields.blueprint_id?.[0] || null;
+    const kpiType      = fields.kpi_type?.[0] || 'purchase';
 
     // Reuse existing campaign/adset dari item sebelumnya (multi-file)
     const existingMetaCampaignId = fields.meta_campaign_id?.[0];
@@ -437,7 +438,8 @@ export default async function handler(req, res) {
           meta_campaign_id: metaCampaignId,
           meta_adset_id: metaAdsetId,
           daily_budget: dailyBudget,
-          campaign_type: adType
+          campaign_type: adType,
+          kpi_type: kpiType
         };
         if (productId) campPayload.product_id = productId;
         if (product?.target_cpr) campPayload.target_cpr = product.target_cpr;
@@ -915,7 +917,8 @@ async function handleRiset(res, body) {
     objective = 'OUTCOME_TRAFFIC', campaign_name, auto_activate,
     page_id: pageIdOverride, pixel_id: pixelIdOverride, url_id,
     bid_strategy = 'LOWEST_COST_WITHOUT_CAP', bid_value,
-    start_time, end_time, adsets = []
+    start_time, end_time, adsets = [],
+    kpi_type = 'purchase'
   } = body;
 
   if (!adsets.length) throw new Error('Minimal 1 adset');
@@ -1003,6 +1006,7 @@ async function handleRiset(res, body) {
       current_phase: null,
       phase_type: 'riset',
       campaign_type: 'riset',
+      kpi_type,
       autopilot_enabled: true,
       phase_started_at: new Date().toISOString(),
     }).select('id').single();
