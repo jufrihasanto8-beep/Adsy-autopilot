@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laporan Akuisisi — Adsy Autopilot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <style>
+    .la-filter { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:24px; }
+    .la-filter input[type="date"], .la-filter select { padding:9px 12px; border:1.5px solid var(--gray-3); border-radius:var(--radius-sm); font-size:13px; background:#fff; color:var(--text); }
+    .la-filter input[type="date"]:focus, .la-filter select:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
+    .la-section { margin-bottom:28px; }
+    .la-section-title { font-size:16px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+    .la-empty { text-align:center; padding:40px 20px; color:var(--gray-5); font-size:14px; }
+    .la-lead-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px,1fr)); gap:10px; }
+    .la-lead-card { background:#fff; border:1px solid var(--gray-3); border-radius:var(--radius-sm); padding:12px; text-align:center; }
+    .la-lead-card .num { font-size:22px; font-weight:700; color:var(--primary); }
+    .la-lead-card .lbl { font-size:11px; color:var(--gray-6); margin-top:4px; }
+
+    /* Modal */
+    .la-modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center; }
+    .la-modal-backdrop.open { display:flex; }
+    .la-modal { background:#fff; border-radius:var(--radius); padding:24px; width:90%; max-width:440px; max-height:85vh; overflow-y:auto; box-shadow:var(--shadow-md); }
+    .la-modal h3 { font-size:16px; font-weight:700; margin-bottom:18px; }
+    .la-modal .form-group { margin-bottom:14px; }
+    .la-modal .form-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+
+    @media(max-width:768px) {
+      .la-filter { gap:8px; }
+      .la-filter input[type="date"], .la-filter select { font-size:12px; padding:8px 10px; }
+      .la-lead-grid { grid-template-columns:repeat(auto-fill, minmax(100px,1fr)); gap:8px; }
+      .la-lead-card .num { font-size:18px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="/assets/autopilot.png" style="width:36px;height:36px;object-fit:contain;border-radius:8px;" alt="Adsy" />
+      <div class="sidebar-logo-text"><strong>Adsy Autopilot</strong><span>Meta Ads</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <div class="nav-item" data-page="dashboard.html"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="create-ad.html"><span class="nav-icon">➕</span> Buat Iklan</div>
+      <div class="nav-item" data-page="ctwa.html"><span class="nav-icon">💬</span> Buat Iklan CTWA</div>
+      <div class="nav-item" data-page="boost-post.html"><span class="nav-icon">🚀</span> Boost Post</div>
+      <div class="nav-item" data-page="library.html"><span class="nav-icon">🖼️</span> Library Konten</div>
+      <div class="nav-item" data-page="generate-image.html"><span class="nav-icon">🎨</span> Generate Gambar</div>
+      <div class="nav-item" data-page="campaigns.html"><span class="nav-icon">📣</span> Kampanye</div>
+      <div class="nav-item" data-page="autopilot.html"><span class="nav-icon">🤖</span> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><span class="nav-icon">📈</span> Laporan</div>
+      <div class="nav-item" data-page="topup.html"><span class="nav-icon">💳</span> Top Up Budget</div>
+      <div class="nav-item" data-page="card.html"><span class="nav-icon">🏦</span> Kartu Iklan Adsy</div>
+      <div class="nav-item" data-page="settings.html"><span class="nav-icon">⚙️</span> Pengaturan</div>
+      <div class="nav-item" data-page="products.html"><span class="nav-icon">📦</span> Produk</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2>Laporan Akuisisi</h2>
+        <p>Ringkasan performa CS, leads & biaya iklan</p>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <!-- FILTER -->
+      <div class="la-filter">
+        <label style="font-size:13px; font-weight:600;">Periode:</label>
+        <input type="date" id="la-start" />
+        <span style="color:var(--gray-5);">—</span>
+        <input type="date" id="la-end" />
+        <select id="la-channel">
+          <option value="">Semua Channel</option>
+          <option value="Web">Web</option>
+          <option value="CTWA">CTWA</option>
+        </select>
+      </div>
+
+      <!-- LOADING -->
+      <div id="la-loading" style="text-align:center; padding:60px 20px; color:var(--gray-5); display:none;">
+        <div style="font-size:28px; margin-bottom:8px;">⏳</div>Menghubungkan ke Laporan Akuisisi...
+      </div>
+
+      <!-- ERROR -->
+      <div id="la-error" style="display:none; text-align:center; padding:40px; color:var(--danger);"></div>
+
+      <!-- CONTENT (hidden until loaded) -->
+      <div id="la-content" style="display:none;">
+
+        <!-- STATS CARDS -->
+        <div class="stats-grid la-section" style="margin-bottom:24px;">
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Total Omzet</div>
+              <div class="stat-value" id="la-omzet">-</div>
+            </div>
+            <div class="stat-icon blue">💰</div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Jumlah Leads</div>
+              <div class="stat-value" id="la-leads">-</div>
+            </div>
+            <div class="stat-icon green">📋</div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Total Closing Bersih</div>
+              <div class="stat-value" id="la-closing">-</div>
+            </div>
+            <div class="stat-icon yellow">🎯</div>
+          </div>
+          <div class="stat-card dark">
+            <div>
+              <div class="stat-label">Closing Rate</div>
+              <div class="stat-value" id="la-cr">-</div>
+            </div>
+            <div class="stat-icon blue">📊</div>
+          </div>
+        </div>
+
+        <!-- PERFORMA CS -->
+        <div class="card la-section">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Performa CS</div>
+              <div class="card-sub">Laporan harian CS per penugasan</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>CS</th>
+                  <th>Produk</th>
+                  <th>Channel</th>
+                  <th>Leads</th>
+                  <th>Closing</th>
+                  <th>Units</th>
+                  <th>Omzet</th>
+                </tr>
+              </thead>
+              <tbody id="la-reports-table">
+                <tr><td colspan="8" class="la-empty">Memuat...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- REPORT LEAD BEF -->
+        <div class="card la-section">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Report Lead BEF</div>
+              <div class="card-sub">Breakdown leads per kategori</div>
+            </div>
+          </div>
+          <div id="la-bef-content">
+            <div class="la-empty">Memuat...</div>
+          </div>
+        </div>
+
+        <!-- BIAYA IKLAN -->
+        <div class="card la-section">
+          <div class="card-header" style="flex-wrap:wrap; gap:12px;">
+            <div>
+              <div class="card-title">Biaya Iklan</div>
+              <div class="card-sub">Riwayat input biaya iklan</div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-add-ads" onclick="openAdsModal()">+ Input Biaya Iklan</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Produk</th>
+                  <th>Channel</th>
+                  <th>Budget</th>
+                  <th>Pajak %</th>
+                  <th>Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="la-ads-table">
+                <tr><td colspan="7" class="la-empty">Memuat...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- #la-content -->
+    </div>
+  </main>
+</div>
+
+<!-- MODAL INPUT BIAYA IKLAN -->
+<div class="la-modal-backdrop" id="modal-ads">
+  <div class="la-modal">
+    <h3>Input Biaya Iklan</h3>
+    <div class="form-group">
+      <label class="form-label">Tanggal <span>*</span></label>
+      <input type="date" class="form-input" id="ads-date" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Penugasan <span>*</span></label>
+      <select class="form-input" id="ads-assignment">
+        <option value="">Pilih penugasan...</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Budget (Rp) <span>*</span></label>
+      <input type="number" class="form-input" id="ads-budget" min="0" placeholder="0" onfocus="this.select()" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Pajak (%)</label>
+      <input type="number" class="form-input" id="ads-tax" min="0" max="100" value="11" onfocus="this.select()" />
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeAdsModal()">Batal</button>
+      <button class="btn btn-primary" id="btn-save-ads" onclick="saveAds()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast, formatRupiah, formatNumber, formatDate } from './js/sidebar.js';
+  import { getSupabase } from './js/supabase.js';
+
+  const API_BASE = 'https://akuisisiadsy.vercel.app';
+  const LEAD_LABELS = {
+    passive: 'Pasif', consultation: 'Konsultasi', priceShipping: 'Harga & Ongkir',
+    ooc: 'OOC', casual: 'Iseng', boughtElsewhere: 'Beli di Tempat Lain', other: 'Lainnya'
+  };
+  const LEAD_KEYS = Object.keys(LEAD_LABELS);
+
+  let sb, accessToken;
+  let state = { assignments: [], catalog: [], reports: [], leadReports: [], ads: [], advName: '' };
+
+  async function init() {
+    sb = await getSupabase();
+    const session = await requireAuth();
+    if (!session) return;
+    await renderUserInfo();
+    initSidebar();
+
+    accessToken = session.access_token;
+
+    // Default filter: bulan ini
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    document.getElementById('la-start').value = `${y}-${m}-01`;
+    document.getElementById('la-end').value = `${y}-${m}-${String(now.getDate()).padStart(2, '0')}`;
+
+    document.getElementById('la-start').addEventListener('change', loadData);
+    document.getElementById('la-end').addEventListener('change', loadData);
+    document.getElementById('la-channel').addEventListener('change', render);
+
+    await loadData();
+  }
+
+  async function apiFetch(action, params = {}, method = 'GET', body = null) {
+    const url = new URL(`${API_BASE}/api/laporan-bridge`);
+    url.searchParams.set('action', action);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    const opts = {
+      method,
+      headers: { 'X-Advertiser-Token': accessToken }
+    };
+    if (body) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(url, opts);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Gagal memuat data');
+    return json;
+  }
+
+  async function loadData() {
+    const start = document.getElementById('la-start').value;
+    const end = document.getElementById('la-end').value;
+    if (!start || !end) return;
+
+    document.getElementById('la-loading').style.display = 'block';
+    document.getElementById('la-content').style.display = 'none';
+    document.getElementById('la-error').style.display = 'none';
+
+    try {
+      const data = await apiFetch('adv-init', { start, end });
+      state.advName = data.advertiser || '';
+      state.assignments = data.assignments || [];
+      state.catalog = data.catalog || [];
+      state.reports = data.reports || [];
+      state.leadReports = data.leadReports || [];
+      state.ads = data.ads || [];
+
+      document.getElementById('la-loading').style.display = 'none';
+      document.getElementById('la-content').style.display = 'block';
+      render();
+    } catch (err) {
+      document.getElementById('la-loading').style.display = 'none';
+      document.getElementById('la-error').textContent = err.message;
+      document.getElementById('la-error').style.display = 'block';
+    }
+  }
+
+  function getFilteredReports() {
+    const ch = document.getElementById('la-channel').value;
+    return ch ? state.reports.filter(r => r.channel === ch) : state.reports;
+  }
+
+  function getFilteredAds() {
+    const ch = document.getElementById('la-channel').value;
+    return ch ? state.ads.filter(a => a.channel === ch) : state.ads;
+  }
+
+  function render() {
+    const reports = getFilteredReports();
+    const ads = getFilteredAds();
+
+    // Stats
+    const totalOmzet = reports.reduce((s, r) => s + (r.omzet || 0), 0);
+    const totalLeads = reports.reduce((s, r) => s + (r.leads || 0), 0);
+    const totalClosing = reports.reduce((s, r) => s + (r.closingBersih || 0), 0);
+    const cr = totalLeads > 0 ? ((totalClosing / totalLeads) * 100).toFixed(1) + '%' : '-';
+
+    document.getElementById('la-omzet').textContent = formatRupiah(totalOmzet);
+    document.getElementById('la-leads').textContent = formatNumber(totalLeads);
+    document.getElementById('la-closing').textContent = formatNumber(totalClosing);
+    document.getElementById('la-cr').textContent = cr;
+
+    // Performa CS table
+    const tbody = document.getElementById('la-reports-table');
+    if (!reports.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="la-empty">Belum ada data laporan</td></tr>';
+    } else {
+      tbody.innerHTML = reports.map(r => `<tr>
+        <td style="white-space:nowrap;">${formatDate(r.date)}</td>
+        <td>${r.cs || '-'}</td>
+        <td>${r.product || '-'}</td>
+        <td><span class="badge ${r.channel === 'CTWA' ? 'badge-primary' : 'badge-success'}">${r.channel || '-'}</span></td>
+        <td>${r.leads ?? 0}</td>
+        <td>${r.closingBersih ?? 0}</td>
+        <td>${r.totalUnits ?? 0}</td>
+        <td style="font-weight:600;">${formatRupiah(r.omzet)}</td>
+      </tr>`).join('');
+    }
+
+    // Lead BEF
+    renderBEF(reports);
+
+    // Ads table
+    renderAds(ads);
+  }
+
+  function renderBEF(reports) {
+    const container = document.getElementById('la-bef-content');
+    // Aggregate lead data from leadReports
+    const reportIds = reports.map(r => r.id);
+    const relevant = state.leadReports.filter(lr => reportIds.includes(lr.reportId));
+
+    if (!relevant.length) {
+      container.innerHTML = '<div class="la-empty">Belum ada data lead BEF</div>';
+      return;
+    }
+
+    const totals = {};
+    LEAD_KEYS.forEach(k => totals[k] = 0);
+    relevant.forEach(lr => {
+      LEAD_KEYS.forEach(k => totals[k] += (lr[k] || 0));
+    });
+    const grandTotal = LEAD_KEYS.reduce((s, k) => s + totals[k], 0);
+
+    container.innerHTML = `
+      <div style="padding:16px 20px;">
+        <div class="la-lead-grid">
+          ${LEAD_KEYS.map(k => `
+            <div class="la-lead-card">
+              <div class="num">${totals[k]}</div>
+              <div class="lbl">${LEAD_LABELS[k]}</div>
+            </div>
+          `).join('')}
+          <div class="la-lead-card" style="border-color:var(--primary); background:var(--primary-light);">
+            <div class="num" style="color:var(--primary);">${grandTotal}</div>
+            <div class="lbl" style="font-weight:600;">Total</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderAds(ads) {
+    const tbody = document.getElementById('la-ads-table');
+    if (!ads.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="la-empty">Belum ada data biaya iklan</td></tr>';
+      return;
+    }
+    tbody.innerHTML = ads.map(a => {
+      const budget = a.budget || 0;
+      const tax = a.tax ?? 11;
+      const total = budget + (budget * tax / 100);
+      return `<tr>
+        <td style="white-space:nowrap;">${formatDate(a.date)}</td>
+        <td>${a.product || '-'}</td>
+        <td><span class="badge ${a.channel === 'CTWA' ? 'badge-primary' : 'badge-success'}">${a.channel || '-'}</span></td>
+        <td>${formatRupiah(budget)}</td>
+        <td>${tax}%</td>
+        <td style="font-weight:600;">${formatRupiah(Math.round(total))}</td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="editAds('${a.id}')">Edit</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Modal Biaya Iklan ──
+  window.openAdsModal = function(editId) {
+    const modal = document.getElementById('modal-ads');
+    const sel = document.getElementById('ads-assignment');
+
+    // Populate assignments dropdown
+    sel.innerHTML = '<option value="">Pilih penugasan...</option>';
+    state.assignments.forEach(a => {
+      sel.innerHTML += `<option value="${a.product}|||${a.channel}">${a.product} — ${a.channel} (CS: ${a.cs})</option>`;
+    });
+
+    if (editId) {
+      const ad = state.ads.find(a => a.id === editId);
+      if (ad) {
+        document.getElementById('ads-date').value = ad.date;
+        sel.value = `${ad.product}|||${ad.channel}`;
+        document.getElementById('ads-budget').value = ad.budget || 0;
+        document.getElementById('ads-tax').value = ad.tax ?? 11;
+      }
+    } else {
+      document.getElementById('ads-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('ads-budget').value = '';
+      document.getElementById('ads-tax').value = 11;
+    }
+
+    modal.classList.add('open');
+  };
+
+  window.editAds = function(id) {
+    window.openAdsModal(id);
+  };
+
+  window.closeAdsModal = function() {
+    document.getElementById('modal-ads').classList.remove('open');
+  };
+
+  window.saveAds = async function() {
+    const date = document.getElementById('ads-date').value;
+    const assignVal = document.getElementById('ads-assignment').value;
+    const budget = document.getElementById('ads-budget').value;
+    const tax = document.getElementById('ads-tax').value;
+
+    if (!date || !assignVal) return showToast('Lengkapi tanggal dan penugasan.', 'warning');
+    const [product, channel] = assignVal.split('|||');
+    if (!product || !channel) return showToast('Penugasan tidak valid.', 'error');
+
+    const btn = document.getElementById('btn-save-ads');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    try {
+      await apiFetch('save-ads', {}, 'POST', {
+        ad: { date, product, channel, budget: Number(budget) || 0, tax: Number(tax) ?? 11 }
+      });
+      showToast('Biaya iklan berhasil disimpan!', 'success');
+      window.closeAdsModal();
+      await loadData();
+    } catch (err) {
+      showToast('Gagal: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Simpan';
+    }
+  };
+
+  // Close modal on backdrop click
+  document.getElementById('modal-ads').addEventListener('click', e => {
+    if (e.target === e.currentTarget) window.closeAdsModal();
+  });
+
+  init();
+</script>
+</body>
+</html>
