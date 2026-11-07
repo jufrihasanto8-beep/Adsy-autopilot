@@ -131,6 +131,7 @@ export function initSidebar() {
   injectProfileModal();
   injectChatNavItem();
   injectGenerateStudioNavItem();
+  injectLaporanNavItem();
   initSidebarCollapse();
   // Init floating chat bubble (async, tidak block render)
   initChatWidget().catch(() => {});
@@ -177,6 +178,24 @@ function injectGenerateStudioNavItem() {
   // Set active state
   const current = window.location.pathname.split('/').pop() || 'dashboard.html';
   if (current === 'generate-studio.html') item.classList.add('active');
+}
+
+function injectLaporanNavItem() {
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav || nav.querySelector('[data-page="laporan.html"]')) return;
+  const item = document.createElement('div');
+  item.className = 'nav-item';
+  item.dataset.page = 'laporan.html';
+  item.innerHTML = '<span class="nav-icon">📊</span> Laporan Akuisisi';
+  item.addEventListener('click', () => {
+    closeMobileMenu();
+    window.location.href = 'laporan.html';
+  });
+  const reportsItem = nav.querySelector('[data-page="reports.html"]');
+  if (reportsItem) reportsItem.insertAdjacentElement('afterend', item);
+  else nav.appendChild(item);
+  const current = window.location.pathname.split('/').pop() || 'dashboard.html';
+  if (current === 'laporan.html') item.classList.add('active');
 }
 
 // ── PROFILE MODAL ──
