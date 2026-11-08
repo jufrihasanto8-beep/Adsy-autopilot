@@ -29,7 +29,7 @@
     .la-filter-item input[type="date"] { max-width:130px; }
 
     /* Stats */
-    .la-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:15px; margin-bottom:22px; }
+    .la-stats { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:15px; margin-bottom:22px; }
     .la-stat { border:1px solid #cce0ec; border-radius:9px; background:#fff; padding:17px 19px 18px; min-height:130px; box-shadow:0 2px 3px #073b5602; }
     .la-stat-top { display:flex; align-items:center; justify-content:space-between; font-size:11px; color:#587488; }
     .la-stat-icon { width:29px; height:29px; border-radius:7px; display:grid; place-items:center; font-size:14px; }
@@ -109,8 +109,12 @@
     .la-modal-actions { display:flex; gap:10px; justify-content:flex-end; padding:0 27px 22px; }
 
     /* Responsive */
+    @media(max-width:1200px) {
+      .la-stats { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .la-stat strong { font-size:21px; }
+    }
     @media(max-width:960px) {
-      .la-stats { grid-template-columns:repeat(2,1fr); }
+      .la-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
     @media(max-width:700px) {
       .la-content { padding:22px 14px; }
@@ -221,7 +225,17 @@
       <!-- CONTENT -->
       <div id="la-content" style="display:none;">
 
-        <!-- STATS -->
+        <!-- HEADING + INPUT BUTTON -->
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px;">
+          <div>
+            <div style="font-size:9px; font-weight:650; letter-spacing:1.7px; color:#587488; margin-bottom:7px;">AKUISISI ADSY TEAM</div>
+            <h1 style="font-family:Manrope; font-weight:750; font-size:24px; letter-spacing:-.7px; color:#073b56;">Ringkasan performa</h1>
+            <p style="font-size:11px; color:#587488; margin-top:7px;">Semua laporan sesuai filter periode dan channel.</p>
+          </div>
+          <button class="la-btn primary" onclick="openAdsModal()">+ Input Biaya Iklan</button>
+        </div>
+
+        <!-- STATS (5 cards like advertiser dashboard) -->
         <div class="la-stats">
           <div class="la-stat">
             <div class="la-stat-top">
@@ -233,11 +247,11 @@
           </div>
           <div class="la-stat">
             <div class="la-stat-top">
-              <span>Jumlah leads</span>
-              <span class="la-stat-icon orange">📋</span>
+              <span>Biaya iklan + pajak</span>
+              <span class="la-stat-icon orange">📣</span>
             </div>
-            <strong id="la-leads">-</strong>
-            <div class="la-stat-note"><i class="orange"></i>Total leads sesuai periode</div>
+            <strong id="la-spend">-</strong>
+            <div class="la-stat-note"><i class="orange"></i>Terhubung dari laporan advertiser</div>
           </div>
           <div class="la-stat">
             <div class="la-stat-top">
@@ -245,7 +259,7 @@
               <span class="la-stat-icon blue">🎯</span>
             </div>
             <strong id="la-closing">-</strong>
-            <div class="la-stat-note"><i class="blue"></i>Closing dikurangi invalid</div>
+            <div class="la-stat-note"><i class="blue"></i><span id="la-units-note">0 botol / box terjual</span></div>
           </div>
           <div class="la-stat">
             <div class="la-stat-top">
@@ -253,7 +267,15 @@
               <span class="la-stat-icon violet">📊</span>
             </div>
             <strong id="la-cr">-</strong>
-            <div class="la-stat-note"><i class="violet"></i>Closing ÷ leads</div>
+            <div class="la-stat-note"><i class="violet"></i><span id="la-leads-note">0 leads ditangani tim</span></div>
+          </div>
+          <div class="la-stat">
+            <div class="la-stat-top">
+              <span>CAQ</span>
+              <span class="la-stat-icon green">💰</span>
+            </div>
+            <strong id="la-caq">-</strong>
+            <div class="la-stat-note"><i class="green"></i>Biaya iklan + pajak ÷ omzet</div>
           </div>
         </div>
 
@@ -306,7 +328,6 @@
               <h3>Biaya Iklan</h3>
               <p>Riwayat input biaya iklan</p>
             </div>
-            <button class="la-btn primary" onclick="openAdsModal()">+ Input Biaya Iklan</button>
           </div>
           <div class="la-table-wrap">
             <table class="la-table">
@@ -473,16 +494,22 @@
     const reports = getFilteredReports();
     const ads = getFilteredAds();
 
-    // Stats
-    const totalOmzet = reports.reduce((s, r) => s + (r.omzet || 0), 0);
+    // Stats — field names match DB: revenue, closing (gross), invalid, units, invalidUnits
+    const totalRevenue = reports.reduce((s, r) => s + (r.revenue || 0), 0);
     const totalLeads = reports.reduce((s, r) => s + (r.leads || 0), 0);
-    const totalClosing = reports.reduce((s, r) => s + (r.closingBersih || 0), 0);
+    const totalClosing = reports.reduce((s, r) => s + ((r.closing || 0) - (r.invalid || 0)), 0);
+    const totalUnits = reports.reduce((s, r) => s + ((r.units || 0) - (r.invalidUnits || 0)), 0);
+    const totalSpend = ads.reduce((s, a) => s + ((a.budget || 0) * (1 + (a.tax ?? 11) / 100)), 0);
     const cr = totalLeads > 0 ? ((totalClosing / totalLeads) * 100).toFixed(1) + '%' : '-';
+    const caq = totalRevenue > 0 ? ((totalSpend / totalRevenue) * 100).toFixed(1) + '%' : '-';
 
-    document.getElementById('la-omzet').textContent = money(totalOmzet);
-    document.getElementById('la-leads').textContent = formatNumber(totalLeads);
+    document.getElementById('la-omzet').textContent = money(totalRevenue);
+    document.getElementById('la-spend').textContent = money(Math.round(totalSpend));
     document.getElementById('la-closing').textContent = formatNumber(totalClosing);
+    document.getElementById('la-units-note').textContent = `${formatNumber(totalUnits)} botol / box terjual`;
     document.getElementById('la-cr').textContent = cr;
+    document.getElementById('la-leads-note').textContent = `${formatNumber(totalLeads)} leads ditangani tim`;
+    document.getElementById('la-caq').textContent = caq;
 
     renderReports(reports);
     renderBEF(reports);
@@ -501,9 +528,9 @@
       <td><strong style="font-weight:550;">${r.product || '-'}</strong></td>
       <td><span class="la-badge ${r.channel === 'CTWA' ? 'ctwa' : 'web'}">${r.channel === 'CTWA' ? '<span style="width:4px;height:4px;border-radius:50%;background:#36985a;"></span>' : ''}${r.channel || '-'}</span></td>
       <td>${r.leads ?? 0}</td>
-      <td>${r.closingBersih ?? 0}</td>
-      <td>${r.totalUnits ?? 0}</td>
-      <td class="money">${money(r.omzet)}</td>
+      <td>${(r.closing||0) - (r.invalid||0)}</td>
+      <td>${(r.units||0) - (r.invalidUnits||0)}</td>
+      <td class="money">${money(r.revenue)}</td>
     </tr>`).join('');
   }
 
