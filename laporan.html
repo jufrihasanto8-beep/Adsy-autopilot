@@ -108,6 +108,18 @@
     .la-modal-body .form-summary b { color:#073b56; margin-left:8px; }
     .la-modal-actions { display:flex; gap:10px; justify-content:flex-end; padding:0 27px 22px; }
 
+    /* Status Input */
+    .la-status-date { display:flex; align-items:center; gap:10px; padding:0 22px 16px; }
+    .la-status-date label { font-size:11px; color:#587488; }
+    .la-status-date input { border:1px solid #cce0ec; border-radius:6px; padding:7px 10px; font-size:11px; background:#f8fcff; color:#1d5c7b; font-family:'DM Sans'; }
+    .la-status-row { display:flex; align-items:center; gap:12px; padding:11px 22px; border-bottom:1px solid #eaf4fa; font-size:11px; }
+    .la-status-row:last-child { border-bottom:none; }
+    .la-status-row .name { min-width:120px; color:#1d5c7b; font-weight:550; }
+    .la-status-row .detail { color:#587488; flex:1; min-width:0; }
+    .la-status-check { display:inline-flex; align-items:center; gap:5px; border-radius:4px; padding:4px 8px; font-size:9px; font-weight:550; }
+    .la-status-check.done { background:#eaf8ef; color:#227148; }
+    .la-status-check.pending { background:#fff5cd; color:#906900; }
+
     /* Responsive */
     @media(max-width:1200px) {
       .la-stats { grid-template-columns:repeat(3,minmax(0,1fr)); }
@@ -284,6 +296,23 @@
           </div>
         </div>
 
+        <!-- STATUS INPUT HARIAN -->
+        <div class="la-card">
+          <div class="la-card-head">
+            <div>
+              <h3>Status Input Harian</h3>
+              <p>Cek siapa yang sudah dan belum input laporan & biaya iklan</p>
+            </div>
+          </div>
+          <div class="la-status-date">
+            <label>Tanggal:</label>
+            <input type="date" id="la-status-date" />
+          </div>
+          <div id="la-status-content">
+            <div class="la-empty">Pilih tanggal untuk cek status</div>
+          </div>
+        </div>
+
         <!-- PERFORMA CS -->
         <div class="la-card">
           <div class="la-card-head">
@@ -427,6 +456,10 @@
     document.getElementById('la-product').addEventListener('change', render);
     document.getElementById('la-channel').addEventListener('change', render);
 
+    // Status date default: hari ini
+    document.getElementById('la-status-date').value = `${y}-${m}-${String(now.getDate()).padStart(2, '0')}`;
+    document.getElementById('la-status-date').addEventListener('change', renderStatus);
+
     // Live total preview in modal
     document.getElementById('ads-budget').addEventListener('input', updateTotalPreview);
     document.getElementById('ads-tax').addEventListener('input', updateTotalPreview);
@@ -526,9 +559,69 @@
     document.getElementById('la-leads-note').textContent = `${formatNumber(totalLeads)} leads ditangani tim`;
     document.getElementById('la-caq').textContent = caq;
 
+    renderStatus();
     renderReports(reports);
     renderBEF(reports);
     renderAds(ads);
+  }
+
+  function renderStatus() {
+    const container = document.getElementById('la-status-content');
+    const date = document.getElementById('la-status-date').value;
+    if (!date || !state.assignments.length) {
+      container.innerHTML = '<div class="la-empty">Belum ada data penugasan</div>';
+      return;
+    }
+
+    const fmtDate = date.split('-').reverse().join('/');
+    let html = '';
+
+    // Group assignments by CS
+    const byCS = {};
+    state.assignments.forEach(a => {
+      if (!byCS[a.cs]) byCS[a.cs] = [];
+      byCS[a.cs].push(a);
+    });
+
+    // Unique product+channel combos for ads check
+    const adsCombos = new Set();
+    state.assignments.forEach(a => adsCombos.add(`${a.product}|||${a.channel}`));
+
+    // CS section
+    html += '<div style="padding:10px 22px 6px;"><div style="font-size:10px;font-weight:650;letter-spacing:1px;color:#587488;margin-bottom:8px;">LAPORAN CS</div></div>';
+    for (const [cs, assigns] of Object.entries(byCS).sort(([a],[b]) => a.localeCompare(b))) {
+      assigns.forEach(a => {
+        const hasReport = state.reports.some(r => r.date === date && r.cs === a.cs && r.product === a.product && r.channel === a.channel);
+        const report = state.reports.find(r => r.date === date && r.cs === a.cs && r.product === a.product && r.channel === a.channel);
+        html += `<div class="la-status-row">
+          <span class="name">${a.cs}</span>
+          <span class="detail">${a.product} · ${a.channel}</span>
+          ${hasReport
+            ? `<span class="la-status-check done">✓ Sudah (${report.leads || 0} leads, ${money(report.revenue)})</span>`
+            : `<span class="la-status-check pending">✕ Belum input</span>`}
+        </div>`;
+      });
+    }
+
+    // Ads section
+    html += '<div style="padding:16px 22px 6px;border-top:1px solid #eaf4fa;"><div style="font-size:10px;font-weight:650;letter-spacing:1px;color:#587488;margin-bottom:8px;">BIAYA IKLAN</div></div>';
+    const seenAds = new Set();
+    state.assignments.forEach(a => {
+      const key = `${a.product}|||${a.channel}`;
+      if (seenAds.has(key)) return;
+      seenAds.add(key);
+      const hasAd = state.ads.some(ad => ad.date === date && ad.product === a.product && ad.channel === a.channel);
+      const ad = state.ads.find(ad => ad.date === date && ad.product === a.product && ad.channel === a.channel);
+      html += `<div class="la-status-row">
+        <span class="name">${a.product}</span>
+        <span class="detail">${a.channel}</span>
+        ${hasAd
+          ? `<span class="la-status-check done">✓ Sudah (${money(ad.budget)} + ${ad.tax}%)</span>`
+          : `<span class="la-status-check pending">✕ Belum input</span>`}
+      </div>`;
+    });
+
+    container.innerHTML = html;
   }
 
   function renderReports(reports) {
