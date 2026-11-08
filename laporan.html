@@ -536,8 +536,10 @@
     <header><h3>Input Biaya Iklan</h3></header>
     <div class="la-modal-body">
       <label>Tanggal <span style="color:#a35343;">*</span>
-        <input type="date" id="ads-date" />
-        <span id="ads-date-day" style="font-size:10px;color:#00789f;font-weight:550;margin-top:4px;display:block;"></span>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:7px;">
+          <input type="date" id="ads-date" style="margin-top:0;" />
+          <span id="ads-date-day" style="font-size:11px;color:#00789f;font-weight:550;white-space:nowrap;"></span>
+        </div>
       </label>
       <label>Penugasan <span style="color:#a35343;">*</span>
         <select id="ads-assignment">
@@ -569,6 +571,11 @@
   import { getSupabase } from './js/supabase.js';
 
   const API_BASE = 'https://akuisisiadsy.vercel.app';
+
+  // Supabase B (Laporan Akuisisi) — anon key for realtime subscription only
+  const LAPORAN_SB_URL = 'https://kpgdhlyfdhflrrlpotrg.supabase.co';
+  const LAPORAN_SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwZ2RobHlmZGhmbHJybHBvdHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwNDY0MzIsImV4cCI6MjEwOTYyMjQzMn0.Omth7KwwLtuvdfcug7it_9xsLfBtBA5d8M30uQCN5vk';
+  let laporanSB = null;
   const LEAD_LABELS = {
     passive: 'Pasif', consultation: 'Konsultasi', priceShipping: 'Harga & Ongkir',
     ooc: 'OOC', casual: 'Iseng', boughtElsewhere: 'Beli di Tempat Lain', other: 'Lainnya'
@@ -902,6 +909,40 @@
     document.getElementById('ads-date').addEventListener('change', updateDateDay);
 
     await loadData();
+
+    // Realtime: subscribe to Supabase B for live updates
+    if (LAPORAN_SB_URL !== 'GANTI_DENGAN_SUPABASE_B_URL' && LAPORAN_SB_ANON !== 'GANTI_DENGAN_SUPABASE_B_ANON_KEY') {
+      try {
+        laporanSB = window.supabase.createClient(LAPORAN_SB_URL, LAPORAN_SB_ANON);
+        const ch = laporanSB.channel('laporan-live')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => silentReload())
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'leadReports' }, () => silentReload())
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'ads' }, () => silentReload())
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments' }, () => silentReload())
+          .subscribe();
+      } catch (e) { console.warn('Realtime subscribe gagal:', e); }
+    }
+  }
+
+  let reloadTimer = null;
+  function silentReload() {
+    // Debounce: multiple changes within 500ms only trigger one reload
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(async () => {
+      try {
+        const start = document.getElementById('la-start').value;
+        const end = document.getElementById('la-end').value;
+        if (!start || !end) return;
+        const data = await apiFetch('adv-init', { start, end });
+        state.advName = data.advertiser || '';
+        state.assignments = data.assignments || [];
+        state.catalog = data.catalog || [];
+        state.reports = data.reports || [];
+        state.leadReports = data.leadReports || [];
+        state.ads = data.ads || [];
+        render();
+      } catch {}
+    }, 500);
   }
 
   function updateTotalPreview() {
