@@ -206,6 +206,11 @@
           <input type="date" id="la-end" />
         </div>
         <div class="la-filter-item">
+          <select id="la-product">
+            <option value="">Semua produk</option>
+          </select>
+        </div>
+        <div class="la-filter-item">
           <select id="la-channel">
             <option value="">Semua channel</option>
             <option value="Web">Web</option>
@@ -419,6 +424,7 @@
 
     document.getElementById('la-start').addEventListener('change', loadData);
     document.getElementById('la-end').addEventListener('change', loadData);
+    document.getElementById('la-product').addEventListener('change', render);
     document.getElementById('la-channel').addEventListener('change', render);
 
     // Live total preview in modal
@@ -470,6 +476,13 @@
       state.leadReports = data.leadReports || [];
       state.ads = data.ads || [];
 
+      // Populate product filter
+      const products = [...new Set([...state.reports.map(r=>r.product),...state.ads.map(a=>a.product)].filter(Boolean))].sort();
+      const prodSel = document.getElementById('la-product');
+      const curProd = prodSel.value;
+      prodSel.innerHTML = '<option value="">Semua produk</option>' + products.map(p => `<option value="${p}">${p}</option>`).join('');
+      if (curProd) prodSel.value = curProd;
+
       document.getElementById('la-loading').style.display = 'none';
       document.getElementById('la-content').style.display = 'block';
       render();
@@ -482,12 +495,14 @@
 
   function getFilteredReports() {
     const ch = document.getElementById('la-channel').value;
-    return ch ? state.reports.filter(r => r.channel === ch) : state.reports;
+    const prod = document.getElementById('la-product').value;
+    return state.reports.filter(r => (!ch || r.channel === ch) && (!prod || r.product === prod));
   }
 
   function getFilteredAds() {
     const ch = document.getElementById('la-channel').value;
-    return ch ? state.ads.filter(a => a.channel === ch) : state.ads;
+    const prod = document.getElementById('la-product').value;
+    return state.ads.filter(a => (!ch || a.channel === ch) && (!prod || a.product === prod));
   }
 
   function render() {
@@ -595,8 +610,14 @@
     const sel = document.getElementById('ads-assignment');
 
     sel.innerHTML = '<option value="">Pilih penugasan...</option>';
+    // Deduplicate by product+channel — ad cost is per product+channel, not per CS
+    const seen = new Set();
     state.assignments.forEach(a => {
-      sel.innerHTML += `<option value="${a.product}|||${a.channel}">${a.product} · ${a.channel} (CS: ${a.cs})</option>`;
+      const key = `${a.product}|||${a.channel}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const csNames = state.assignments.filter(x => x.product === a.product && x.channel === a.channel).map(x => x.cs).join(', ');
+      sel.innerHTML += `<option value="${key}">${a.product} · ${a.channel} (${csNames})</option>`;
     });
 
     if (editId) {
