@@ -46,7 +46,8 @@
     .la-stat-note i.violet { background:#7b89c4; }
 
     /* Cards */
-    .la-card { border:1px solid #cce0ec; border-radius:9px; background:#fff; box-shadow:0 2px 3px #073b5602; overflow:hidden; margin-bottom:22px; }
+    .la-card { border:1px solid #cce0ec; border-radius:9px; background:#fff; box-shadow:0 2px 3px #073b5602; overflow:hidden; margin-bottom:22px; position:relative; }
+    .la-card.no-clip { overflow:visible; }
     .la-card-head { padding:21px 22px 17px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
     .la-card-head h3 { font-family:Manrope; font-weight:750; font-size:13px; letter-spacing:-.15px; color:#073b56; }
     .la-card-head p { font-size:10px; color:#587488; margin-top:6px; }
@@ -265,11 +266,38 @@
 
     <div class="la-content">
       <!-- FILTER -->
+      <input type="hidden" id="la-start" />
+      <input type="hidden" id="la-end" />
       <div class="la-filter">
-        <div class="la-filter-item">
-          📅 <input type="date" id="la-start" />
-          <span style="color:#cce0ec;">—</span>
-          <input type="date" id="la-end" />
+        <div class="la-drp-wrap">
+          <button class="la-drp-trigger" id="drp-main-trigger" onclick="drpMainToggle()">
+            📅 <span id="drp-main-label">Bulan Ini</span> <span style="color:#c5d3dd;">▾</span>
+          </button>
+          <div class="la-drp-dropdown" id="drp-main-dropdown">
+            <div class="la-drp-presets">
+              <button class="la-drp-preset" onclick="drpMainPreset(0,'Hari Ini',this)">Hari Ini</button>
+              <button class="la-drp-preset" onclick="drpMainPresetYesterday(this)">Kemarin</button>
+              <hr style="border:none;border-top:1px solid #eaf4fa;margin:4px 0;">
+              <button class="la-drp-preset" onclick="drpMainPreset(7,'7 Hari Terakhir',this)">7 Hari Terakhir</button>
+              <button class="la-drp-preset" onclick="drpMainPreset(14,'14 Hari Terakhir',this)">14 Hari Terakhir</button>
+              <button class="la-drp-preset" onclick="drpMainPreset(30,'30 Hari Terakhir',this)">30 Hari Terakhir</button>
+              <hr style="border:none;border-top:1px solid #eaf4fa;margin:4px 0;">
+              <button class="la-drp-preset active" onclick="drpMainPresetThisMonth(this)">Bulan Ini</button>
+              <button class="la-drp-preset" onclick="drpMainPresetLastMonth(this)">Bulan Lalu</button>
+            </div>
+            <div style="display:flex;flex-direction:column;flex:1;">
+              <div class="la-drp-cal" id="drp-main-cal"></div>
+              <div class="la-drp-footer">
+                <div class="la-drp-sel-txt">
+                  <span id="drp-main-sel-start">—</span> → <span id="drp-main-sel-end">—</span>
+                </div>
+                <div class="la-drp-footer-btns">
+                  <button class="la-drp-cancel" onclick="drpMainClose()">Batal</button>
+                  <button class="la-drp-apply" onclick="drpMainApply()">Terapkan</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="la-filter-item">
           <select id="la-product">
@@ -389,7 +417,7 @@
         </div>
 
         <!-- PERFORMA CS -->
-        <div class="la-card">
+        <div class="la-card no-clip">
           <div class="la-card-head">
             <div>
               <h3>Performa CS</h3>
@@ -576,10 +604,16 @@
     document.getElementById('drp-dropdown').classList.remove('open');
     document.removeEventListener('click', drpOutside);
   };
-  function drpOutside(e) { if (!document.getElementById('drp-dropdown').contains(e.target) && !document.getElementById('drp-trigger').contains(e.target)) drpClose(); }
+  let drpSkipOutside = false;
+  function drpOutside(e) {
+    if (drpSkipOutside) { drpSkipOutside = false; return; }
+    const dd = document.getElementById('drp-dropdown');
+    const tr = document.getElementById('drp-trigger');
+    if (!dd.contains(e.target) && !tr.contains(e.target)) drpClose();
+  }
 
   function drpActivate(btn) {
-    document.querySelectorAll('.la-drp-preset').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#drp-dropdown .la-drp-preset').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
   }
   window.drpPreset = function(days, label, btn) {
@@ -613,6 +647,7 @@
   };
 
   window.drpClickDay = function(y, m, d) {
+    drpSkipOutside = true;
     const clicked = new Date(y, m, d, 12);
     if (!drpPickingEnd || !drpSelStart) {
       drpSelStart = clicked; drpSelEnd = null; drpPickingEnd = true;
@@ -625,6 +660,7 @@
   };
 
   window.drpNav = function(dir) {
+    drpSkipOutside = true;
     drpViewMonth += dir;
     if (drpViewMonth < 0) { drpViewMonth = 11; drpViewYear--; }
     if (drpViewMonth > 11) { drpViewMonth = 0; drpViewYear++; }
@@ -689,10 +725,146 @@
     if (!drpSelStart) return;
     drpStart = new Date(drpSelStart);
     drpEnd = drpSelEnd ? new Date(drpSelEnd) : new Date(drpSelStart);
-    const label = document.querySelector('.la-drp-preset.active');
+    const label = document.getElementById('drp-dropdown').querySelector('.la-drp-preset.active');
     document.getElementById('drp-label').textContent = label ? label.textContent : `${drpFmt(drpStart)} - ${drpFmt(drpEnd)}`;
     drpClose();
     renderChartData();
+  };
+
+  // ── Main Date Range Picker (top filter) ──
+  let drpMainStart, drpMainEnd;
+  let drpMSelStart, drpMSelEnd, drpMPickingEnd = false;
+  let drpMViewYear, drpMViewMonth;
+  let drpMSkipOutside = false;
+
+  window.drpMainToggle = function() {
+    const dd = document.getElementById('drp-main-dropdown');
+    if (dd.classList.contains('open')) { drpMainClose(); return; }
+    drpMSelStart = drpMainStart ? new Date(drpMainStart) : null;
+    drpMSelEnd = drpMainEnd ? new Date(drpMainEnd) : null;
+    drpMPickingEnd = false;
+    const ref = drpMSelStart || new Date();
+    drpMViewYear = ref.getFullYear(); drpMViewMonth = ref.getMonth();
+    drpMRender(); drpMUpdateSel();
+    dd.classList.add('open');
+    setTimeout(() => document.addEventListener('click', drpMOutside), 0);
+  };
+  window.drpMainClose = function() {
+    document.getElementById('drp-main-dropdown').classList.remove('open');
+    document.removeEventListener('click', drpMOutside);
+  };
+  function drpMOutside(e) {
+    if (drpMSkipOutside) { drpMSkipOutside = false; return; }
+    const dd = document.getElementById('drp-main-dropdown');
+    const tr = document.getElementById('drp-main-trigger');
+    if (!dd.contains(e.target) && !tr.contains(e.target)) drpMainClose();
+  }
+  function drpMActivate(btn) {
+    document.querySelectorAll('#drp-main-dropdown .la-drp-preset').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+  }
+  window.drpMainPreset = function(days, label, btn) {
+    const now = new Date(); now.setHours(12,0,0,0);
+    if (days === 0) { drpMSelStart = new Date(now); drpMSelEnd = new Date(now); }
+    else { drpMSelEnd = new Date(now); drpMSelStart = new Date(now); drpMSelStart.setDate(drpMSelStart.getDate() - (days - 1)); }
+    drpMViewYear = drpMSelEnd.getFullYear(); drpMViewMonth = drpMSelEnd.getMonth();
+    drpMPickingEnd = false; drpMActivate(btn); drpMRender(); drpMUpdateSel();
+  };
+  window.drpMainPresetYesterday = function(btn) {
+    const d = new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate() - 1);
+    drpMSelStart = new Date(d); drpMSelEnd = new Date(d);
+    drpMViewYear = d.getFullYear(); drpMViewMonth = d.getMonth();
+    drpMPickingEnd = false; drpMActivate(btn); drpMRender(); drpMUpdateSel();
+  };
+  window.drpMainPresetThisMonth = function(btn) {
+    const now = new Date(); now.setHours(12,0,0,0);
+    drpMSelStart = new Date(now.getFullYear(), now.getMonth(), 1, 12);
+    drpMSelEnd = new Date(now);
+    drpMViewYear = now.getFullYear(); drpMViewMonth = now.getMonth();
+    drpMPickingEnd = false; drpMActivate(btn); drpMRender(); drpMUpdateSel();
+  };
+  window.drpMainPresetLastMonth = function(btn) {
+    const now = new Date();
+    const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const m = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    drpMSelStart = new Date(y, m, 1, 12);
+    drpMSelEnd = new Date(y, m + 1, 0, 12);
+    drpMViewYear = y; drpMViewMonth = m;
+    drpMPickingEnd = false; drpMActivate(btn); drpMRender(); drpMUpdateSel();
+  };
+  window.drpMClickDay = function(y, m, d) {
+    drpMSkipOutside = true;
+    const clicked = new Date(y, m, d, 12);
+    if (!drpMPickingEnd || !drpMSelStart) {
+      drpMSelStart = clicked; drpMSelEnd = null; drpMPickingEnd = true;
+    } else {
+      if (clicked < drpMSelStart) { drpMSelEnd = new Date(drpMSelStart); drpMSelStart = clicked; }
+      else { drpMSelEnd = clicked; }
+      drpMPickingEnd = false;
+    }
+    drpMActivate(null); drpMRender(); drpMUpdateSel();
+  };
+  window.drpMNav = function(dir) {
+    drpMSkipOutside = true;
+    drpMViewMonth += dir;
+    if (drpMViewMonth < 0) { drpMViewMonth = 11; drpMViewYear--; }
+    if (drpMViewMonth > 11) { drpMViewMonth = 0; drpMViewYear++; }
+    drpMRender();
+  };
+  function drpMUpdateSel() {
+    document.getElementById('drp-main-sel-start').textContent = drpMSelStart ? drpFmt(drpMSelStart) : '—';
+    document.getElementById('drp-main-sel-end').textContent = drpMSelEnd ? drpFmt(drpMSelEnd) : '—';
+  }
+  function drpMRender() {
+    const cal = document.getElementById('drp-main-cal');
+    const today = new Date(); today.setHours(12,0,0,0);
+    const first = new Date(drpMViewYear, drpMViewMonth, 1);
+    let startDay = first.getDay() - 1; if (startDay < 0) startDay = 6;
+    const dim = new Date(drpMViewYear, drpMViewMonth + 1, 0).getDate();
+    let html = `<div class="la-drp-cal-hdr">
+      <button class="la-drp-nav" onclick="drpMNav(-1)">‹</button>
+      <span>${MONTHS_DRP[drpMViewMonth]} ${drpMViewYear}</span>
+      <button class="la-drp-nav" onclick="drpMNav(1)">›</button>
+    </div>
+    <div class="la-drp-days-hdr"><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span></div>
+    <div class="la-drp-days">`;
+    const prevM = new Date(drpMViewYear, drpMViewMonth, 0);
+    for (let i = startDay - 1; i >= 0; i--) {
+      const d = prevM.getDate() - i;
+      const m = drpMViewMonth - 1; const yy = m < 0 ? drpMViewYear - 1 : drpMViewYear; const mf = m < 0 ? 11 : m;
+      html += `<button class="la-drp-day other" onclick="drpMClickDay(${yy},${mf},${d})">${d}</button>`;
+    }
+    for (let d = 1; d <= dim; d++) {
+      const date = new Date(drpMViewYear, drpMViewMonth, d, 12);
+      let cls = 'la-drp-day';
+      if (drpSame(date, today)) cls += ' today';
+      if (drpMSelStart && drpMSelEnd) {
+        if (drpSame(date, drpMSelStart) && drpSame(date, drpMSelEnd)) cls += ' selected';
+        else if (drpSame(date, drpMSelStart)) cls += ' range-start';
+        else if (drpSame(date, drpMSelEnd)) cls += ' range-end';
+        else if (date > drpMSelStart && date < drpMSelEnd) cls += ' in-range';
+      } else if (drpMSelStart && drpSame(date, drpMSelStart)) cls += ' selected';
+      html += `<button class="${cls}" onclick="drpMClickDay(${drpMViewYear},${drpMViewMonth},${d})">${d}</button>`;
+    }
+    const total = startDay + dim;
+    const remain = total % 7 === 0 ? 0 : 7 - (total % 7);
+    for (let d = 1; d <= remain; d++) {
+      const m = drpMViewMonth + 1; const yy = m > 11 ? drpMViewYear + 1 : drpMViewYear; const mf = m > 11 ? 0 : m;
+      html += `<button class="la-drp-day other" onclick="drpMClickDay(${yy},${mf},${d})">${d}</button>`;
+    }
+    html += '</div>';
+    cal.innerHTML = html;
+  }
+  window.drpMainApply = function() {
+    if (!drpMSelStart) return;
+    drpMainStart = new Date(drpMSelStart);
+    drpMainEnd = drpMSelEnd ? new Date(drpMSelEnd) : new Date(drpMSelStart);
+    const label = document.getElementById('drp-main-dropdown').querySelector('.la-drp-preset.active');
+    document.getElementById('drp-main-label').textContent = label ? label.textContent : `${drpFmt(drpMainStart)} - ${drpFmt(drpMainEnd)}`;
+    document.getElementById('la-start').value = drpISO(drpMainStart);
+    document.getElementById('la-end').value = drpISO(drpMainEnd);
+    drpMainClose();
+    loadData();
   };
 
   async function init() {
@@ -708,15 +880,14 @@
     const now = new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, '0');
+    drpMainStart = new Date(y, now.getMonth(), 1, 12);
+    drpMainEnd = new Date(now); drpMainEnd.setHours(12,0,0,0);
     document.getElementById('la-start').value = `${y}-${m}-01`;
     document.getElementById('la-end').value = `${y}-${m}-${String(now.getDate()).padStart(2, '0')}`;
 
     // Chart date picker default: bulan ini
     drpStart = new Date(y, now.getMonth(), 1, 12);
     drpEnd = new Date(now); drpEnd.setHours(12,0,0,0);
-
-    document.getElementById('la-start').addEventListener('change', loadData);
-    document.getElementById('la-end').addEventListener('change', loadData);
     document.getElementById('la-product').addEventListener('change', render);
     document.getElementById('la-channel').addEventListener('change', render);
     document.getElementById('la-rekap-product').addEventListener('change', renderRekap);
