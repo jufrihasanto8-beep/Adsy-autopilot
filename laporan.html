@@ -4,36 +4,140 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Laporan Akuisisi — Adsy Autopilot</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/components.css" />
   <style>
-    .la-filter { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:24px; }
-    .la-filter input[type="date"], .la-filter select { padding:9px 12px; border:1.5px solid var(--gray-3); border-radius:var(--radius-sm); font-size:13px; background:#fff; color:var(--text); }
-    .la-filter input[type="date"]:focus, .la-filter select:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
-    .la-section { margin-bottom:28px; }
-    .la-section-title { font-size:16px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
-    .la-empty { text-align:center; padding:40px 20px; color:var(--gray-5); font-size:14px; }
-    .la-lead-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px,1fr)); gap:10px; }
-    .la-lead-card { background:#fff; border:1px solid var(--gray-3); border-radius:var(--radius-sm); padding:12px; text-align:center; }
-    .la-lead-card .num { font-size:22px; font-weight:700; color:var(--primary); }
-    .la-lead-card .lbl { font-size:11px; color:var(--gray-6); margin-top:4px; }
+    /* ── Laporan Akuisisi theme override ── */
+    .la-page { font-family:'DM Sans',sans-serif; color:#073b56; }
+    .la-page *{ box-sizing:border-box; }
+
+    /* Topbar override */
+    .la-topbar { height:60px; background:#fff; border-bottom:1px solid #d8e7f0; display:flex; align-items:center; justify-content:space-between; padding:0 30px; position:sticky; top:0; z-index:100; }
+    .la-topbar h2 { font-family:Manrope; font-size:18px; font-weight:750; color:#073b56; letter-spacing:-.3px; }
+    .la-topbar p { font-size:11px; color:#587488; margin-top:2px; }
+
+    /* Content */
+    .la-content { padding:25px 30px; max-width:1400px; }
+
+    /* Filter */
+    .la-filter { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-bottom:21px; }
+    .la-filter-item { display:flex; align-items:center; gap:7px; border:1px solid #cce0ec; border-radius:6px; padding:8px 10px; background:#f8fcff; color:#1d5c7b; }
+    .la-filter-item select, .la-filter-item input { background:none; border:0; outline:none; font-size:11px; cursor:pointer; color:#1d5c7b; font-family:'DM Sans'; }
+    .la-filter-item input[type="date"] { max-width:130px; }
+
+    /* Stats */
+    .la-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:15px; margin-bottom:22px; }
+    .la-stat { border:1px solid #cce0ec; border-radius:9px; background:#fff; padding:17px 19px 18px; min-height:130px; box-shadow:0 2px 3px #073b5602; }
+    .la-stat-top { display:flex; align-items:center; justify-content:space-between; font-size:11px; color:#587488; }
+    .la-stat-icon { width:29px; height:29px; border-radius:7px; display:grid; place-items:center; font-size:14px; }
+    .la-stat-icon.green { background:#e4f6fc; color:#00789f; }
+    .la-stat-icon.orange { background:#fff5cd; color:#906900; }
+    .la-stat-icon.blue { background:#e7f0fa; color:#285d92; }
+    .la-stat-icon.violet { background:#eef1fc; color:#5866a1; }
+    .la-stat strong { display:block; font-family:Manrope; font-size:24px; font-weight:750; letter-spacing:-.8px; margin:9px 0 13px; color:#073b56; }
+    .la-stat-note { display:flex; align-items:center; gap:6px; font-size:9px; color:#587488; }
+    .la-stat-note i { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+    .la-stat-note i.green { background:#00a8df; }
+    .la-stat-note i.orange { background:#ffd12a; }
+    .la-stat-note i.blue { background:#236ca2; }
+    .la-stat-note i.violet { background:#7b89c4; }
+
+    /* Cards */
+    .la-card { border:1px solid #cce0ec; border-radius:9px; background:#fff; box-shadow:0 2px 3px #073b5602; overflow:hidden; margin-bottom:22px; }
+    .la-card-head { padding:21px 22px 17px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+    .la-card-head h3 { font-family:Manrope; font-weight:750; font-size:13px; letter-spacing:-.15px; color:#073b56; }
+    .la-card-head p { font-size:10px; color:#587488; margin-top:6px; }
+
+    /* Tables */
+    .la-table-wrap { overflow:auto; }
+    .la-table { width:100%; border-collapse:collapse; text-align:left; white-space:nowrap; }
+    .la-table th { font-size:9px; letter-spacing:.15px; color:#587488; background:#eaf4fa; padding:13px 20px; border-top:1px solid #eaf4fa; border-bottom:1px solid #eaf4fa; font-weight:500; }
+    .la-table td { padding:14px 20px; font-size:11px; color:#1d5c7b; border-bottom:1px solid #eaf4fa; }
+    .la-table tr:last-child td { border-bottom:none; }
+    .la-table tbody tr:hover { background:#f8fcff; }
+    .la-table .money { color:#1d5c7b; font-weight:550; }
+
+    /* Badges */
+    .la-badge { display:inline-flex; align-items:center; gap:4px; border:1px solid; border-radius:4px; padding:4px 6px; font-size:8px; }
+    .la-badge.ctwa { color:#287947; background:#eaf8ef; border-color:#cfe8d8; }
+    .la-badge.web { color:#356987; background:#edf5fc; border-color:#d6e6f3; }
+
+    /* Lead BEF grid */
+    .la-lead-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(115px,1fr)); gap:10px; padding:16px 22px; }
+    .la-lead-card { border:1px solid #cce0ec; background:#fff; border-radius:8px; padding:14px; text-align:center; border-top:3px solid #00a8df; }
+    .la-lead-card:nth-child(3n) { border-top-color:#ffd12a; }
+    .la-lead-card .num { font-family:Manrope; font-size:23px; font-weight:750; color:#073b56; }
+    .la-lead-card .lbl { display:block; font-size:11px; color:#587488; margin-top:6px; }
+    .la-lead-card.total { border-top-color:#073b56; background:#eaf4fa; }
+    .la-lead-card.total .num { color:#073b56; }
+
+    /* Buttons - Laporan Akuisisi style */
+    .la-btn { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid #cce0ec; border-radius:6px; font-size:11px; font-weight:550; font-family:'DM Sans'; white-space:nowrap; color:#1d5c7b; background:#fff; cursor:pointer; }
+    .la-btn:hover { background:#eaf4fa; }
+    .la-btn.primary { background:#00789f; border-color:#00789f; color:#fff; }
+    .la-btn.primary:hover { background:#006889; }
+    .la-btn.primary:disabled { opacity:.45; cursor:not-allowed; }
+    .la-text-btn { font-size:10px; color:#00799f; background:none; border:0; padding:5px 0; cursor:pointer; font-family:'DM Sans'; }
+    .la-text-btn:hover { text-decoration:underline; }
+
+    /* Empty state */
+    .la-empty { min-height:120px; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#587488; gap:8px; font-size:12px; padding:30px; }
+
+    /* Loading */
+    .la-loading { text-align:center; padding:60px 20px; color:#587488; font-size:13px; }
+
+    /* Error */
+    .la-error { background:#fbefeb; color:#a35343; border:1px solid #f1d7ce; border-radius:6px; padding:12px; font-size:12px; line-height:1.6; margin-bottom:17px; }
 
     /* Modal */
-    .la-modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center; }
+    .la-modal-backdrop { display:none; position:fixed; inset:0; background:#073b5666; backdrop-filter:blur(3px); z-index:200; align-items:center; justify-content:center; }
     .la-modal-backdrop.open { display:flex; }
-    .la-modal { background:#fff; border-radius:var(--radius); padding:24px; width:90%; max-width:440px; max-height:85vh; overflow-y:auto; box-shadow:var(--shadow-md); }
-    .la-modal h3 { font-size:16px; font-weight:700; margin-bottom:18px; }
-    .la-modal .form-group { margin-bottom:14px; }
-    .la-modal .form-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+    .la-modal { background:#fff; border-radius:13px; width:90%; max-width:480px; max-height:92vh; overflow:auto; box-shadow:0 20px 80px #073b5633; }
+    .la-modal header { padding:26px 27px 20px; border-bottom:1px solid #eaf4fa; }
+    .la-modal header h3 { font-family:Manrope; font-size:21px; letter-spacing:-.5px; color:#073b56; margin:0; }
+    .la-modal-body { padding:22px 27px; }
+    .la-modal-body label { font-size:11px; color:#1d5c7b; display:block; margin-bottom:14px; }
+    .la-modal-body label > input,
+    .la-modal-body label > select { display:block; width:100%; border:1px solid #cce0ec; background:#fff; border-radius:6px; padding:10px 11px; margin-top:7px; font-size:12px; outline:none; font-family:'DM Sans'; color:#073b56; }
+    .la-modal-body label > input:focus,
+    .la-modal-body label > select:focus { border-color:#00a8df; box-shadow:0 0 0 3px rgba(0,168,223,0.1); }
+    .la-modal-body .form-summary { display:flex; align-items:center; justify-content:space-between; border-radius:6px; background:#edf6fc; padding:14px; margin:17px 0; font-size:11px; color:#426c83; }
+    .la-modal-body .form-summary b { color:#073b56; margin-left:8px; }
+    .la-modal-actions { display:flex; gap:10px; justify-content:flex-end; padding:0 27px 22px; }
 
-    @media(max-width:768px) {
-      .la-filter { gap:8px; }
-      .la-filter input[type="date"], .la-filter select { font-size:12px; padding:8px 10px; }
-      .la-lead-grid { grid-template-columns:repeat(auto-fill, minmax(100px,1fr)); gap:8px; }
+    /* Responsive */
+    @media(max-width:960px) {
+      .la-stats { grid-template-columns:repeat(2,1fr); }
+    }
+    @media(max-width:700px) {
+      .la-content { padding:22px 14px; }
+      .la-topbar { height:52px; padding:0 14px; }
+      .la-topbar h2 { font-size:16px; }
+      .la-stats { gap:10px; }
+      .la-stat { padding:14px 12px; min-height:120px; }
+      .la-stat strong { font-size:20px; }
+      .la-stat-top { font-size:10px; }
+      .la-stat-note { font-size:8px; }
+      .la-card-head { padding:17px 15px; }
+      .la-card-head h3 { font-size:12px; }
+      .la-table th { padding:11px 14px; font-size:8px; }
+      .la-table td { padding:12px 14px; font-size:10px; }
+      .la-filter-item { padding:6px 8px; }
+      .la-filter-item select, .la-filter-item input { font-size:10px; }
+      .la-lead-grid { grid-template-columns:repeat(auto-fill, minmax(95px,1fr)); gap:8px; padding:14px; }
+      .la-lead-card { padding:11px 8px; }
       .la-lead-card .num { font-size:18px; }
+      .la-lead-card .lbl { font-size:10px; }
+      .la-modal-backdrop { padding:12px 0 0; align-items:flex-end; }
+      .la-modal { width:100%; max-width:none; max-height:calc(100dvh - 12px); border-radius:16px 16px 0 0; }
+      .la-modal header { padding:20px 19px 16px; }
+      .la-modal header h3 { font-size:18px; }
+      .la-modal-body { padding:18px; }
+      .la-modal-body label > input, .la-modal-body label > select { font-size:16px; min-height:46px; padding:11px 12px; }
+      .la-modal-actions { padding:0 18px 24px; }
     }
   </style>
 </head>
@@ -81,81 +185,88 @@
     </div>
   </aside>
 
-  <main class="main-content">
-    <header class="topbar">
-      <div class="topbar-left">
+  <main class="main-content la-page">
+    <div class="la-topbar">
+      <div>
         <h2>Laporan Akuisisi</h2>
         <p>Ringkasan performa CS, leads & biaya iklan</p>
       </div>
-    </header>
+    </div>
 
-    <div class="page-content">
+    <div class="la-content">
       <!-- FILTER -->
       <div class="la-filter">
-        <label style="font-size:13px; font-weight:600;">Periode:</label>
-        <input type="date" id="la-start" />
-        <span style="color:var(--gray-5);">—</span>
-        <input type="date" id="la-end" />
-        <select id="la-channel">
-          <option value="">Semua Channel</option>
-          <option value="Web">Web</option>
-          <option value="CTWA">CTWA</option>
-        </select>
+        <div class="la-filter-item">
+          📅 <input type="date" id="la-start" />
+          <span style="color:#cce0ec;">—</span>
+          <input type="date" id="la-end" />
+        </div>
+        <div class="la-filter-item">
+          <select id="la-channel">
+            <option value="">Semua channel</option>
+            <option value="Web">Web</option>
+            <option value="CTWA">CTWA</option>
+          </select>
+        </div>
       </div>
 
       <!-- LOADING -->
-      <div id="la-loading" style="text-align:center; padding:60px 20px; color:var(--gray-5); display:none;">
-        <div style="font-size:28px; margin-bottom:8px;">⏳</div>Menghubungkan ke Laporan Akuisisi...
+      <div id="la-loading" class="la-loading" style="display:none;">
+        Menghubungkan ke Laporan Akuisisi...
       </div>
 
       <!-- ERROR -->
-      <div id="la-error" style="display:none; text-align:center; padding:40px; color:var(--danger);"></div>
+      <div id="la-error" class="la-error" style="display:none;"></div>
 
-      <!-- CONTENT (hidden until loaded) -->
+      <!-- CONTENT -->
       <div id="la-content" style="display:none;">
 
-        <!-- STATS CARDS -->
-        <div class="stats-grid la-section" style="margin-bottom:24px;">
-          <div class="stat-card">
-            <div>
-              <div class="stat-label">Total Omzet</div>
-              <div class="stat-value" id="la-omzet">-</div>
+        <!-- STATS -->
+        <div class="la-stats">
+          <div class="la-stat">
+            <div class="la-stat-top">
+              <span>Total omzet</span>
+              <span class="la-stat-icon green">💰</span>
             </div>
-            <div class="stat-icon blue">💰</div>
+            <strong id="la-omzet">-</strong>
+            <div class="la-stat-note"><i class="green"></i>Dihitung dari order dan harga paket</div>
           </div>
-          <div class="stat-card">
-            <div>
-              <div class="stat-label">Jumlah Leads</div>
-              <div class="stat-value" id="la-leads">-</div>
+          <div class="la-stat">
+            <div class="la-stat-top">
+              <span>Jumlah leads</span>
+              <span class="la-stat-icon orange">📋</span>
             </div>
-            <div class="stat-icon green">📋</div>
+            <strong id="la-leads">-</strong>
+            <div class="la-stat-note"><i class="orange"></i>Total leads sesuai periode</div>
           </div>
-          <div class="stat-card">
-            <div>
-              <div class="stat-label">Total Closing Bersih</div>
-              <div class="stat-value" id="la-closing">-</div>
+          <div class="la-stat">
+            <div class="la-stat-top">
+              <span>Total closing bersih</span>
+              <span class="la-stat-icon blue">🎯</span>
             </div>
-            <div class="stat-icon yellow">🎯</div>
+            <strong id="la-closing">-</strong>
+            <div class="la-stat-note"><i class="blue"></i>Closing dikurangi invalid</div>
           </div>
-          <div class="stat-card dark">
-            <div>
-              <div class="stat-label">Closing Rate</div>
-              <div class="stat-value" id="la-cr">-</div>
+          <div class="la-stat">
+            <div class="la-stat-top">
+              <span>Closing rate</span>
+              <span class="la-stat-icon violet">📊</span>
             </div>
-            <div class="stat-icon blue">📊</div>
+            <strong id="la-cr">-</strong>
+            <div class="la-stat-note"><i class="violet"></i>Closing ÷ leads</div>
           </div>
         </div>
 
         <!-- PERFORMA CS -->
-        <div class="card la-section">
-          <div class="card-header">
+        <div class="la-card">
+          <div class="la-card-head">
             <div>
-              <div class="card-title">Performa CS</div>
-              <div class="card-sub">Laporan harian CS per penugasan</div>
+              <h3>Performa CS</h3>
+              <p>Laporan harian CS per penugasan</p>
             </div>
           </div>
-          <div class="table-wrap">
-            <table>
+          <div class="la-table-wrap">
+            <table class="la-table">
               <thead>
                 <tr>
                   <th>Tanggal</th>
@@ -169,18 +280,18 @@
                 </tr>
               </thead>
               <tbody id="la-reports-table">
-                <tr><td colspan="8" class="la-empty">Memuat...</td></tr>
+                <tr><td colspan="8"><div class="la-empty">Memuat...</div></td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
         <!-- REPORT LEAD BEF -->
-        <div class="card la-section">
-          <div class="card-header">
+        <div class="la-card">
+          <div class="la-card-head">
             <div>
-              <div class="card-title">Report Lead BEF</div>
-              <div class="card-sub">Breakdown leads per kategori</div>
+              <h3>Report Lead BEF</h3>
+              <p>Breakdown leads per kategori</p>
             </div>
           </div>
           <div id="la-bef-content">
@@ -189,29 +300,29 @@
         </div>
 
         <!-- BIAYA IKLAN -->
-        <div class="card la-section">
-          <div class="card-header" style="flex-wrap:wrap; gap:12px;">
+        <div class="la-card">
+          <div class="la-card-head">
             <div>
-              <div class="card-title">Biaya Iklan</div>
-              <div class="card-sub">Riwayat input biaya iklan</div>
+              <h3>Biaya Iklan</h3>
+              <p>Riwayat input biaya iklan</p>
             </div>
-            <button class="btn btn-primary btn-sm" id="btn-add-ads" onclick="openAdsModal()">+ Input Biaya Iklan</button>
+            <button class="la-btn primary" onclick="openAdsModal()">+ Input Biaya Iklan</button>
           </div>
-          <div class="table-wrap">
-            <table>
+          <div class="la-table-wrap">
+            <table class="la-table">
               <thead>
                 <tr>
                   <th>Tanggal</th>
                   <th>Produk</th>
                   <th>Channel</th>
                   <th>Budget</th>
-                  <th>Pajak %</th>
-                  <th>Total</th>
+                  <th>Pajak</th>
+                  <th>Total biaya</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody id="la-ads-table">
-                <tr><td colspan="7" class="la-empty">Memuat...</td></tr>
+                <tr><td colspan="7"><div class="la-empty">Memuat...</div></td></tr>
               </tbody>
             </table>
           </div>
@@ -225,28 +336,27 @@
 <!-- MODAL INPUT BIAYA IKLAN -->
 <div class="la-modal-backdrop" id="modal-ads">
   <div class="la-modal">
-    <h3>Input Biaya Iklan</h3>
-    <div class="form-group">
-      <label class="form-label">Tanggal <span>*</span></label>
-      <input type="date" class="form-input" id="ads-date" />
+    <header><h3>Input Biaya Iklan</h3></header>
+    <div class="la-modal-body">
+      <label>Tanggal <span style="color:#a35343;">*</span>
+        <input type="date" id="ads-date" />
+      </label>
+      <label>Penugasan <span style="color:#a35343;">*</span>
+        <select id="ads-assignment">
+          <option value="">Pilih penugasan...</option>
+        </select>
+      </label>
+      <label>Budget (Rp) <span style="color:#a35343;">*</span>
+        <input type="number" id="ads-budget" min="0" placeholder="0" onfocus="this.select()" />
+      </label>
+      <label>Pajak (%)
+        <input type="number" id="ads-tax" min="0" max="100" value="11" onfocus="this.select()" />
+      </label>
+      <div class="form-summary">Total biaya termasuk pajak <b id="ads-total-preview">Rp 0</b></div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Penugasan <span>*</span></label>
-      <select class="form-input" id="ads-assignment">
-        <option value="">Pilih penugasan...</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Budget (Rp) <span>*</span></label>
-      <input type="number" class="form-input" id="ads-budget" min="0" placeholder="0" onfocus="this.select()" />
-    </div>
-    <div class="form-group">
-      <label class="form-label">Pajak (%)</label>
-      <input type="number" class="form-input" id="ads-tax" min="0" max="100" value="11" onfocus="this.select()" />
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-outline" onclick="closeAdsModal()">Batal</button>
-      <button class="btn btn-primary" id="btn-save-ads" onclick="saveAds()">Simpan</button>
+    <div class="la-modal-actions">
+      <button class="la-btn" onclick="closeAdsModal()">Batal</button>
+      <button class="la-btn primary" id="btn-save-ads" onclick="saveAds()">Simpan</button>
     </div>
   </div>
 </div>
@@ -265,6 +375,7 @@
     ooc: 'OOC', casual: 'Iseng', boughtElsewhere: 'Beli di Tempat Lain', other: 'Lainnya'
   };
   const LEAD_KEYS = Object.keys(LEAD_LABELS);
+  const money = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n||0);
 
   let sb, accessToken;
   let state = { assignments: [], catalog: [], reports: [], leadReports: [], ads: [], advName: '' };
@@ -289,7 +400,17 @@
     document.getElementById('la-end').addEventListener('change', loadData);
     document.getElementById('la-channel').addEventListener('change', render);
 
+    // Live total preview in modal
+    document.getElementById('ads-budget').addEventListener('input', updateTotalPreview);
+    document.getElementById('ads-tax').addEventListener('input', updateTotalPreview);
+
     await loadData();
+  }
+
+  function updateTotalPreview() {
+    const budget = Number(document.getElementById('ads-budget').value) || 0;
+    const tax = Number(document.getElementById('ads-tax').value) || 0;
+    document.getElementById('ads-total-preview').textContent = money(budget * (1 + tax / 100));
   }
 
   async function apiFetch(action, params = {}, method = 'GET', body = null) {
@@ -358,43 +479,41 @@
     const totalClosing = reports.reduce((s, r) => s + (r.closingBersih || 0), 0);
     const cr = totalLeads > 0 ? ((totalClosing / totalLeads) * 100).toFixed(1) + '%' : '-';
 
-    document.getElementById('la-omzet').textContent = formatRupiah(totalOmzet);
+    document.getElementById('la-omzet').textContent = money(totalOmzet);
     document.getElementById('la-leads').textContent = formatNumber(totalLeads);
     document.getElementById('la-closing').textContent = formatNumber(totalClosing);
     document.getElementById('la-cr').textContent = cr;
 
-    // Performa CS table
+    renderReports(reports);
+    renderBEF(reports);
+    renderAds(ads);
+  }
+
+  function renderReports(reports) {
     const tbody = document.getElementById('la-reports-table');
     if (!reports.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="la-empty">Belum ada data laporan</td></tr>';
-    } else {
-      tbody.innerHTML = reports.map(r => `<tr>
-        <td style="white-space:nowrap;">${formatDate(r.date)}</td>
-        <td>${r.cs || '-'}</td>
-        <td>${r.product || '-'}</td>
-        <td><span class="badge ${r.channel === 'CTWA' ? 'badge-primary' : 'badge-success'}">${r.channel || '-'}</span></td>
-        <td>${r.leads ?? 0}</td>
-        <td>${r.closingBersih ?? 0}</td>
-        <td>${r.totalUnits ?? 0}</td>
-        <td style="font-weight:600;">${formatRupiah(r.omzet)}</td>
-      </tr>`).join('');
+      tbody.innerHTML = '<tr><td colspan="8"><div class="la-empty">Belum ada data laporan di periode ini</div></td></tr>';
+      return;
     }
-
-    // Lead BEF
-    renderBEF(reports);
-
-    // Ads table
-    renderAds(ads);
+    tbody.innerHTML = reports.map(r => `<tr>
+      <td style="white-space:nowrap;">${r.date ? r.date.split('-').reverse().join('/') : '-'}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:24px;height:24px;border-radius:50%;background:#eaf4fa;display:grid;place-items:center;font-size:8px;color:#587488;">${(r.cs||'?').slice(0,2).toUpperCase()}</span>${r.cs || '-'}</span></td>
+      <td><strong style="font-weight:550;">${r.product || '-'}</strong></td>
+      <td><span class="la-badge ${r.channel === 'CTWA' ? 'ctwa' : 'web'}">${r.channel === 'CTWA' ? '<span style="width:4px;height:4px;border-radius:50%;background:#36985a;"></span>' : ''}${r.channel || '-'}</span></td>
+      <td>${r.leads ?? 0}</td>
+      <td>${r.closingBersih ?? 0}</td>
+      <td>${r.totalUnits ?? 0}</td>
+      <td class="money">${money(r.omzet)}</td>
+    </tr>`).join('');
   }
 
   function renderBEF(reports) {
     const container = document.getElementById('la-bef-content');
-    // Aggregate lead data from leadReports
     const reportIds = reports.map(r => r.id);
     const relevant = state.leadReports.filter(lr => reportIds.includes(lr.reportId));
 
     if (!relevant.length) {
-      container.innerHTML = '<div class="la-empty">Belum ada data lead BEF</div>';
+      container.innerHTML = '<div class="la-empty">Belum ada data lead BEF di periode ini</div>';
       return;
     }
 
@@ -406,18 +525,16 @@
     const grandTotal = LEAD_KEYS.reduce((s, k) => s + totals[k], 0);
 
     container.innerHTML = `
-      <div style="padding:16px 20px;">
-        <div class="la-lead-grid">
-          ${LEAD_KEYS.map(k => `
-            <div class="la-lead-card">
-              <div class="num">${totals[k]}</div>
-              <div class="lbl">${LEAD_LABELS[k]}</div>
-            </div>
-          `).join('')}
-          <div class="la-lead-card" style="border-color:var(--primary); background:var(--primary-light);">
-            <div class="num" style="color:var(--primary);">${grandTotal}</div>
-            <div class="lbl" style="font-weight:600;">Total</div>
+      <div class="la-lead-grid">
+        ${LEAD_KEYS.map(k => `
+          <div class="la-lead-card">
+            <div class="num">${totals[k]}</div>
+            <div class="lbl">${LEAD_LABELS[k]}</div>
           </div>
+        `).join('')}
+        <div class="la-lead-card total">
+          <div class="num">${grandTotal}</div>
+          <div class="lbl" style="font-weight:600;">Total</div>
         </div>
       </div>
     `;
@@ -426,23 +543,21 @@
   function renderAds(ads) {
     const tbody = document.getElementById('la-ads-table');
     if (!ads.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="la-empty">Belum ada data biaya iklan</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7"><div class="la-empty">Belum ada data biaya iklan di periode ini</div></td></tr>';
       return;
     }
     tbody.innerHTML = ads.map(a => {
       const budget = a.budget || 0;
       const tax = a.tax ?? 11;
-      const total = budget + (budget * tax / 100);
+      const total = budget * (1 + tax / 100);
       return `<tr>
-        <td style="white-space:nowrap;">${formatDate(a.date)}</td>
-        <td>${a.product || '-'}</td>
-        <td><span class="badge ${a.channel === 'CTWA' ? 'badge-primary' : 'badge-success'}">${a.channel || '-'}</span></td>
-        <td>${formatRupiah(budget)}</td>
+        <td style="white-space:nowrap;">${a.date ? a.date.split('-').reverse().join('/') : '-'}</td>
+        <td><strong style="font-weight:550;">${a.product || '-'}</strong></td>
+        <td><span class="la-badge ${a.channel === 'CTWA' ? 'ctwa' : 'web'}">${a.channel || '-'}</span></td>
+        <td>${money(budget)}</td>
         <td>${tax}%</td>
-        <td style="font-weight:600;">${formatRupiah(Math.round(total))}</td>
-        <td>
-          <button class="btn btn-outline btn-sm" onclick="editAds('${a.id}')">Edit</button>
-        </td>
+        <td class="money">${money(Math.round(total))}</td>
+        <td><button class="la-text-btn" onclick="editAds('${a.id}')">Edit</button></td>
       </tr>`;
     }).join('');
   }
@@ -452,10 +567,9 @@
     const modal = document.getElementById('modal-ads');
     const sel = document.getElementById('ads-assignment');
 
-    // Populate assignments dropdown
     sel.innerHTML = '<option value="">Pilih penugasan...</option>';
     state.assignments.forEach(a => {
-      sel.innerHTML += `<option value="${a.product}|||${a.channel}">${a.product} — ${a.channel} (CS: ${a.cs})</option>`;
+      sel.innerHTML += `<option value="${a.product}|||${a.channel}">${a.product} · ${a.channel} (CS: ${a.cs})</option>`;
     });
 
     if (editId) {
@@ -472,16 +586,12 @@
       document.getElementById('ads-tax').value = 11;
     }
 
+    updateTotalPreview();
     modal.classList.add('open');
   };
 
-  window.editAds = function(id) {
-    window.openAdsModal(id);
-  };
-
-  window.closeAdsModal = function() {
-    document.getElementById('modal-ads').classList.remove('open');
-  };
+  window.editAds = function(id) { window.openAdsModal(id); };
+  window.closeAdsModal = function() { document.getElementById('modal-ads').classList.remove('open'); };
 
   window.saveAds = async function() {
     const date = document.getElementById('ads-date').value;
@@ -510,7 +620,6 @@
     }
   };
 
-  // Close modal on backdrop click
   document.getElementById('modal-ads').addEventListener('click', e => {
     if (e.target === e.currentTarget) window.closeAdsModal();
   });
