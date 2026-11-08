@@ -108,6 +108,20 @@
     .la-modal-body .form-summary b { color:#073b56; margin-left:8px; }
     .la-modal-actions { display:flex; gap:10px; justify-content:flex-end; padding:0 27px 22px; }
 
+    /* Rekap Harian */
+    .la-rekap-head { display:flex; align-items:center; gap:10px; padding:0 22px 14px; flex-wrap:wrap; }
+    .la-rekap-head select { border:1px solid #cce0ec; border-radius:6px; padding:7px 10px; font-size:11px; background:#f8fcff; color:#1d5c7b; font-family:'DM Sans'; }
+    .la-table.rekap th { font-size:8px; padding:10px 12px; text-align:right; white-space:normal; line-height:1.4; }
+    .la-table.rekap th:first-child { text-align:left; }
+    .la-table.rekap td { font-size:10px; padding:10px 12px; text-align:right; font-variant-numeric:tabular-nums; }
+    .la-table.rekap td:first-child { text-align:left; white-space:nowrap; }
+    .la-table.rekap tr.has-data { background:#f0faf4; }
+    .la-table.rekap .zero { color:#c5d3dd; }
+    .la-table.rekap .eval-good { color:#227148; font-weight:600; }
+    .la-table.rekap .eval-warn { color:#906900; font-weight:600; }
+    .la-table.rekap .eval-bad { color:#a35343; font-weight:600; }
+    .la-table.rekap tfoot td { font-weight:650; background:#eaf4fa; border-top:2px solid #cce0ec; color:#073b56; }
+
     /* Status Input */
     .la-status-date { display:flex; align-items:center; gap:10px; padding:0 22px 16px; }
     .la-status-date label { font-size:11px; color:#587488; }
@@ -313,6 +327,44 @@
           </div>
         </div>
 
+        <!-- REKAP HARIAN (spreadsheet-style) -->
+        <div class="la-card">
+          <div class="la-card-head">
+            <div>
+              <h3>Rekap Harian Advertiser</h3>
+              <p>Riwayat harian per produk — semua kolom seperti spreadsheet</p>
+            </div>
+          </div>
+          <div class="la-rekap-head">
+            <select id="la-rekap-product"></select>
+            <select id="la-rekap-channel">
+              <option value="">Semua channel</option>
+              <option value="Web">Web</option>
+              <option value="CTWA">CTWA</option>
+            </select>
+          </div>
+          <div class="la-table-wrap">
+            <table class="la-table rekap" id="la-rekap-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left;">Date</th>
+                  <th>Budget Iklan+Pajak</th>
+                  <th>Jumlah Lead</th>
+                  <th>Closing</th>
+                  <th>Closing Botol</th>
+                  <th>Closing Rate</th>
+                  <th>Biaya Akuisisi Lead</th>
+                  <th>Biaya Akuisisi Customer</th>
+                  <th>Biaya Akuisisi Botol</th>
+                  <th>Omset</th>
+                </tr>
+              </thead>
+              <tbody id="la-rekap-body"></tbody>
+              <tfoot id="la-rekap-foot"></tfoot>
+            </table>
+          </div>
+        </div>
+
         <!-- PERFORMA CS -->
         <div class="la-card">
           <div class="la-card-head">
@@ -455,6 +507,8 @@
     document.getElementById('la-end').addEventListener('change', loadData);
     document.getElementById('la-product').addEventListener('change', render);
     document.getElementById('la-channel').addEventListener('change', render);
+    document.getElementById('la-rekap-product').addEventListener('change', renderRekap);
+    document.getElementById('la-rekap-channel').addEventListener('change', renderRekap);
 
     // Status date default: hari ini
     document.getElementById('la-status-date').value = `${y}-${m}-${String(now.getDate()).padStart(2, '0')}`;
@@ -509,12 +563,20 @@
       state.leadReports = data.leadReports || [];
       state.ads = data.ads || [];
 
-      // Populate product filter
-      const products = [...new Set([...state.reports.map(r=>r.product),...state.ads.map(a=>a.product)].filter(Boolean))].sort();
+      // Populate product filters
+      const products = [...new Set([...state.reports.map(r=>r.product),...state.ads.map(a=>a.product),...state.assignments.map(a=>a.product)].filter(Boolean))].sort();
+      const prodOpts = products.map(p => `<option value="${p}">${p}</option>`).join('');
+
       const prodSel = document.getElementById('la-product');
       const curProd = prodSel.value;
-      prodSel.innerHTML = '<option value="">Semua produk</option>' + products.map(p => `<option value="${p}">${p}</option>`).join('');
+      prodSel.innerHTML = '<option value="">Semua produk</option>' + prodOpts;
       if (curProd) prodSel.value = curProd;
+
+      const rekapSel = document.getElementById('la-rekap-product');
+      const curRekap = rekapSel.value;
+      rekapSel.innerHTML = (products.length > 1 ? '<option value="">Semua produk</option>' : '') + prodOpts;
+      if (curRekap) rekapSel.value = curRekap;
+      else if (products.length) rekapSel.value = products[0];
 
       document.getElementById('la-loading').style.display = 'none';
       document.getElementById('la-content').style.display = 'block';
@@ -560,9 +622,96 @@
     document.getElementById('la-caq').textContent = caq;
 
     renderStatus();
+    renderRekap();
     renderReports(reports);
     renderBEF(reports);
     renderAds(ads);
+  }
+
+  const DAYS_ID = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+  function renderRekap() {
+    const tbody = document.getElementById('la-rekap-body');
+    const tfoot = document.getElementById('la-rekap-foot');
+    const start = document.getElementById('la-start').value;
+    const end = document.getElementById('la-end').value;
+    const prod = document.getElementById('la-rekap-product').value;
+    const ch = document.getElementById('la-rekap-channel').value;
+
+    if (!start || !end) { tbody.innerHTML = ''; tfoot.innerHTML = ''; return; }
+
+    // Generate all days in range
+    const days = [];
+    const d = new Date(start + 'T12:00:00');
+    const endD = new Date(end + 'T12:00:00');
+    while (d <= endD) {
+      days.push(d.toISOString().split('T')[0]);
+      d.setDate(d.getDate() + 1);
+    }
+
+    // Filter reports & ads by product+channel selection
+    const reps = state.reports.filter(r => (!prod || r.product === prod) && (!ch || r.channel === ch));
+    const adsList = state.ads.filter(a => (!prod || a.product === prod) && (!ch || a.channel === ch));
+
+    // Totals for footer
+    let totBudget=0, totLeads=0, totClosing=0, totUnits=0, totRevenue=0;
+
+    const rows = days.map(date => {
+      const dayReps = reps.filter(r => r.date === date);
+      const dayAds = adsList.filter(a => a.date === date);
+
+      const spend = dayAds.reduce((s,a) => s + (a.budget||0) * (1 + (a.tax??11)/100), 0);
+      const leads = dayReps.reduce((s,r) => s + (r.leads||0), 0);
+      const closing = dayReps.reduce((s,r) => s + ((r.closing||0) - (r.invalid||0)), 0);
+      const units = dayReps.reduce((s,r) => s + ((r.units||0) - (r.invalidUnits||0)), 0);
+      const revenue = dayReps.reduce((s,r) => s + (r.revenue||0), 0);
+      const cr = leads > 0 ? ((closing / leads) * 100).toFixed(1) + '%' : '0,00%';
+      const calLead = leads > 0 ? spend / leads : 0;
+      const calCustomer = closing > 0 ? spend / closing : 0;
+      const calUnit = units > 0 ? spend / units : 0;
+
+      totBudget += spend; totLeads += leads; totClosing += closing; totUnits += units; totRevenue += revenue;
+
+      const hasData = leads > 0 || closing > 0 || spend > 0 || revenue > 0;
+      const dt = new Date(date + 'T12:00:00');
+      const dayLabel = `${DAYS_ID[dt.getDay()]}, ${String(dt.getDate()).padStart(2,'0')} ${MONTHS_ID[dt.getMonth()]} ${dt.getFullYear()}`;
+      const z = v => v === 0 ? '<span class="zero">0</span>' : v;
+      const zMoney = v => v === 0 ? '<span class="zero">Rp0</span>' : money(Math.round(v));
+
+      return `<tr class="${hasData ? 'has-data' : ''}">
+        <td>${dayLabel}</td>
+        <td>${zMoney(spend)}</td>
+        <td>${z(leads)}</td>
+        <td>${z(closing)}</td>
+        <td>${z(units)}</td>
+        <td>${leads > 0 ? cr : '<span class="zero">0,00%</span>'}</td>
+        <td>${zMoney(calLead)}</td>
+        <td>${zMoney(calCustomer)}</td>
+        <td>${zMoney(calUnit)}</td>
+        <td>${zMoney(revenue)}</td>
+      </tr>`;
+    }).join('');
+
+    tbody.innerHTML = rows;
+
+    // Footer totals
+    const totCR = totLeads > 0 ? ((totClosing / totLeads) * 100).toFixed(1) + '%' : '0,00%';
+    const totCAL = totLeads > 0 ? money(Math.round(totBudget / totLeads)) : '-';
+    const totCAC = totClosing > 0 ? money(Math.round(totBudget / totClosing)) : '-';
+    const totCAU = totUnits > 0 ? money(Math.round(totBudget / totUnits)) : '-';
+    tfoot.innerHTML = `<tr>
+      <td style="text-align:left;">TOTAL</td>
+      <td>${money(Math.round(totBudget))}</td>
+      <td>${totLeads}</td>
+      <td>${totClosing}</td>
+      <td>${totUnits}</td>
+      <td>${totCR}</td>
+      <td>${totCAL}</td>
+      <td>${totCAC}</td>
+      <td>${totCAU}</td>
+      <td>${money(Math.round(totRevenue))}</td>
+    </tr>`;
   }
 
   function renderStatus() {
