@@ -537,6 +537,7 @@
     <div class="la-modal-body">
       <label>Tanggal <span style="color:#a35343;">*</span>
         <input type="date" id="ads-date" />
+        <span id="ads-date-day" style="font-size:10px;color:#00789f;font-weight:550;margin-top:4px;display:block;"></span>
       </label>
       <label>Penugasan <span style="color:#a35343;">*</span>
         <select id="ads-assignment">
@@ -898,6 +899,7 @@
     // Live total preview in modal
     document.getElementById('ads-budget').addEventListener('input', updateTotalPreview);
     document.getElementById('ads-tax').addEventListener('input', updateTotalPreview);
+    document.getElementById('ads-date').addEventListener('change', updateDateDay);
 
     await loadData();
   }
@@ -906,6 +908,16 @@
     const budget = Number(document.getElementById('ads-budget').value) || 0;
     const tax = Number(document.getElementById('ads-tax').value) || 0;
     document.getElementById('ads-total-preview').textContent = money(budget * (1 + tax / 100));
+  }
+
+  const HARI = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  function updateDateDay() {
+    const v = document.getElementById('ads-date').value;
+    const el = document.getElementById('ads-date-day');
+    if (!v) { el.textContent = ''; return; }
+    const d = new Date(v + 'T12:00:00');
+    el.textContent = `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()}`;
   }
 
   async function apiFetch(action, params = {}, method = 'GET', body = null) {
@@ -1307,6 +1319,7 @@
     }
 
     updateTotalPreview();
+    updateDateDay();
     modal.classList.add('open');
   };
 
