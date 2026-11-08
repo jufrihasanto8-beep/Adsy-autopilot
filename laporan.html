@@ -135,6 +135,45 @@
     .la-chart-item .cs-rate.mid { color:#906900; }
     .la-chart-item .cs-rate.low { color:#a35343; }
 
+    /* Date Range Picker */
+    .la-drp-wrap { position:relative; }
+    .la-drp-trigger { display:inline-flex; align-items:center; gap:7px; border:1px solid #cce0ec; border-radius:6px; padding:7px 12px; font-size:11px; font-family:'DM Sans'; font-weight:550; background:#f8fcff; color:#1d5c7b; cursor:pointer; white-space:nowrap; }
+    .la-drp-trigger:hover { border-color:#00a8df; }
+    .la-drp-dropdown { display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:150; background:#fff; border:1px solid #cce0ec; border-radius:10px; box-shadow:0 12px 40px rgba(7,59,86,.14); min-width:480px; }
+    .la-drp-dropdown.open { display:flex; }
+    .la-drp-presets { width:150px; border-right:1px solid #eaf4fa; padding:10px 0; flex-shrink:0; }
+    .la-drp-preset { display:block; width:100%; text-align:left; border:none; background:none; padding:8px 16px; font-size:11px; font-family:'DM Sans'; color:#587488; cursor:pointer; }
+    .la-drp-preset:hover { background:#f8fcff; color:#073b56; }
+    .la-drp-preset.active { color:#00789f; font-weight:650; background:#edf6fc; }
+    .la-drp-cal { padding:14px 18px 8px; flex:1; }
+    .la-drp-cal-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .la-drp-cal-hdr span { font-family:Manrope; font-size:13px; font-weight:700; color:#073b56; }
+    .la-drp-nav { width:28px; height:28px; border-radius:6px; border:1px solid #cce0ec; background:#fff; display:grid; place-items:center; cursor:pointer; font-size:12px; color:#587488; }
+    .la-drp-nav:hover { border-color:#00a8df; color:#073b56; }
+    .la-drp-days-hdr { display:grid; grid-template-columns:repeat(7,1fr); text-align:center; margin-bottom:4px; }
+    .la-drp-days-hdr span { font-size:10px; font-weight:600; color:#587488; padding:4px 0; }
+    .la-drp-days { display:grid; grid-template-columns:repeat(7,1fr); text-align:center; gap:2px; }
+    .la-drp-day { padding:7px 0; font-size:11px; border-radius:6px; cursor:pointer; color:#1d5c7b; border:none; background:none; font-family:'DM Sans'; }
+    .la-drp-day:hover { background:#edf6fc; }
+    .la-drp-day.other { color:#c5d3dd; }
+    .la-drp-day.today { font-weight:700; color:#00789f; }
+    .la-drp-day.selected, .la-drp-day.range-start, .la-drp-day.range-end { background:#073b56; color:#fff; border-radius:6px; font-weight:600; }
+    .la-drp-day.in-range { background:#edf6fc; color:#073b56; border-radius:0; }
+    .la-drp-day.range-start { border-radius:6px 0 0 6px; }
+    .la-drp-day.range-end { border-radius:0 6px 6px 0; }
+    .la-drp-footer { display:flex; align-items:center; justify-content:space-between; padding:10px 18px 14px; border-top:1px solid #eaf4fa; }
+    .la-drp-sel-txt { font-size:10px; color:#587488; display:flex; align-items:center; gap:5px; }
+    .la-drp-footer-btns { display:flex; gap:6px; }
+    .la-drp-cancel { border:1px solid #cce0ec; border-radius:6px; padding:7px 14px; font-size:11px; font-family:'DM Sans'; background:#fff; color:#587488; cursor:pointer; }
+    .la-drp-cancel:hover { background:#f8fcff; }
+    .la-drp-apply { border:none; border-radius:6px; padding:7px 16px; font-size:11px; font-family:'DM Sans'; font-weight:600; background:#073b56; color:#fff; cursor:pointer; }
+    .la-drp-apply:hover { background:#0a4d6e; }
+    @media(max-width:700px) {
+      .la-drp-dropdown { min-width:auto; width:calc(100vw - 28px); flex-direction:column; }
+      .la-drp-presets { width:auto; border-right:none; border-bottom:1px solid #eaf4fa; display:flex; flex-wrap:wrap; gap:2px; padding:8px; }
+      .la-drp-preset { width:auto; padding:6px 10px; font-size:10px; border-radius:4px; }
+    }
+
     /* Responsive */
     @media(max-width:1200px) {
       .la-stats { grid-template-columns:repeat(3,minmax(0,1fr)); }
@@ -358,6 +397,36 @@
             </div>
           </div>
           <div class="la-chart-filters">
+            <div class="la-drp-wrap">
+              <button class="la-drp-trigger" id="drp-trigger" onclick="drpToggle()">
+                📅 <span id="drp-label">Bulan Ini</span> <span style="color:#c5d3dd;">▾</span>
+              </button>
+              <div class="la-drp-dropdown" id="drp-dropdown">
+                <div class="la-drp-presets">
+                  <button class="la-drp-preset" onclick="drpPreset(0,'Hari Ini',this)">Hari Ini</button>
+                  <button class="la-drp-preset" onclick="drpPresetYesterday(this)">Kemarin</button>
+                  <hr style="border:none;border-top:1px solid #eaf4fa;margin:4px 0;">
+                  <button class="la-drp-preset" onclick="drpPreset(7,'7 Hari Terakhir',this)">7 Hari Terakhir</button>
+                  <button class="la-drp-preset" onclick="drpPreset(14,'14 Hari Terakhir',this)">14 Hari Terakhir</button>
+                  <button class="la-drp-preset" onclick="drpPreset(30,'30 Hari Terakhir',this)">30 Hari Terakhir</button>
+                  <hr style="border:none;border-top:1px solid #eaf4fa;margin:4px 0;">
+                  <button class="la-drp-preset active" onclick="drpPresetThisMonth(this)">Bulan Ini</button>
+                  <button class="la-drp-preset" onclick="drpPresetLastMonth(this)">Bulan Lalu</button>
+                </div>
+                <div style="display:flex;flex-direction:column;flex:1;">
+                  <div class="la-drp-cal" id="drp-cal"></div>
+                  <div class="la-drp-footer">
+                    <div class="la-drp-sel-txt">
+                      <span id="drp-sel-start">—</span> → <span id="drp-sel-end">—</span>
+                    </div>
+                    <div class="la-drp-footer-btns">
+                      <button class="la-drp-cancel" onclick="drpClose()">Batal</button>
+                      <button class="la-drp-apply" onclick="drpApply()">Terapkan</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <select id="la-chart-product">
               <option value="">Semua produk</option>
             </select>
@@ -372,18 +441,16 @@
             <table class="la-table">
               <thead>
                 <tr>
-                  <th>Tanggal</th>
                   <th>CS</th>
-                  <th>Produk</th>
-                  <th>Channel</th>
                   <th>Leads</th>
                   <th>Closing</th>
                   <th>Units</th>
+                  <th>Closing Rate</th>
                   <th>Omzet</th>
                 </tr>
               </thead>
               <tbody id="la-reports-table">
-                <tr><td colspan="8"><div class="la-empty">Memuat...</div></td></tr>
+                <tr><td colspan="6"><div class="la-empty">Memuat...</div></td></tr>
               </tbody>
             </table>
           </div>
@@ -483,6 +550,151 @@
   let sb, accessToken;
   let state = { assignments: [], catalog: [], reports: [], leadReports: [], ads: [], advName: '' };
 
+  // ── Date Range Picker state ──
+  const MONTHS_DRP = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  let drpStart, drpEnd; // committed range for chart
+  let drpSelStart, drpSelEnd, drpPickingEnd = false;
+  let drpViewYear, drpViewMonth;
+
+  function drpFmt(d) { return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; }
+  function drpISO(d) { return d.toISOString().split('T')[0]; }
+  function drpSame(a,b) { return a && b && a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+  window.drpToggle = function() {
+    const dd = document.getElementById('drp-dropdown');
+    if (dd.classList.contains('open')) { drpClose(); return; }
+    drpSelStart = drpStart ? new Date(drpStart) : null;
+    drpSelEnd = drpEnd ? new Date(drpEnd) : null;
+    drpPickingEnd = false;
+    const ref = drpSelStart || new Date();
+    drpViewYear = ref.getFullYear(); drpViewMonth = ref.getMonth();
+    drpRender(); drpUpdateSel();
+    dd.classList.add('open');
+    setTimeout(() => document.addEventListener('click', drpOutside), 0);
+  };
+  window.drpClose = function() {
+    document.getElementById('drp-dropdown').classList.remove('open');
+    document.removeEventListener('click', drpOutside);
+  };
+  function drpOutside(e) { if (!document.getElementById('drp-dropdown').contains(e.target) && !document.getElementById('drp-trigger').contains(e.target)) drpClose(); }
+
+  function drpActivate(btn) {
+    document.querySelectorAll('.la-drp-preset').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+  }
+  window.drpPreset = function(days, label, btn) {
+    const now = new Date(); now.setHours(12,0,0,0);
+    if (days === 0) { drpSelStart = new Date(now); drpSelEnd = new Date(now); }
+    else { drpSelEnd = new Date(now); drpSelStart = new Date(now); drpSelStart.setDate(drpSelStart.getDate() - (days - 1)); }
+    drpViewYear = drpSelEnd.getFullYear(); drpViewMonth = drpSelEnd.getMonth();
+    drpPickingEnd = false; drpActivate(btn); drpRender(); drpUpdateSel();
+  };
+  window.drpPresetYesterday = function(btn) {
+    const d = new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate() - 1);
+    drpSelStart = new Date(d); drpSelEnd = new Date(d);
+    drpViewYear = d.getFullYear(); drpViewMonth = d.getMonth();
+    drpPickingEnd = false; drpActivate(btn); drpRender(); drpUpdateSel();
+  };
+  window.drpPresetThisMonth = function(btn) {
+    const now = new Date(); now.setHours(12,0,0,0);
+    drpSelStart = new Date(now.getFullYear(), now.getMonth(), 1, 12);
+    drpSelEnd = new Date(now);
+    drpViewYear = now.getFullYear(); drpViewMonth = now.getMonth();
+    drpPickingEnd = false; drpActivate(btn); drpRender(); drpUpdateSel();
+  };
+  window.drpPresetLastMonth = function(btn) {
+    const now = new Date();
+    const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const m = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    drpSelStart = new Date(y, m, 1, 12);
+    drpSelEnd = new Date(y, m + 1, 0, 12);
+    drpViewYear = y; drpViewMonth = m;
+    drpPickingEnd = false; drpActivate(btn); drpRender(); drpUpdateSel();
+  };
+
+  window.drpClickDay = function(y, m, d) {
+    const clicked = new Date(y, m, d, 12);
+    if (!drpPickingEnd || !drpSelStart) {
+      drpSelStart = clicked; drpSelEnd = null; drpPickingEnd = true;
+    } else {
+      if (clicked < drpSelStart) { drpSelEnd = new Date(drpSelStart); drpSelStart = clicked; }
+      else { drpSelEnd = clicked; }
+      drpPickingEnd = false;
+    }
+    drpActivate(null); drpRender(); drpUpdateSel();
+  };
+
+  window.drpNav = function(dir) {
+    drpViewMonth += dir;
+    if (drpViewMonth < 0) { drpViewMonth = 11; drpViewYear--; }
+    if (drpViewMonth > 11) { drpViewMonth = 0; drpViewYear++; }
+    drpRender();
+  };
+
+  function drpUpdateSel() {
+    document.getElementById('drp-sel-start').textContent = drpSelStart ? drpFmt(drpSelStart) : '—';
+    document.getElementById('drp-sel-end').textContent = drpSelEnd ? drpFmt(drpSelEnd) : '—';
+  }
+
+  function drpRender() {
+    const cal = document.getElementById('drp-cal');
+    const today = new Date(); today.setHours(12,0,0,0);
+    const first = new Date(drpViewYear, drpViewMonth, 1);
+    let startDay = first.getDay() - 1; if (startDay < 0) startDay = 6; // Mon=0
+    const daysInMonth = new Date(drpViewYear, drpViewMonth + 1, 0).getDate();
+
+    let html = `<div class="la-drp-cal-hdr">
+      <button class="la-drp-nav" onclick="drpNav(-1)">‹</button>
+      <span>${MONTHS_DRP[drpViewMonth]} ${drpViewYear}</span>
+      <button class="la-drp-nav" onclick="drpNav(1)">›</button>
+    </div>
+    <div class="la-drp-days-hdr"><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span></div>
+    <div class="la-drp-days">`;
+
+    // Previous month fill
+    const prevMonth = new Date(drpViewYear, drpViewMonth, 0);
+    for (let i = startDay - 1; i >= 0; i--) {
+      const d = prevMonth.getDate() - i;
+      const m = drpViewMonth - 1; const y = m < 0 ? drpViewYear - 1 : drpViewYear; const mf = m < 0 ? 11 : m;
+      html += `<button class="la-drp-day other" onclick="drpClickDay(${y},${mf},${d})">${d}</button>`;
+    }
+
+    // Current month
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(drpViewYear, drpViewMonth, d, 12);
+      let cls = 'la-drp-day';
+      if (drpSame(date, today)) cls += ' today';
+      if (drpSelStart && drpSelEnd) {
+        if (drpSame(date, drpSelStart) && drpSame(date, drpSelEnd)) cls += ' selected';
+        else if (drpSame(date, drpSelStart)) cls += ' range-start';
+        else if (drpSame(date, drpSelEnd)) cls += ' range-end';
+        else if (date > drpSelStart && date < drpSelEnd) cls += ' in-range';
+      } else if (drpSelStart && drpSame(date, drpSelStart)) cls += ' selected';
+      html += `<button class="${cls}" onclick="drpClickDay(${drpViewYear},${drpViewMonth},${d})">${d}</button>`;
+    }
+
+    // Next month fill
+    const totalCells = startDay + daysInMonth;
+    const remain = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+    for (let d = 1; d <= remain; d++) {
+      const m = drpViewMonth + 1; const y = m > 11 ? drpViewYear + 1 : drpViewYear; const mf = m > 11 ? 0 : m;
+      html += `<button class="la-drp-day other" onclick="drpClickDay(${y},${mf},${d})">${d}</button>`;
+    }
+
+    html += '</div>';
+    cal.innerHTML = html;
+  }
+
+  window.drpApply = function() {
+    if (!drpSelStart) return;
+    drpStart = new Date(drpSelStart);
+    drpEnd = drpSelEnd ? new Date(drpSelEnd) : new Date(drpSelStart);
+    const label = document.querySelector('.la-drp-preset.active');
+    document.getElementById('drp-label').textContent = label ? label.textContent : `${drpFmt(drpStart)} - ${drpFmt(drpEnd)}`;
+    drpClose();
+    renderChartData();
+  };
+
   async function init() {
     sb = await getSupabase();
     const session = await requireAuth();
@@ -499,14 +711,18 @@
     document.getElementById('la-start').value = `${y}-${m}-01`;
     document.getElementById('la-end').value = `${y}-${m}-${String(now.getDate()).padStart(2, '0')}`;
 
+    // Chart date picker default: bulan ini
+    drpStart = new Date(y, now.getMonth(), 1, 12);
+    drpEnd = new Date(now); drpEnd.setHours(12,0,0,0);
+
     document.getElementById('la-start').addEventListener('change', loadData);
     document.getElementById('la-end').addEventListener('change', loadData);
     document.getElementById('la-product').addEventListener('change', render);
     document.getElementById('la-channel').addEventListener('change', render);
     document.getElementById('la-rekap-product').addEventListener('change', renderRekap);
     document.getElementById('la-rekap-channel').addEventListener('change', renderRekap);
-    document.getElementById('la-chart-product').addEventListener('change', renderChart);
-    document.getElementById('la-chart-channel').addEventListener('change', renderChart);
+    document.getElementById('la-chart-product').addEventListener('change', renderChartData);
+    document.getElementById('la-chart-channel').addEventListener('change', renderChartData);
 
     // Live total preview in modal
     document.getElementById('ads-budget').addEventListener('input', updateTotalPreview);
@@ -620,9 +836,8 @@
     document.getElementById('la-leads-note').textContent = `${formatNumber(totalLeads)} leads ditangani tim`;
     document.getElementById('la-caq').textContent = caq;
 
-    renderChart();
+    renderChartData();
     renderRekap();
-    renderReports(reports);
     renderBEF(reports);
     renderAds(ads);
   }
@@ -714,10 +929,23 @@
   }
 
   let csCharts = [];
+  let chartReports = []; // separate data for chart section
+
+  async function renderChartData() {
+    if (!drpStart || !drpEnd) return;
+    const start = drpISO(drpStart);
+    const end = drpISO(drpEnd);
+    try {
+      const data = await apiFetch('adv-reports', { start, end });
+      chartReports = data.reports || [];
+    } catch { chartReports = []; }
+    renderChart();
+  }
+
   function renderChart() {
     const prod = document.getElementById('la-chart-product').value;
     const ch = document.getElementById('la-chart-channel').value;
-    const reps = state.reports.filter(r => (!prod || r.product === prod) && (!ch || r.channel === ch));
+    const reps = chartReports.filter(r => (!prod || r.product === prod) && (!ch || r.channel === ch));
 
     // Aggregate per CS
     const byCS = {};
@@ -787,24 +1015,39 @@
       });
       csCharts.push(chart);
     });
+
+    // Update summary table with same filtered data
+    renderReports(reps);
   }
 
   function renderReports(reports) {
     const tbody = document.getElementById('la-reports-table');
     if (!reports.length) {
-      tbody.innerHTML = '<tr><td colspan="8"><div class="la-empty">Belum ada data laporan di periode ini</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6"><div class="la-empty">Belum ada data laporan di periode ini</div></td></tr>';
       return;
     }
-    tbody.innerHTML = reports.map(r => `<tr>
-      <td style="white-space:nowrap;">${r.date ? r.date.split('-').reverse().join('/') : '-'}</td>
-      <td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:24px;height:24px;border-radius:50%;background:#eaf4fa;display:grid;place-items:center;font-size:8px;color:#587488;">${(r.cs||'?').slice(0,2).toUpperCase()}</span>${r.cs || '-'}</span></td>
-      <td><strong style="font-weight:550;">${r.product || '-'}</strong></td>
-      <td><span class="la-badge ${r.channel === 'CTWA' ? 'ctwa' : 'web'}">${r.channel === 'CTWA' ? '<span style="width:4px;height:4px;border-radius:50%;background:#36985a;"></span>' : ''}${r.channel || '-'}</span></td>
-      <td>${r.leads ?? 0}</td>
-      <td>${(r.closing||0) - (r.invalid||0)}</td>
-      <td>${(r.units||0) - (r.invalidUnits||0)}</td>
-      <td class="money">${money(r.revenue)}</td>
-    </tr>`).join('');
+    const byCS = {};
+    reports.forEach(r => {
+      if (!byCS[r.cs]) byCS[r.cs] = { leads:0, closing:0, units:0, revenue:0 };
+      const c = byCS[r.cs];
+      c.leads += (r.leads || 0);
+      c.closing += (r.closing || 0) - (r.invalid || 0);
+      c.units += (r.units || 0) - (r.invalidUnits || 0);
+      c.revenue += (r.revenue || 0);
+    });
+    tbody.innerHTML = Object.entries(byCS)
+      .sort((a,b) => b[1].revenue - a[1].revenue)
+      .map(([cs, d]) => {
+        const cr = d.leads > 0 ? (d.closing / d.leads * 100).toFixed(1) + '%' : '-';
+        return `<tr>
+          <td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:24px;height:24px;border-radius:50%;background:#eaf4fa;display:grid;place-items:center;font-size:8px;color:#587488;">${(cs||'?').slice(0,2).toUpperCase()}</span>${cs}</span></td>
+          <td>${d.leads}</td>
+          <td>${d.closing}</td>
+          <td>${d.units}</td>
+          <td>${cr}</td>
+          <td class="money">${money(d.revenue)}</td>
+        </tr>`;
+      }).join('');
   }
 
   function renderBEF(reports) {
