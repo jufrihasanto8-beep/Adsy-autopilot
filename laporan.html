@@ -311,6 +311,14 @@
             <option value="CTWA">CTWA</option>
           </select>
         </div>
+        <div class="la-filter-item">
+          <select id="la-platform">
+            <option value="">Semua platform</option>
+            <option value="Meta">Meta</option>
+            <option value="Google">Google</option>
+            <option value="TikTok">TikTok</option>
+          </select>
+        </div>
       </div>
 
       <!-- LOADING -->
@@ -328,7 +336,7 @@
         <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px;">
           <div>
             <div style="font-size:9px; font-weight:650; letter-spacing:1.7px; color:#587488; margin-bottom:7px;">AKUISISI ADSY TEAM</div>
-            <h1 style="font-family:Manrope; font-weight:750; font-size:24px; letter-spacing:-.7px; color:#073b56;">Ringkasan performa</h1>
+            <h1 style="font-family:Manrope; font-weight:750; font-size:24px; letter-spacing:-.7px; color:#073b56;">Ringkasan performa <span id="la-adv-name" style="color:#00789f;"></span></h1>
             <p style="font-size:11px; color:#587488; margin-top:7px;">Semua laporan sesuai filter periode dan channel.</p>
           </div>
           <button class="la-btn primary" onclick="openAdsModal()">+ Input Biaya Iklan</button>
@@ -512,6 +520,7 @@
                   <th>Tanggal</th>
                   <th>Produk</th>
                   <th>Channel</th>
+                  <th>Platform</th>
                   <th>Budget</th>
                   <th>Pajak</th>
                   <th>Total biaya</th>
@@ -519,7 +528,7 @@
                 </tr>
               </thead>
               <tbody id="la-ads-table">
-                <tr><td colspan="7"><div class="la-empty">Memuat...</div></td></tr>
+                <tr><td colspan="8"><div class="la-empty">Memuat...</div></td></tr>
               </tbody>
             </table>
           </div>
@@ -896,6 +905,7 @@
     drpEnd = new Date(now); drpEnd.setHours(12,0,0,0);
     document.getElementById('la-product').addEventListener('change', render);
     document.getElementById('la-channel').addEventListener('change', render);
+    document.getElementById('la-platform').addEventListener('change', render);
     document.getElementById('la-rekap-product').addEventListener('change', renderRekap);
     document.getElementById('la-rekap-channel').addEventListener('change', renderRekap);
     document.getElementById('la-chart-product').addEventListener('change', renderChartData);
@@ -1018,13 +1028,15 @@
   function getFilteredReports() {
     const ch = document.getElementById('la-channel').value;
     const prod = document.getElementById('la-product').value;
-    return state.reports.filter(r => (!ch || r.channel === ch) && (!prod || r.product === prod));
+    const plat = document.getElementById('la-platform').value;
+    return state.reports.filter(r => (!ch || r.channel === ch) && (!prod || r.product === prod) && (!plat || (r.platform||'Meta') === plat));
   }
 
   function getFilteredAds() {
     const ch = document.getElementById('la-channel').value;
     const prod = document.getElementById('la-product').value;
-    return state.ads.filter(a => (!ch || a.channel === ch) && (!prod || a.product === prod));
+    const plat = document.getElementById('la-platform').value;
+    return state.ads.filter(a => (!ch || a.channel === ch) && (!prod || a.product === prod) && (!plat || (a.platform||'Meta') === plat));
   }
 
   function render() {
@@ -1298,7 +1310,7 @@
   function renderAds(ads) {
     const tbody = document.getElementById('la-ads-table');
     if (!ads.length) {
-      tbody.innerHTML = '<tr><td colspan="7"><div class="la-empty">Belum ada data biaya iklan di periode ini</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8"><div class="la-empty">Belum ada data biaya iklan di periode ini</div></td></tr>';
       return;
     }
     tbody.innerHTML = ads.map(a => {
@@ -1309,6 +1321,7 @@
         <td style="white-space:nowrap;">${a.date ? a.date.split('-').reverse().join('/') : '-'}</td>
         <td><strong style="font-weight:550;">${a.product || '-'}</strong></td>
         <td><span class="la-badge ${a.channel === 'CTWA' ? 'ctwa' : 'web'}">${a.channel || '-'}</span></td>
+        <td>${a.platform || 'Meta'}</td>
         <td>${money(budget)}</td>
         <td>${tax}%</td>
         <td class="money">${money(Math.round(total))}</td>
@@ -1323,21 +1336,22 @@
     const sel = document.getElementById('ads-assignment');
 
     sel.innerHTML = '<option value="">Pilih penugasan...</option>';
-    // Deduplicate by product+channel — ad cost is per product+channel, not per CS
+    // Deduplicate by product+channel+platform — ad cost is per product+channel+platform, not per CS
     const seen = new Set();
     state.assignments.forEach(a => {
-      const key = `${a.product}|||${a.channel}`;
+      const plat = a.platform || 'Meta';
+      const key = `${a.product}|||${a.channel}|||${plat}`;
       if (seen.has(key)) return;
       seen.add(key);
-      const csNames = state.assignments.filter(x => x.product === a.product && x.channel === a.channel).map(x => x.cs).join(', ');
-      sel.innerHTML += `<option value="${key}">${a.product} · ${a.channel} (${csNames})</option>`;
+      const csNames = state.assignments.filter(x => x.product === a.product && x.channel === a.channel && (x.platform||'Meta') === plat).map(x => x.cs).join(', ');
+      sel.innerHTML += `<option value="${key}">${a.product} · ${a.channel} · ${plat} (${csNames})</option>`;
     });
 
     if (editId) {
       const ad = state.ads.find(a => a.id === editId);
       if (ad) {
         document.getElementById('ads-date').value = ad.date;
-        sel.value = `${ad.product}|||${ad.channel}`;
+        sel.value = `${ad.product}|||${ad.channel}|||${ad.platform||'Meta'}`;
         document.getElementById('ads-budget').value = ad.budget || 0;
         document.getElementById('ads-tax').value = ad.tax ?? 11;
       }
@@ -1362,15 +1376,15 @@
     const tax = document.getElementById('ads-tax').value;
 
     if (!date || !assignVal) return showToast('Lengkapi tanggal dan penugasan.', 'warning');
-    const [product, channel] = assignVal.split('|||');
-    if (!product || !channel) return showToast('Penugasan tidak valid.', 'error');
+    const [product, channel, platform] = assignVal.split('|||');
+    if (!product || !channel || !platform) return showToast('Penugasan tidak valid.', 'error');
 
     const btn = document.getElementById('btn-save-ads');
     btn.disabled = true; btn.textContent = 'Menyimpan...';
 
     try {
       await apiFetch('save-ads', {}, 'POST', {
-        ad: { date, product, channel, budget: Number(budget) || 0, tax: Number(tax) ?? 11 }
+        ad: { date, product, channel, platform, budget: Number(budget) || 0, tax: Number(tax) ?? 11 }
       });
       showToast('Biaya iklan berhasil disimpan!', 'success');
       window.closeAdsModal();
