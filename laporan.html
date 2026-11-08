@@ -122,17 +122,15 @@
     .la-table.rekap .eval-bad { color:#a35343; font-weight:600; }
     .la-table.rekap tfoot td { font-weight:650; background:#eaf4fa; border-top:2px solid #cce0ec; color:#073b56; }
 
-    /* Status Input */
-    .la-status-date { display:flex; align-items:center; gap:10px; padding:0 22px 16px; }
-    .la-status-date label { font-size:11px; color:#587488; }
-    .la-status-date input { border:1px solid #cce0ec; border-radius:6px; padding:7px 10px; font-size:11px; background:#f8fcff; color:#1d5c7b; font-family:'DM Sans'; }
-    .la-status-row { display:flex; align-items:center; gap:12px; padding:11px 22px; border-bottom:1px solid #eaf4fa; font-size:11px; }
-    .la-status-row:last-child { border-bottom:none; }
-    .la-status-row .name { min-width:120px; color:#1d5c7b; font-weight:550; }
-    .la-status-row .detail { color:#587488; flex:1; min-width:0; }
-    .la-status-check { display:inline-flex; align-items:center; gap:5px; border-radius:4px; padding:4px 8px; font-size:9px; font-weight:550; }
-    .la-status-check.done { background:#eaf8ef; color:#227148; }
-    .la-status-check.pending { background:#fff5cd; color:#906900; }
+    /* Chart */
+    .la-chart-filters { display:flex; align-items:center; gap:10px; padding:0 22px 16px; flex-wrap:wrap; }
+    .la-chart-filters select { border:1px solid #cce0ec; border-radius:6px; padding:7px 10px; font-size:11px; background:#f8fcff; color:#1d5c7b; font-family:'DM Sans'; }
+    .la-chart-filters .la-chip-group { display:flex; gap:5px; flex-wrap:wrap; }
+    .la-chip { display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:16px; font-size:10px; font-weight:550; cursor:pointer; border:1px solid #cce0ec; background:#fff; color:#587488; transition:all .15s; }
+    .la-chip:hover { border-color:#00a8df; color:#00789f; }
+    .la-chip.active { background:#00789f; border-color:#00789f; color:#fff; }
+    .la-chart-wrap { padding:10px 22px 22px; position:relative; min-height:300px; }
+    .la-chart-wrap canvas { max-height:400px; }
 
     /* Responsive */
     @media(max-width:1200px) {
@@ -310,23 +308,6 @@
           </div>
         </div>
 
-        <!-- STATUS INPUT HARIAN -->
-        <div class="la-card">
-          <div class="la-card-head">
-            <div>
-              <h3>Status Input Harian</h3>
-              <p>Cek siapa yang sudah dan belum input laporan & biaya iklan</p>
-            </div>
-          </div>
-          <div class="la-status-date">
-            <label>Tanggal:</label>
-            <input type="date" id="la-status-date" />
-          </div>
-          <div id="la-status-content">
-            <div class="la-empty">Pilih tanggal untuk cek status</div>
-          </div>
-        </div>
-
         <!-- REKAP HARIAN (spreadsheet-style) -->
         <div class="la-card">
           <div class="la-card-head">
@@ -370,8 +351,27 @@
           <div class="la-card-head">
             <div>
               <h3>Performa CS</h3>
-              <p>Laporan harian CS per penugasan</p>
+              <p>Grafik performa CS — leads, closing & omzet per CS</p>
             </div>
+          </div>
+          <div class="la-chart-filters">
+            <select id="la-chart-product">
+              <option value="">Semua produk</option>
+            </select>
+            <select id="la-chart-channel">
+              <option value="">Semua channel</option>
+              <option value="Web">Web</option>
+              <option value="CTWA">CTWA</option>
+            </select>
+            <div class="la-chip-group">
+              <span class="la-chip active" data-metric="leads">Leads</span>
+              <span class="la-chip active" data-metric="closing">Closing</span>
+              <span class="la-chip active" data-metric="units">Units</span>
+              <span class="la-chip active" data-metric="revenue">Omzet</span>
+            </div>
+          </div>
+          <div class="la-chart-wrap">
+            <canvas id="la-chart-cs"></canvas>
           </div>
           <div class="la-table-wrap">
             <table class="la-table">
@@ -471,6 +471,7 @@
 <div class="toast-container"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script type="module">
   import { requireAuth, renderUserInfo } from './js/auth.js';
   import { initSidebar, showToast, formatRupiah, formatNumber, formatDate } from './js/sidebar.js';
@@ -509,10 +510,13 @@
     document.getElementById('la-channel').addEventListener('change', render);
     document.getElementById('la-rekap-product').addEventListener('change', renderRekap);
     document.getElementById('la-rekap-channel').addEventListener('change', renderRekap);
+    document.getElementById('la-chart-product').addEventListener('change', renderChart);
+    document.getElementById('la-chart-channel').addEventListener('change', renderChart);
 
-    // Status date default: hari ini
-    document.getElementById('la-status-date').value = `${y}-${m}-${String(now.getDate()).padStart(2, '0')}`;
-    document.getElementById('la-status-date').addEventListener('change', renderStatus);
+    // Chip toggles for chart metrics
+    document.querySelectorAll('.la-chip[data-metric]').forEach(chip => {
+      chip.addEventListener('click', () => { chip.classList.toggle('active'); renderChart(); });
+    });
 
     // Live total preview in modal
     document.getElementById('ads-budget').addEventListener('input', updateTotalPreview);
@@ -578,6 +582,11 @@
       if (curRekap) rekapSel.value = curRekap;
       else if (products.length) rekapSel.value = products[0];
 
+      const chartProdSel = document.getElementById('la-chart-product');
+      const curChartProd = chartProdSel.value;
+      chartProdSel.innerHTML = '<option value="">Semua produk</option>' + prodOpts;
+      if (curChartProd) chartProdSel.value = curChartProd;
+
       document.getElementById('la-loading').style.display = 'none';
       document.getElementById('la-content').style.display = 'block';
       render();
@@ -621,7 +630,7 @@
     document.getElementById('la-leads-note').textContent = `${formatNumber(totalLeads)} leads ditangani tim`;
     document.getElementById('la-caq').textContent = caq;
 
-    renderStatus();
+    renderChart();
     renderRekap();
     renderReports(reports);
     renderBEF(reports);
@@ -714,63 +723,86 @@
     </tr>`;
   }
 
-  function renderStatus() {
-    const container = document.getElementById('la-status-content');
-    const date = document.getElementById('la-status-date').value;
-    if (!date || !state.assignments.length) {
-      container.innerHTML = '<div class="la-empty">Belum ada data penugasan</div>';
-      return;
-    }
+  let csChart = null;
+  function renderChart() {
+    const prod = document.getElementById('la-chart-product').value;
+    const ch = document.getElementById('la-chart-channel').value;
+    const reps = state.reports.filter(r => (!prod || r.product === prod) && (!ch || r.channel === ch));
 
-    const fmtDate = date.split('-').reverse().join('/');
-    let html = '';
-
-    // Group assignments by CS
+    // Aggregate per CS
     const byCS = {};
-    state.assignments.forEach(a => {
-      if (!byCS[a.cs]) byCS[a.cs] = [];
-      byCS[a.cs].push(a);
+    reps.forEach(r => {
+      if (!byCS[r.cs]) byCS[r.cs] = { leads:0, closing:0, units:0, revenue:0 };
+      const c = byCS[r.cs];
+      c.leads += (r.leads || 0);
+      c.closing += (r.closing || 0) - (r.invalid || 0);
+      c.units += (r.units || 0) - (r.invalidUnits || 0);
+      c.revenue += (r.revenue || 0);
     });
 
-    // Unique product+channel combos for ads check
-    const adsCombos = new Set();
-    state.assignments.forEach(a => adsCombos.add(`${a.product}|||${a.channel}`));
+    const csNames = Object.keys(byCS).sort((a,b) => byCS[b].revenue - byCS[a].revenue);
+    const activeMetrics = [...document.querySelectorAll('.la-chip.active[data-metric]')].map(c => c.dataset.metric);
 
-    // CS section
-    html += '<div style="padding:10px 22px 6px;"><div style="font-size:10px;font-weight:650;letter-spacing:1px;color:#587488;margin-bottom:8px;">LAPORAN CS</div></div>';
-    for (const [cs, assigns] of Object.entries(byCS).sort(([a],[b]) => a.localeCompare(b))) {
-      assigns.forEach(a => {
-        const hasReport = state.reports.some(r => r.date === date && r.cs === a.cs && r.product === a.product && r.channel === a.channel);
-        const report = state.reports.find(r => r.date === date && r.cs === a.cs && r.product === a.product && r.channel === a.channel);
-        html += `<div class="la-status-row">
-          <span class="name">${a.cs}</span>
-          <span class="detail">${a.product} · ${a.channel}</span>
-          ${hasReport
-            ? `<span class="la-status-check done">✓ Sudah (${report.leads || 0} leads, ${money(report.revenue)})</span>`
-            : `<span class="la-status-check pending">✕ Belum input</span>`}
-        </div>`;
-      });
-    }
+    const METRIC_CFG = {
+      leads:   { label:'Leads',   color:'#00a8df', bg:'rgba(0,168,223,.75)' },
+      closing: { label:'Closing', color:'#073b56', bg:'rgba(7,59,86,.75)' },
+      units:   { label:'Units',   color:'#ffd12a', bg:'rgba(255,209,42,.85)' },
+      revenue: { label:'Omzet',   color:'#36985a', bg:'rgba(54,152,90,.75)', yAxisID:'y1' }
+    };
 
-    // Ads section
-    html += '<div style="padding:16px 22px 6px;border-top:1px solid #eaf4fa;"><div style="font-size:10px;font-weight:650;letter-spacing:1px;color:#587488;margin-bottom:8px;">BIAYA IKLAN</div></div>';
-    const seenAds = new Set();
-    state.assignments.forEach(a => {
-      const key = `${a.product}|||${a.channel}`;
-      if (seenAds.has(key)) return;
-      seenAds.add(key);
-      const hasAd = state.ads.some(ad => ad.date === date && ad.product === a.product && ad.channel === a.channel);
-      const ad = state.ads.find(ad => ad.date === date && ad.product === a.product && ad.channel === a.channel);
-      html += `<div class="la-status-row">
-        <span class="name">${a.product}</span>
-        <span class="detail">${a.channel}</span>
-        ${hasAd
-          ? `<span class="la-status-check done">✓ Sudah (${money(ad.budget)} + ${ad.tax}%)</span>`
-          : `<span class="la-status-check pending">✕ Belum input</span>`}
-      </div>`;
+    const datasets = activeMetrics.map(m => ({
+      label: METRIC_CFG[m].label,
+      data: csNames.map(cs => byCS[cs][m] || 0),
+      backgroundColor: METRIC_CFG[m].bg,
+      borderColor: METRIC_CFG[m].color,
+      borderWidth: 1,
+      borderRadius: 4,
+      yAxisID: METRIC_CFG[m].yAxisID || 'y'
+    }));
+
+    const hasRevenue = activeMetrics.includes('revenue');
+    const ctx = document.getElementById('la-chart-cs');
+
+    if (csChart) csChart.destroy();
+    csChart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: csNames, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode:'index', intersect: false },
+        plugins: {
+          legend: { position:'top', labels: { font: { family:'DM Sans', size:11 }, boxWidth:12, padding:14 } },
+          tooltip: {
+            callbacks: {
+              label: item => {
+                const v = item.raw;
+                return item.dataset.yAxisID === 'y1'
+                  ? `${item.dataset.label}: ${money(v)}`
+                  : `${item.dataset.label}: ${v.toLocaleString('id-ID')}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { font: { family:'DM Sans', size:10 } }, grid: { display:false } },
+          y: {
+            beginAtZero: true, position:'left',
+            ticks: { font: { family:'DM Sans', size:10 } },
+            grid: { color:'#eaf4fa' },
+            title: { display: true, text:'Leads / Closing / Units', font: { family:'DM Sans', size:10 }, color:'#587488' }
+          },
+          ...(hasRevenue ? {
+            y1: {
+              beginAtZero: true, position:'right',
+              ticks: { font: { family:'DM Sans', size:10 }, callback: v => v >= 1e6 ? (v/1e6).toFixed(0)+'jt' : v >= 1e3 ? (v/1e3).toFixed(0)+'rb' : v },
+              grid: { drawOnChartArea: false },
+              title: { display: true, text:'Omzet (Rp)', font: { family:'DM Sans', size:10 }, color:'#587488' }
+            }
+          } : {})
+        }
+      }
     });
-
-    container.innerHTML = html;
   }
 
   function renderReports(reports) {
