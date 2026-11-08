@@ -111,7 +111,7 @@
     /* Rekap Harian */
     .la-rekap-head { display:flex; align-items:center; gap:10px; padding:0 22px 14px; flex-wrap:wrap; }
     .la-rekap-head select { border:1px solid #cce0ec; border-radius:6px; padding:7px 10px; font-size:11px; background:#f8fcff; color:#1d5c7b; font-family:'DM Sans'; }
-    .la-table.rekap th { font-size:8px; padding:10px 12px; text-align:right; white-space:normal; line-height:1.4; }
+    .la-table.rekap th { font-size:8px; padding:10px 12px; text-align:right; white-space:normal; line-height:1.4; position:sticky; top:0; z-index:2; }
     .la-table.rekap th:first-child { text-align:left; }
     .la-table.rekap td { font-size:10px; padding:10px 12px; text-align:right; font-variant-numeric:tabular-nums; }
     .la-table.rekap td:first-child { text-align:left; white-space:nowrap; }
@@ -125,12 +125,15 @@
     /* Chart */
     .la-chart-filters { display:flex; align-items:center; gap:10px; padding:0 22px 16px; flex-wrap:wrap; }
     .la-chart-filters select { border:1px solid #cce0ec; border-radius:6px; padding:7px 10px; font-size:11px; background:#f8fcff; color:#1d5c7b; font-family:'DM Sans'; }
-    .la-chart-filters .la-chip-group { display:flex; gap:5px; flex-wrap:wrap; }
-    .la-chip { display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:16px; font-size:10px; font-weight:550; cursor:pointer; border:1px solid #cce0ec; background:#fff; color:#587488; transition:all .15s; }
-    .la-chip:hover { border-color:#00a8df; color:#00789f; }
-    .la-chip.active { background:#00789f; border-color:#00789f; color:#fff; }
-    .la-chart-wrap { padding:10px 22px 22px; position:relative; min-height:300px; }
-    .la-chart-wrap canvas { max-height:400px; }
+    .la-chart-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:18px; padding:6px 22px 22px; }
+    .la-chart-item { text-align:center; }
+    .la-chart-item canvas { max-width:140px; max-height:140px; margin:0 auto; }
+    .la-chart-item .cs-name { font-family:Manrope; font-size:12px; font-weight:650; color:#073b56; margin-top:10px; }
+    .la-chart-item .cs-meta { font-size:10px; color:#587488; margin-top:3px; }
+    .la-chart-item .cs-rate { font-family:Manrope; font-size:20px; font-weight:750; letter-spacing:-.5px; margin-top:6px; }
+    .la-chart-item .cs-rate.good { color:#227148; }
+    .la-chart-item .cs-rate.mid { color:#906900; }
+    .la-chart-item .cs-rate.low { color:#a35343; }
 
     /* Responsive */
     @media(max-width:1200px) {
@@ -324,7 +327,7 @@
               <option value="CTWA">CTWA</option>
             </select>
           </div>
-          <div class="la-table-wrap">
+          <div class="la-table-wrap" style="max-height:480px; overflow:auto;">
             <table class="la-table rekap" id="la-rekap-table">
               <thead>
                 <tr>
@@ -363,16 +366,8 @@
               <option value="Web">Web</option>
               <option value="CTWA">CTWA</option>
             </select>
-            <div class="la-chip-group">
-              <span class="la-chip active" data-metric="leads">Leads</span>
-              <span class="la-chip active" data-metric="closing">Closing</span>
-              <span class="la-chip active" data-metric="units">Units</span>
-              <span class="la-chip active" data-metric="revenue">Omzet</span>
-            </div>
           </div>
-          <div class="la-chart-wrap">
-            <canvas id="la-chart-cs"></canvas>
-          </div>
+          <div class="la-chart-grid" id="la-chart-grid"></div>
           <div class="la-table-wrap">
             <table class="la-table">
               <thead>
@@ -512,11 +507,6 @@
     document.getElementById('la-rekap-channel').addEventListener('change', renderRekap);
     document.getElementById('la-chart-product').addEventListener('change', renderChart);
     document.getElementById('la-chart-channel').addEventListener('change', renderChart);
-
-    // Chip toggles for chart metrics
-    document.querySelectorAll('.la-chip[data-metric]').forEach(chip => {
-      chip.addEventListener('click', () => { chip.classList.toggle('active'); renderChart(); });
-    });
 
     // Live total preview in modal
     document.getElementById('ads-budget').addEventListener('input', updateTotalPreview);
@@ -723,7 +713,7 @@
     </tr>`;
   }
 
-  let csChart = null;
+  let csCharts = [];
   function renderChart() {
     const prod = document.getElementById('la-chart-product').value;
     const ch = document.getElementById('la-chart-channel').value;
@@ -732,76 +722,70 @@
     // Aggregate per CS
     const byCS = {};
     reps.forEach(r => {
-      if (!byCS[r.cs]) byCS[r.cs] = { leads:0, closing:0, units:0, revenue:0 };
-      const c = byCS[r.cs];
-      c.leads += (r.leads || 0);
-      c.closing += (r.closing || 0) - (r.invalid || 0);
-      c.units += (r.units || 0) - (r.invalidUnits || 0);
-      c.revenue += (r.revenue || 0);
+      if (!byCS[r.cs]) byCS[r.cs] = { leads:0, closing:0 };
+      byCS[r.cs].leads += (r.leads || 0);
+      byCS[r.cs].closing += (r.closing || 0) - (r.invalid || 0);
     });
 
-    const csNames = Object.keys(byCS).sort((a,b) => byCS[b].revenue - byCS[a].revenue);
-    const activeMetrics = [...document.querySelectorAll('.la-chip.active[data-metric]')].map(c => c.dataset.metric);
+    const grid = document.getElementById('la-chart-grid');
+    csCharts.forEach(c => c.destroy());
+    csCharts = [];
 
-    const METRIC_CFG = {
-      leads:   { label:'Leads',   color:'#00a8df', bg:'rgba(0,168,223,.75)' },
-      closing: { label:'Closing', color:'#073b56', bg:'rgba(7,59,86,.75)' },
-      units:   { label:'Units',   color:'#ffd12a', bg:'rgba(255,209,42,.85)' },
-      revenue: { label:'Omzet',   color:'#36985a', bg:'rgba(54,152,90,.75)', yAxisID:'y1' }
-    };
+    const entries = Object.entries(byCS).sort((a,b) => {
+      const rA = a[1].leads > 0 ? a[1].closing / a[1].leads : 0;
+      const rB = b[1].leads > 0 ? b[1].closing / b[1].leads : 0;
+      return rB - rA;
+    });
 
-    const datasets = activeMetrics.map(m => ({
-      label: METRIC_CFG[m].label,
-      data: csNames.map(cs => byCS[cs][m] || 0),
-      backgroundColor: METRIC_CFG[m].bg,
-      borderColor: METRIC_CFG[m].color,
-      borderWidth: 1,
-      borderRadius: 4,
-      yAxisID: METRIC_CFG[m].yAxisID || 'y'
-    }));
+    if (!entries.length) {
+      grid.innerHTML = '<div class="la-empty" style="grid-column:1/-1;">Belum ada data laporan CS</div>';
+      return;
+    }
 
-    const hasRevenue = activeMetrics.includes('revenue');
-    const ctx = document.getElementById('la-chart-cs');
+    grid.innerHTML = entries.map(([cs], i) => `
+      <div class="la-chart-item">
+        <canvas id="la-cs-chart-${i}"></canvas>
+        <div class="cs-name">${cs}</div>
+        <div class="cs-meta" id="la-cs-meta-${i}"></div>
+        <div class="cs-rate" id="la-cs-rate-${i}"></div>
+      </div>
+    `).join('');
 
-    if (csChart) csChart.destroy();
-    csChart = new Chart(ctx, {
-      type: 'bar',
-      data: { labels: csNames, datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode:'index', intersect: false },
-        plugins: {
-          legend: { position:'top', labels: { font: { family:'DM Sans', size:11 }, boxWidth:12, padding:14 } },
-          tooltip: {
-            callbacks: {
-              label: item => {
-                const v = item.raw;
-                return item.dataset.yAxisID === 'y1'
-                  ? `${item.dataset.label}: ${money(v)}`
-                  : `${item.dataset.label}: ${v.toLocaleString('id-ID')}`;
+    entries.forEach(([cs, d], i) => {
+      const rate = d.leads > 0 ? (d.closing / d.leads * 100) : 0;
+      const sisa = Math.max(d.leads - d.closing, 0);
+      const rateClass = rate >= 15 ? 'good' : rate >= 8 ? 'mid' : 'low';
+
+      document.getElementById(`la-cs-meta-${i}`).textContent = `${d.closing} closing / ${d.leads} leads`;
+      const rateEl = document.getElementById(`la-cs-rate-${i}`);
+      rateEl.textContent = rate.toFixed(1) + '%';
+      rateEl.className = 'cs-rate ' + rateClass;
+
+      const chart = new Chart(document.getElementById(`la-cs-chart-${i}`), {
+        type: 'doughnut',
+        data: {
+          labels: ['Closing', 'Belum closing'],
+          datasets: [{
+            data: [d.closing, sisa],
+            backgroundColor: ['#073b56', '#e2ecf2'],
+            borderWidth: 0,
+            cutout: '72%'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: item => `${item.label}: ${item.raw} (${d.leads > 0 ? (item.raw / d.leads * 100).toFixed(1) : 0}%)`
               }
             }
           }
-        },
-        scales: {
-          x: { ticks: { font: { family:'DM Sans', size:10 } }, grid: { display:false } },
-          y: {
-            beginAtZero: true, position:'left',
-            ticks: { font: { family:'DM Sans', size:10 } },
-            grid: { color:'#eaf4fa' },
-            title: { display: true, text:'Leads / Closing / Units', font: { family:'DM Sans', size:10 }, color:'#587488' }
-          },
-          ...(hasRevenue ? {
-            y1: {
-              beginAtZero: true, position:'right',
-              ticks: { font: { family:'DM Sans', size:10 }, callback: v => v >= 1e6 ? (v/1e6).toFixed(0)+'jt' : v >= 1e3 ? (v/1e3).toFixed(0)+'rb' : v },
-              grid: { drawOnChartArea: false },
-              title: { display: true, text:'Omzet (Rp)', font: { family:'DM Sans', size:10 }, color:'#587488' }
-            }
-          } : {})
         }
-      }
+      });
+      csCharts.push(chart);
     });
   }
 
