@@ -924,23 +924,8 @@
 
   let reloadTimer = null;
   function silentReload() {
-    // Debounce: multiple changes within 500ms only trigger one reload
     clearTimeout(reloadTimer);
-    reloadTimer = setTimeout(async () => {
-      try {
-        const start = document.getElementById('la-start').value;
-        const end = document.getElementById('la-end').value;
-        if (!start || !end) return;
-        const data = await apiFetch('adv-init', { start, end });
-        state.advName = data.advertiser || '';
-        state.assignments = data.assignments || [];
-        state.catalog = data.catalog || [];
-        state.reports = data.reports || [];
-        state.leadReports = data.leadReports || [];
-        state.ads = data.ads || [];
-        render();
-      } catch {}
-    }, 500);
+    reloadTimer = setTimeout(() => loadData(true), 500);
   }
 
   function updateTotalPreview() {
@@ -977,14 +962,16 @@
     return json;
   }
 
-  async function loadData() {
+  async function loadData(silent = false) {
     const start = document.getElementById('la-start').value;
     const end = document.getElementById('la-end').value;
     if (!start || !end) return;
 
-    document.getElementById('la-loading').style.display = 'block';
-    document.getElementById('la-content').style.display = 'none';
-    document.getElementById('la-error').style.display = 'none';
+    if (!silent) {
+      document.getElementById('la-loading').style.display = 'block';
+      document.getElementById('la-content').style.display = 'none';
+      document.getElementById('la-error').style.display = 'none';
+    }
 
     try {
       const data = await apiFetch('adv-init', { start, end });
@@ -1015,10 +1002,13 @@
       chartProdSel.innerHTML = '<option value="">Semua produk</option>' + prodOpts;
       if (curChartProd) chartProdSel.value = curChartProd;
 
-      document.getElementById('la-loading').style.display = 'none';
-      document.getElementById('la-content').style.display = 'block';
+      if (!silent) {
+        document.getElementById('la-loading').style.display = 'none';
+        document.getElementById('la-content').style.display = 'block';
+      }
       render();
     } catch (err) {
+      if (silent) return;
       document.getElementById('la-loading').style.display = 'none';
       document.getElementById('la-error').textContent = err.message;
       document.getElementById('la-error').style.display = 'block';
