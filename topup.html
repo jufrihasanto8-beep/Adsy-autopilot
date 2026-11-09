@@ -1850,10 +1850,10 @@
       return;
     }
 
-    // Enrich Selow requests dengan info kartu dari topup_ad_accounts → linebank_cards
-    const selowItems = (data || []).filter(r => r.extracted_data?.payment_method === 'selow' && r.topup_ad_account_id);
-    if (selowItems.length) {
-      const accIds = [...new Set(selowItems.map(r => r.topup_ad_account_id))];
+    // Enrich semua requests dengan info kartu dari topup_ad_accounts → linebank_cards
+    const itemsWithAcc = (data || []).filter(r => r.topup_ad_account_id);
+    if (itemsWithAcc.length) {
+      const accIds = [...new Set(itemsWithAcc.map(r => r.topup_ad_account_id))];
       const { data: accRows } = await sb.from('topup_ad_accounts').select('id, linebank_card_id').in('id', accIds);
       const cardIds = [...new Set((accRows || []).map(a => a.linebank_card_id).filter(Boolean))];
       let cardMap = {};
@@ -1904,9 +1904,9 @@
       ? '<span style="background:#eff6ff;color:#1d4ed8;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;">🔵 Selow.id</span>'
       : '<span style="background:#f3f4f6;color:#374151;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;">💳 Kartu/LB</span>';
 
-    // Info kartu Selow (enriched dari loadFinanceList)
+    // Info kartu (enriched dari loadFinanceList)
     const card = r._card;
-    const cardInfo = isSelow && card
+    const cardInfo = card
       ? `<div class="fin-card-row"><span class="lbl">💳 Kartu</span><span class="val">${card.label || '-'}${card.nomor_kartu ? ' · ••••' + card.nomor_kartu.replace(/\\s/g,'').slice(-4) : ''}</span></div>`
       : '';
 
