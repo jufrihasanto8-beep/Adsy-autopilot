@@ -220,6 +220,17 @@
       <!-- ── Panel: Request ── -->
       <div id="panel-request" class="topup-panel" style="max-width:600px;margin:0 auto;">
 
+        <!-- Info skema top up Selow -->
+        <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+          <div style="font-size:13px;font-weight:700;color:#1d4ed8;margin-bottom:6px;">ℹ️ Skema Top Up Selow Terbaru</div>
+          <div style="font-size:12px;color:#1e40af;line-height:1.7;">
+            <div>1. Kamu submit request top up seperti biasa</div>
+            <div>2. Setelah SPV approve, <strong>finance langsung dapat notifikasi</strong> berisi info kartu & nominal</div>
+            <div>3. Finance share saldo ke kartu kamu, lalu konfirmasi selesai</div>
+            <div style="margin-top:6px;font-size:11px;color:#3b82f6;">Tidak perlu input nominal unik lagi — semua otomatis!</div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header">
             <div>
@@ -1820,7 +1831,7 @@
     const weekWIB = new Date(Date.now() + WIB - 7 * 86400000).toISOString().slice(0, 10);
 
     let query = sb.from('topup_requests')
-      .select('id, user_name, nominal_request, nominal_disetujui, status, created_at, updated_at, finance_acc, finance_acc_at, finance_acc_by, ad_account_name, topup_time, extracted_data, products(name)')
+      .select('id, user_name, nominal_request, nominal_disetujui, status, created_at, updated_at, finance_acc, finance_acc_at, finance_acc_by, ad_account_name, topup_time, extracted_data, topup_ad_account_id, products(name)')
       .eq('status', 'approved')
       .order('updated_at', { ascending: false });
 
@@ -1839,11 +1850,24 @@
       return;
     }
 
-    // Tentukan isDone per item: Selow pakai transfer_confirmed, non-Selow pakai finance_acc
-    const isTransferDone = r => {
-      const isSelow = r.extracted_data?.payment_method === 'selow';
-      return isSelow ? !!r.extracted_data?.transfer_confirmed : !!r.finance_acc;
-    };
+    // Enrich Selow requests dengan info kartu dari topup_ad_accounts → linebank_cards
+    const selowItems = (data || []).filter(r => r.extracted_data?.payment_method === 'selow' && r.topup_ad_account_id);
+    if (selowItems.length) {
+      const accIds = [...new Set(selowItems.map(r => r.topup_ad_account_id))];
+      const { data: accRows } = await sb.from('topup_ad_accounts').select('id, linebank_card_id').in('id', accIds);
+      const cardIds = [...new Set((accRows || []).map(a => a.linebank_card_id).filter(Boolean))];
+      let cardMap = {};
+      if (cardIds.length) {
+        const { data: cards } = await sb.from('linebank_cards').select('id, label, nomor_kartu').in('id', cardIds);
+        (cards || []).forEach(c => { cardMap[c.id] = c; });
+      }
+      const accCardMap = {};
+      (accRows || []).forEach(a => { if (a.linebank_card_id) accCardMap[a.id] = cardMap[a.linebank_card_id]; });
+      (data || []).forEach(r => { if (r.topup_ad_account_id && accCardMap[r.topup_ad_account_id]) r._card = accCardMap[r.topup_ad_account_id]; });
+    }
+
+    // isDone: semua pakai finance_acc (Selow & non-Selow sama)
+    const isTransferDone = r => !!r.finance_acc;
     const pending = (data || []).filter(r => !isTransferDone(r));
     const done = (data || []).filter(r => isTransferDone(r));
 
@@ -1880,44 +1904,27 @@
       ? '<span style="background:#eff6ff;color:#1d4ed8;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;">🔵 Selow.id</span>'
       : '<span style="background:#f3f4f6;color:#374151;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;">💳 Kartu/LB</span>';
 
+    // Info kartu Selow (enriched dari loadFinanceList)
+    const card = r._card;
+    const cardInfo = isSelow && card
+      ? `<div class="fin-card-row"><span class="lbl">💳 Kartu</span><span class="val">${card.label || '-'}${card.nomor_kartu ? ' · ••••' + card.nomor_kartu.replace(/\\s/g,'').slice(-4) : ''}</span></div>`
+      : '';
+
     let actionBtn = '';
     if (isDone) {
-      if (isSelow) {
-        // Selow: konfirmasi sudah via link — tampilkan info transfer
-        const bankLabel = r.transfer_bank === 'bri' ? 'BRI' : r.transfer_bank === 'mandiri' ? 'Mandiri' : '-';
-        const nominalTf = r.nominal_transfer ? 'Rp ' + Number(r.nominal_transfer).toLocaleString('id-ID') : '-';
-        actionBtn = `<div style="text-align:center; min-width:120px;">
-          <div style="font-size:22px; margin-bottom:2px;">✅</div>
-          <div style="font-size:11px; color:#065f46; font-weight:700;">Dikonfirmasi Finance</div>
-          <div style="font-size:10px; color:var(--text-sub); margin-top:2px;">🏦 ${bankLabel} · ${nominalTf}</div>
-        </div>`;
-      } else {
-        // Non-Selow: tombol ACC manual
-        const accAt = r.finance_acc_at ? new Date(r.finance_acc_at).toLocaleString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' }) : null;
-        actionBtn = `<div style="text-align:center; min-width:120px;">
-          <div style="font-size:22px; margin-bottom:2px;">✅</div>
-          <div style="font-size:11px; color:#065f46; font-weight:700;">Sudah Transfer</div>
-          ${accAt ? '<div style="font-size:10px; color:var(--text-sub); margin-top:2px;">' + accAt + '</div>' : ''}
-          ${r.finance_acc_by ? '<div style="font-size:10px; color:var(--text-sub);">oleh ' + r.finance_acc_by + '</div>' : ''}
-        </div>`;
-      }
+      const accAt = r.finance_acc_at ? new Date(r.finance_acc_at).toLocaleString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' }) : null;
+      actionBtn = `<div style="text-align:center; min-width:120px;">
+        <div style="font-size:22px; margin-bottom:2px;">✅</div>
+        <div style="font-size:11px; color:#065f46; font-weight:700;">Sudah Transfer</div>
+        ${accAt ? '<div style="font-size:10px; color:var(--text-sub); margin-top:2px;">' + accAt + '</div>' : ''}
+        ${r.finance_acc_by ? '<div style="font-size:10px; color:var(--text-sub);">oleh ' + r.finance_acc_by + '</div>' : ''}
+      </div>`;
     } else {
-      if (isSelow) {
-        // Selow belum confirm: tampilkan status step-nya, tidak ada tombol manual
-        const step = ext.transfer_confirmed ? 4 : r.nominal_transfer ? 3 : 2;
-        const stepLabels = { 2:'Menunggu input nominal', 3:'Menunggu konfirmasi finance', 4:'Selesai' };
-        actionBtn = `<div style="text-align:center; min-width:130px;">
-          <div style="font-size:20px; margin-bottom:4px;">⏳</div>
-          <div style="font-size:11px; color:#92400e; font-weight:700;">${stepLabels[step] || 'Proses'}</div>
-          <div style="font-size:10px; color:var(--text-sub); margin-top:2px;">Konfirmasi via link WA</div>
-        </div>`;
-      } else {
-        // Non-Selow: tombol ACC
-        actionBtn = `<button class="btn btn-sm" onclick="accFinance('${r.id}')" id="fin-btn-${r.id}"
-          style="background:var(--primary);color:#fff;border:none;white-space:nowrap;min-width:120px;">
-          ✅ Sudah Transfer
-        </button>`;
-      }
+      // Semua (Selow & non-Selow) pakai tombol yang sama
+      actionBtn = `<button class="btn btn-sm" onclick="accFinance('${r.id}')" id="fin-btn-${r.id}"
+        style="background:var(--primary);color:#fff;border:none;white-space:nowrap;min-width:120px;">
+        ✅ Sudah Transfer
+      </button>`;
     }
 
     return `
@@ -1932,8 +1939,8 @@
           <div class="fin-card-rows">
             <div class="fin-card-row"><span class="lbl">💰 Nominal Disetujui</span><span class="val" style="color:var(--primary);font-size:13px;">${fmtNum(nominal)}</span></div>
             <div class="fin-card-row"><span class="lbl">🖥️ Akun Iklan</span><span class="val">${r.ad_account_name || '-'}</span></div>
+            ${cardInfo}
             <div class="fin-card-row"><span class="lbl">📅 Disetujui</span><span class="val">${tglAcc}</span></div>
-            ${r.nominal_transfer ? '<div class="fin-card-row"><span class="lbl">💸 Transfer</span><span class="val">Rp ' + Number(r.nominal_transfer).toLocaleString('id-ID') + '</span></div>' : ''}
           </div>
         </div>
         <div class="fin-acc-btn" style="align-self:center;">
@@ -1956,8 +1963,17 @@
 
       if (error) throw error;
 
+      // Kirim WA notif ke advertiser bahwa transfer selesai (fire & forget)
+      const { data: reqRow } = await sb.from('topup_requests').select('approve_token').eq('id', id).single();
+      if (reqRow?.approve_token) {
+        fetch('/api/notify-wa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'confirm_selow', id, token: reqRow.approve_token })
+        }).catch(() => {});
+      }
+
       showToast('Transfer tercatat!', 'success');
-      // Refresh kartu langsung tanpa reload semua
       await loadFinanceList();
     } catch (e) {
       showToast('Gagal: ' + e.message, 'error');
@@ -2049,34 +2065,26 @@
       const recNominal = rec.recommendation_pct ? Math.round(r.nominal_request * rec.recommendation_pct / 100) : null;
       recChipHtml = '<span class="chip ' + recClass + '">⚡ ' + recLabel + ' · ' + rec.recommendation_pct + '%' + (recNominal ? ' = Rp ' + recNominal.toLocaleString('id-ID') : '') + '</span>';
     }
-    // ── Selow.id: step indicator + section per state ──
+    // ── Selow.id: step indicator + section per state (3 step: ACC → Transfer → Selesai) ──
     let selowHtml = '';
     let selowBadge = '';
     if (ext.payment_method === 'selow') {
-      const nominalTf = r.nominal_transfer;
-      const tfConfirmed = ext.transfer_confirmed;
-
-      // Tentukan step saat ini
-      // step 1: pending, step 2: approved+belum input, step 3: input+belum confirm, step 4: confirmed
+      // step 1: pending, step 2: approved+menunggu transfer, step 3: finance_acc done
       const step = r.status === 'rejected' ? 0
         : r.status === 'pending' ? 1
-        : tfConfirmed ? 4
-        : nominalTf ? 3
+        : r.finance_acc ? 3
         : 2;
 
-      // Badge status override untuk Selow.id
-      const stepLabels = { 0:'Ditolak', 1:'Menunggu ACC', 2:'Menunggu Nominal', 3:'Menunggu Transfer', 4:'Selesai' };
-      const stepColors = { 0:'#fee2e2:#991b1b', 1:'#fff7ed:#c2410c', 2:'#eff6ff:#1d4ed8', 3:'#fef3c7:#92400e', 4:'#d1fae5:#065f46' };
+      const stepLabels = { 0:'Ditolak', 1:'Menunggu ACC', 2:'Menunggu Transfer', 3:'Selesai' };
+      const stepColors = { 0:'#fee2e2:#991b1b', 1:'#fff7ed:#c2410c', 2:'#fef3c7:#92400e', 3:'#d1fae5:#065f46' };
       const [bgC, txC] = (stepColors[step] || stepColors[1]).split(':');
       selowBadge = '<span style="background:' + bgC + ';color:' + txC + ';border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;">' + (stepLabels[step] || '-') + '</span>';
 
-      // Progress bar steps
-      const steps = ['ACC', 'Input Nominal', 'Transfer', 'Selesai'];
+      // Progress bar 3 steps
+      const steps = ['ACC', 'Transfer', 'Selesai'];
       const stepsHtml = steps.map((s, i) => {
-        const stepNum = i + 1; // step 1=ACC(=2), 2=Input(=2), 3=Transfer(=3), 4=Selesai(=4)
-        // mapping: ACC = step>=2, Input = step>=3, Transfer = step>=4, Selesai = step=4
-        const done = (i === 0 && step >= 2) || (i === 1 && step >= 3) || (i === 2 && step >= 4) || (i === 3 && step >= 4);
-        const active = (i === 0 && step === 2) || (i === 1 && step === 3) || (i === 2 && step === 4);
+        const done = (i === 0 && step >= 2) || (i === 1 && step >= 3) || (i === 2 && step >= 3);
+        const active = (i === 0 && step === 1) || (i === 1 && step === 2) || (i === 2 && step === 3);
         const c = done ? '#10b981' : active ? '#3b82f6' : '#d1d5db';
         return '<div style="display:flex;flex-direction:column;align-items:center;flex:1;">'
           + '<div style="width:24px;height:24px;border-radius:50%;background:' + c + ';display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:700;">' + (done ? '✓' : (i + 1)) + '</div>'
@@ -2088,43 +2096,21 @@
         ? '<div style="margin-top:12px;display:flex;align-items:flex-start;">' + stepsHtml + '</div>'
         : '';
 
-      if (step === 4) {
-        // Transfer sudah dikonfirmasi finance
+      if (step === 3) {
+        // Finance sudah transfer
+        const accAt = r.finance_acc_at ? new Date(r.finance_acc_at).toLocaleString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' }) : '';
         selowHtml = progressHtml
           + '<div style="margin-top:10px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:10px 14px;">'
           + '<div style="font-size:12px;font-weight:700;color:#166534;">✅ Transfer selesai dikonfirmasi finance</div>'
-          + (nominalTf && r.transfer_bank ? '<div style="font-size:11px;color:#166534;margin-top:2px;">🏦 ' + (r.transfer_bank === 'bri' ? 'BRI' : 'Mandiri') + ' · Rp ' + Number(nominalTf).toLocaleString('id-ID') + '</div>' : '')
+          + (accAt ? '<div style="font-size:11px;color:#166534;margin-top:2px;">' + accAt + '</div>' : '')
           + '</div>';
-      } else if (step === 3) {
-        // Nominal sudah dikirim, menunggu finance transfer
+      } else if (step === 2) {
+        // Approved — menunggu finance transfer
         selowHtml = progressHtml
           + '<div style="margin-top:10px;background:#fefce8;border:1.5px solid #fde68a;border-radius:10px;padding:10px 14px;">'
           + '<div style="font-size:12px;font-weight:700;color:#92400e;">⏳ Menunggu finance transfer</div>'
-          + (nominalTf && r.transfer_bank ? '<div style="font-size:11px;color:#92400e;margin-top:2px;">🏦 ' + (r.transfer_bank === 'bri' ? 'BRI' : 'Mandiri') + ' · Rp ' + Number(nominalTf).toLocaleString('id-ID') + '</div>' : '')
+          + '<div style="font-size:11px;color:#92400e;margin-top:2px;">Notifikasi sudah dikirim ke group finance</div>'
           + '</div>';
-      } else if (step === 2) {
-        // Approved — belum input nominal
-        const nominalLabel = fmtNum(r.nominal_disetujui || r.nominal_request);
-        const nominalRaw = String(r.nominal_disetujui || r.nominal_request || '').replace(/\D/g, '');
-        selowHtml = progressHtml
-          + '<div style="margin-top:10px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;">'
-          + '<div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:8px;">🔵 Selow.id — Input Nominal Transfer</div>'
-          + '<div style="font-size:12px;color:#475569;margin-bottom:10px;">Buka Selow.id → request Rp ' + nominalLabel + ' → input nominal yang diberikan Selow.id di bawah:</div>'
-          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
-          + '<label style="cursor:pointer;" onclick="document.getElementById(\'selow-bank-bri-' + r.id + '\').checked=true;document.getElementById(\'selow-card-bri-' + r.id + '\').classList.add(\'active\');document.getElementById(\'selow-card-mandiri-' + r.id + '\').classList.remove(\'active\');">'
-          + '<input type="radio" name="selow-bank-' + r.id + '" id="selow-bank-bri-' + r.id + '" value="bri" checked style="display:none;" />'
-          + '<div class="topup-time-card active" id="selow-card-bri-' + r.id + '" style="padding:8px 10px;"><div style="font-size:13px;font-weight:700;">🏦 BRI</div></div>'
-          + '</label>'
-          + '<label style="cursor:pointer;" onclick="document.getElementById(\'selow-bank-mandiri-' + r.id + '\').checked=true;document.getElementById(\'selow-card-mandiri-' + r.id + '\').classList.add(\'active\');document.getElementById(\'selow-card-bri-' + r.id + '\').classList.remove(\'active\');">'
-          + '<input type="radio" name="selow-bank-' + r.id + '" id="selow-bank-mandiri-' + r.id + '" value="mandiri" style="display:none;" />'
-          + '<div class="topup-time-card" id="selow-card-mandiri-' + r.id + '" style="padding:8px 10px;"><div style="font-size:13px;font-weight:700;">🏦 Mandiri</div></div>'
-          + '</label>'
-          + '</div>'
-          + '<div style="display:flex;gap:8px;align-items:center;">'
-          + '<div class="nominal-wrap" style="flex:1;"><span class="prefix" style="font-size:13px;">Rp</span>'
-          + '<input type="text" id="selow-input-' + r.id + '" class="form-input" placeholder="Contoh: ' + nominalRaw + '.303" inputmode="numeric" oninput="formatNominalInput(this)" style="padding-left:38px;font-size:15px;font-weight:700;" /></div>'
-          + '<button onclick="submitNominalTransfer(\'' + r.id + '\')" class="btn btn-primary btn-sm" style="white-space:nowrap;">Kirim ke Finance</button>'
-          + '</div></div>';
       }
     }
 
@@ -2164,49 +2150,7 @@
     </div>`;
   }
 
-  // ── Selow.id: Submit Nominal Transfer ──
-  window.submitNominalTransfer = async function(requestId) {
-    const inputEl = document.getElementById(`selow-input-${requestId}`);
-    const nominalTf = parseInt(inputEl?.value.replace(/\D/g, '')) || 0;
-    const bank = document.querySelector(`input[name="selow-bank-${requestId}"]:checked`)?.value || 'bri';
-    if (!nominalTf || nominalTf < 1000) { showToast('Masukkan nominal transfer dari Selow.id', 'warning'); return; }
-
-    const btn = document.querySelector(`button[onclick="submitNominalTransfer('${requestId}')"]`);
-    if (btn) { btn.disabled = true; btn.textContent = 'Mengirim...'; }
-
-    try {
-      const req = window._historyData?.find(r => r.id === requestId);
-
-      await fetch('/api/notify-wa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'notify_selow_transfer',
-          request_id: requestId,
-          user_name: req?.user_name || '',
-          nominal_disetujui: req?.nominal_disetujui || req?.nominal_request || 0,
-          nominal_transfer: nominalTf,
-          transfer_bank: bank,
-          ad_account_name: req?.ad_account_name || '',
-          billing_data: req?.billing_data || {}
-        })
-      });
-
-      // Update data lokal & re-render card
-      const idx = window._historyData?.findIndex(r => r.id === requestId);
-      if (idx !== -1 && idx !== undefined) {
-        window._historyData[idx].nominal_transfer = nominalTf;
-        window._historyData[idx].transfer_bank = bank;
-        const isAdmin = ['admin', 'superadmin'].includes(currentProfile?.role);
-        const cardEl = document.getElementById('req-' + requestId);
-        if (cardEl) cardEl.outerHTML = renderCard(window._historyData[idx], isAdmin);
-      }
-      showToast('Nominal transfer dikirim ke finance!', 'success');
-    } catch (e) {
-      showToast('Error: ' + e.message, 'error');
-      if (btn) { btn.disabled = false; btn.textContent = 'Kirim ke Finance'; }
-    }
-  };
+  // submitNominalTransfer removed — Selow flow no longer needs manual nominal input
 
   window.copyNominal = function(nominal) {
     navigator.clipboard.writeText(String(nominal)).then(() => showToast('Nominal disalin!', 'success'));
