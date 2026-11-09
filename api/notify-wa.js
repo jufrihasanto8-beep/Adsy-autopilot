@@ -1,5 +1,5 @@
 // api/notify-wa.js — WA notif + Top Up handler
-// Actions (POST): send | extract_topup | notify_topup | approve_topup
+// Actions (POST): send | extract_topup | notify_topup | approve_topup | confirm_selow
 // GET: ?action=approve&id=xxx&token=yyy → halaman konfirmasi approve
 import { createClient } from '@supabase/supabase-js';
 
@@ -256,40 +256,35 @@ export default async function handler(req, res) {
         .select('*, products(name)').eq('id', id).eq('approve_token', token).single();
       res.setHeader('Content-Type', 'text/html');
       if (!rows) return res.status(404).send(htmlPage('🔗', 'Link Tidak Valid', 'Request tidak ditemukan atau token salah.', '#ef4444'));
-      if (rows.extracted_data?.transfer_confirmed) return res.send(htmlPage('✅', 'Sudah Dikonfirmasi', `Transfer dari <strong>${rows.user_name}</strong> sudah pernah dikonfirmasi.`, '#10b981'));
+      if (rows.finance_acc) return res.send(htmlPage('✅', 'Sudah Dikonfirmasi', `Transfer dari <strong>${rows.user_name}</strong> sudah pernah dikonfirmasi.`, '#10b981'));
 
       const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
-      const isBri = rows.transfer_bank === 'bri';
-      const bankLabel = isBri ? 'BRI' : rows.transfer_bank === 'mandiri' ? 'Mandiri' : '-';
 
-      // Ambil VA dari global_settings
-      const { data: gs2 } = await sb.from('global_settings')
-        .select('selow_va_bri, selow_va_mandiri').eq('id', '00000000-0000-0000-0000-000000000001').single();
-      const va = isBri ? (gs2?.selow_va_bri || '-') : (gs2?.selow_va_mandiri || '-');
+      // Ambil info kartu dari topup_ad_accounts → linebank_cards
+      let cardLine = '';
+      if (rows.topup_ad_account_id) {
+        const { data: acc } = await sb.from('topup_ad_accounts').select('linebank_card_id').eq('id', rows.topup_ad_account_id).single();
+        if (acc?.linebank_card_id) {
+          const { data: card } = await sb.from('linebank_cards').select('label, nomor_kartu').eq('id', acc.linebank_card_id).single();
+          if (card) cardLine = `<div class="row"><span class="lbl">💳 Kartu</span><span class="val">${card.label || '-'}${card.nomor_kartu ? ' · ····' + card.nomor_kartu.replace(/\\s/g,'').slice(-4) : ''}</span></div>`;
+        }
+      }
 
       return res.send(`<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Konfirmasi Transfer Selow.id</title>
-<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6fa;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}.card{background:#fff;border-radius:20px;padding:36px 28px;max-width:420px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08);}h1{font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;}.sub{font-size:13px;color:#64748b;margin-bottom:20px;}.info{background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:16px;}.row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px solid #f1f5f9;}.row:last-child{border-bottom:none;}.lbl{color:#64748b;}.val{font-weight:600;color:#1e293b;display:flex;align-items:center;gap:8px;}.copy-btn{border:none;background:#e0f2fe;color:#0369a1;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;}.va-box{background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin-bottom:16px;}.va-label{font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px;}.va-number{font-size:20px;font-weight:800;color:#1e293b;letter-spacing:1px;}.btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;background:#10b981;color:#fff;transition:background .2s;}.btn:hover{background:#059669;}.btn:disabled{background:#94a3b8;cursor:not-allowed;}.note{font-size:11px;color:#94a3b8;text-align:center;margin-top:12px;}</style></head>
+<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6fa;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}.card{background:#fff;border-radius:20px;padding:36px 28px;max-width:420px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08);}h1{font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;}.sub{font-size:13px;color:#64748b;margin-bottom:20px;}.info{background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:16px;}.row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px solid #f1f5f9;}.row:last-child{border-bottom:none;}.lbl{color:#64748b;}.val{font-weight:600;color:#1e293b;display:flex;align-items:center;gap:8px;}.btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;background:#10b981;color:#fff;transition:background .2s;}.btn:hover{background:#059669;}.btn:disabled{background:#94a3b8;cursor:not-allowed;}.note{font-size:11px;color:#94a3b8;text-align:center;margin-top:12px;}</style></head>
 <body><div class="card">
-  <h1>🔵 Konfirmasi Transfer Selow.id</h1>
-  <div class="sub">Konfirmasi setelah transfer berhasil dilakukan</div>
+  <h1>💳 Konfirmasi Transfer Selow</h1>
+  <div class="sub">Konfirmasi setelah share saldo ke kartu berhasil</div>
   <div class="info">
     <div class="row"><span class="lbl">👤 Advertiser</span><span class="val">${rows.user_name}</span></div>
-    <div class="row"><span class="lbl">💰 Nominal Disetujui</span><span class="val">Rp ${fmtNum(rows.nominal_disetujui)}</span></div>
-    <div class="row"><span class="lbl">💸 Nominal Transfer</span><span class="val">Rp ${fmtNum(rows.nominal_transfer)} <button class="copy-btn" onclick="copyText('${rows.nominal_transfer}')">📋 Copy</button></span></div>
-    <div class="row"><span class="lbl">🏦 Bank</span><span class="val">${bankLabel}</span></div>
+    <div class="row"><span class="lbl">🖥️ Akun Iklan</span><span class="val">${rows.ad_account_name || '-'}</span></div>
+    ${cardLine}
+    <div class="row"><span class="lbl">💰 Nominal</span><span class="val" style="color:#059669;font-size:15px;">Rp ${fmtNum(rows.nominal_disetujui || rows.nominal_request)}</span></div>
   </div>
-  <div class="va-box">
-    <div class="va-label">🏦 Nomor VA ${bankLabel}</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div class="va-number">${va}</div>
-      <button class="copy-btn" style="font-size:13px;padding:6px 12px;" onclick="copyText('${va}')">📋 Copy VA</button>
-    </div>
-  </div>
-  <button class="btn" id="btn-confirm" onclick="doConfirm()">✅ Konfirmasi Transfer Selesai</button>
-  <div class="note" id="note">Tekan tombol setelah transfer berhasil.</div>
+  <button class="btn" id="btn-confirm" onclick="doConfirm()">✅ Konfirmasi Sudah Transfer</button>
+  <div class="note" id="note">Tekan tombol setelah share saldo berhasil.</div>
 </div>
 <script>
-function copyText(t) { navigator.clipboard.writeText(String(t)).then(() => alert('Disalin!')); }
 async function doConfirm() {
   const btn = document.getElementById('btn-confirm');
   btn.disabled = true; btn.textContent = 'Memproses...';
@@ -298,8 +293,8 @@ async function doConfirm() {
       body: JSON.stringify({ action:'confirm_selow', id:'${id}', token:'${token}' }) });
     const d = await r.json();
     if (d.ok) { btn.textContent = '✅ Transfer Dikonfirmasi!'; document.getElementById('note').textContent = 'Kamu bisa tutup halaman ini.'; }
-    else { btn.disabled = false; btn.textContent = '✅ Konfirmasi Transfer Selesai'; alert(d.error || 'Gagal'); }
-  } catch(e) { btn.disabled = false; btn.textContent = '✅ Konfirmasi Transfer Selesai'; alert('Error: ' + e.message); }
+    else { btn.disabled = false; btn.textContent = '✅ Konfirmasi Sudah Transfer'; alert(d.error || 'Gagal'); }
+  } catch(e) { btn.disabled = false; btn.textContent = '✅ Konfirmasi Sudah Transfer'; alert('Error: ' + e.message); }
 }
 </script></body></html>`);
     }
@@ -814,83 +809,65 @@ Field tidak ditemukan = null.` }
       }
     } catch (_) {}
 
+    // ── Selow: auto kirim WA ke group finance saat approve ──
+    if (!reject && req_data.extracted_data?.payment_method === 'selow') {
+      try {
+        const { data: gs } = await sb.from('global_settings')
+          .select('topup_wa_targets, selow_wa_group').eq('id', '00000000-0000-0000-0000-000000000001').single();
+        const waTargets = gs?.selow_wa_group ? [gs.selow_wa_group] : (gs?.topup_wa_targets || []);
+
+        if (waTargets.length) {
+          const { data: cfgFonnte } = await sb.from('app_config')
+            .select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle();
+          const fonnteTokenFinance = cfgFonnte?.fonnte_token || process.env.FONNTE_TOKEN;
+
+          if (fonnteTokenFinance) {
+            // Ambil info kartu dari topup_ad_accounts → linebank_cards
+            let cardLabel = '';
+            let cardNomor = '';
+            if (req_data.topup_ad_account_id) {
+              const { data: acc } = await sb.from('topup_ad_accounts').select('linebank_card_id').eq('id', req_data.topup_ad_account_id).single();
+              if (acc?.linebank_card_id) {
+                const { data: card } = await sb.from('linebank_cards').select('label, nomor_kartu').eq('id', acc.linebank_card_id).single();
+                if (card) { cardLabel = card.label || ''; cardNomor = card.nomor_kartu ? '····' + card.nomor_kartu.replace(/\s/g,'').slice(-4) : ''; }
+              }
+            }
+
+            const fmtN = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
+            const baseUrl = process.env.APP_URL || 'https://adsy-autopilot.vercel.app';
+            const confirmLink = `${baseUrl}/api/notify-wa?action=confirm_selow&id=${id}&token=${req_data.approve_token}`;
+
+            const pesanFinance = [
+              `💳 *Top Up Selow*`,
+              ``,
+              `👤 Advertiser: *${req_data.user_name}*`,
+              req_data.ad_account_name ? `🖥️ Akun Iklan: ${req_data.ad_account_name}` : null,
+              cardLabel ? `💳 Kartu: ${cardLabel}${cardNomor ? ' ' + cardNomor : ''}` : null,
+              `💰 *Nominal: Rp ${fmtN(nominal_disetujui || req_data.nominal_request)}*`,
+              ``,
+              `🔗 Konfirmasi setelah transfer:\n${confirmLink}`,
+              `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+            ].filter(Boolean).join('\n');
+
+            await Promise.all(waTargets.map(async no => {
+              const target = formatWaTarget(no);
+              try {
+                await fetch('https://api.fonnte.com/send', {
+                  method: 'POST',
+                  headers: { 'Authorization': fonnteTokenFinance, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ target, message: pesanFinance })
+                });
+              } catch (_) {}
+            }));
+          }
+        }
+      } catch (_) {}
+    }
+
     return res.json({ ok: true, status: newStatus });
   }
 
-  // ── notify_selow_transfer: WA ke finance dengan nominal transfer dari Selow.id ──
-  if (action === 'notify_selow_transfer') {
-    const { request_id, user_name, nominal_disetujui, nominal_transfer, transfer_bank, ad_account_name, billing_data } = body;
-
-    // Update DB pakai service key (bypass RLS)
-    if (request_id && nominal_transfer && transfer_bank) {
-      const { error: updErr } = await sb.from('topup_requests')
-        .update({ nominal_transfer: Number(nominal_transfer), transfer_bank, updated_at: new Date().toISOString() })
-        .eq('id', request_id);
-      if (updErr) return res.status(500).json({ error: 'Gagal simpan nominal: ' + updErr.message });
-    }
-
-    const { data: cfgWithToken } = await sb.from('app_config')
-      .select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle();
-    const fonnteToken = cfgWithToken?.fonnte_token || process.env.FONNTE_TOKEN;
-    if (!fonnteToken) return res.json({ ok: false, warn: 'Fonnte token belum dikonfigurasi' });
-
-    const { data: gs } = await sb.from('global_settings')
-      .select('topup_wa_targets, selow_va_bri, selow_va_mandiri, selow_wa_group').eq('id', '00000000-0000-0000-0000-000000000001').single();
-    // Kalau selow_wa_group diset, kirim ke group itu saja; kalau tidak, fallback ke topup_wa_targets
-    const waTargets = gs?.selow_wa_group
-      ? [gs.selow_wa_group]
-      : (gs?.topup_wa_targets || []);
-    if (!waTargets.length) return res.json({ ok: false, warn: 'Belum ada nomor/group penerima notif Selow di Settings' });
-
-    // Ambil approve_token dari request untuk buat confirm link
-    let confirmLink = null;
-    if (request_id) {
-      const { data: reqRow } = await sb.from('topup_requests').select('approve_token').eq('id', request_id).single();
-      if (reqRow?.approve_token) {
-        const baseUrl = process.env.APP_URL || 'https://adsy-autopilot.vercel.app';
-        confirmLink = `${baseUrl}/api/notify-wa?action=confirm_selow&id=${request_id}&token=${reqRow.approve_token}`;
-      }
-    }
-
-    const selowVaBri = gs?.selow_va_bri || null;
-    const selowVaMandiri = gs?.selow_va_mandiri || null;
-    const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
-    const bd = billing_data || {};
-    const isBri = transfer_bank === 'bri';
-    const va = isBri ? selowVaBri : selowVaMandiri;
-    const bankName = isBri ? 'BRI' : 'Mandiri';
-
-    const pesan = [
-      `🔵 *Selow.id — Siap Transfer*`,
-      ``,
-      `👤 Advertiser: *${user_name}*`,
-      ad_account_name ? `🖥️ Akun Iklan: ${ad_account_name}` : null,
-      bd.kartu_kredit_nama ? `💳 Kartu: ${bd.kartu_kredit_nama} ····${bd.kartu_kredit_nomor || ''}` : null,
-      ``,
-      `✅ Disetujui: Rp ${fmtNum(nominal_disetujui)}`,
-      `💰 *Nominal Transfer: Rp ${fmtNum(nominal_transfer)}*`,
-      va ? `🏦 *Transfer via ${bankName}: ${va}*` : `🏦 Bank: ${bankName} (VA belum diset di Settings)`,
-      ``,
-      confirmLink ? `🔗 Konfirmasi setelah transfer:\n${confirmLink}` : null,
-      `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
-    ].filter(Boolean).join('\n');
-
-    const results = await Promise.all(waTargets.map(async no => {
-      const target = formatWaTarget(no);
-      try {
-        const r2 = await fetch('https://api.fonnte.com/send', {
-          method: 'POST',
-          headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target, message: pesan })
-        });
-        const d = await r2.json();
-        return { no: target, ok: d.status !== false };
-      } catch (e) { return { no: target, ok: false }; }
-    }));
-
-    const allFailed = results.every(r => !r.ok);
-    return res.json({ ok: !allFailed });
-  }
+  // notify_selow_transfer removed — WA ke finance sekarang dikirim otomatis saat approve
 
   // ── confirm_selow: finance konfirmasi transfer sudah dilakukan ──
   if (action === 'confirm_selow') {
@@ -900,10 +877,17 @@ Field tidak ditemukan = null.` }
     const { data: req_data } = await sb.from('topup_requests')
       .select('*, extracted_data, approve_token').eq('id', id).eq('approve_token', token).single();
     if (!req_data) return res.status(404).json({ error: 'Request tidak ditemukan atau token salah' });
-    if (req_data.extracted_data?.transfer_confirmed) return res.json({ ok: true, already: true });
+    if (req_data.finance_acc) return res.json({ ok: true, already: true });
 
+    // Set finance_acc + transfer_confirmed (backward compat)
     const newExt = { ...(req_data.extracted_data || {}), transfer_confirmed: true, transfer_confirmed_at: new Date().toISOString() };
-    const { error } = await sb.from('topup_requests').update({ extracted_data: newExt, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await sb.from('topup_requests').update({
+      extracted_data: newExt,
+      finance_acc: true,
+      finance_acc_at: new Date().toISOString(),
+      finance_acc_by: 'via link',
+      updated_at: new Date().toISOString()
+    }).eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
 
     // Kirim notif WA ke advertiser
@@ -1225,5 +1209,5 @@ Field tidak ditemukan = null.` }
     }
   }
 
-  return res.status(400).json({ error: 'Invalid action. Use: send | extract_topup | notify_topup | approve_topup | notify_selow_transfer | confirm_selow | notify_kartu_request | notify_kartu_info | notify_akun_pro_request | notify_akun_pro_info | chat_message' });
+  return res.status(400).json({ error: 'Invalid action. Use: send | extract_topup | notify_topup | approve_topup | confirm_selow | notify_kartu_request | notify_kartu_info | notify_akun_pro_request | notify_akun_pro_info | chat_message' });
 }
