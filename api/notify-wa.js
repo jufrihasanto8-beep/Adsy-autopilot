@@ -912,7 +912,8 @@ Field tidak ditemukan = null.` }
           `Finance sudah melakukan transfer budget ke akun Meta Ads kamu.`,
           `💰 *Nominal: Rp ${fmtNum(req_data.nominal_disetujui || req_data.nominal_request)}*`,
           ``,
-          `Silakan cek kartu dan lakukan pembayaran ke Meta Ads.`,
+          `Cek dulu apakah kartu dan dana nya sudah sesuai, lalu lakukan pembayaran ke Meta Ads.`,
+          `Semoga hari ini iklannya lebih murah lagi! 🚀`,
           `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
         ].join('\n');
 
@@ -953,7 +954,8 @@ Field tidak ditemukan = null.` }
           `Finance sudah melakukan transfer budget ke akun Meta Ads kamu.`,
           `💰 *Nominal: Rp ${fmtNum(req_data.nominal_disetujui || req_data.nominal_request)}*`,
           ``,
-          `Silakan cek kartu dan lakukan pembayaran ke Meta Ads.`,
+          `Cek dulu apakah kartu dan dana nya sudah sesuai, lalu lakukan pembayaran ke Meta Ads.`,
+          `Semoga hari ini iklannya lebih murah lagi! 🚀`,
           `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
         ].join('\n');
 
