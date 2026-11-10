@@ -1,5 +1,5 @@
 // api/notify-wa.js — WA notif + Top Up handler
-// Actions (POST): send | extract_topup | notify_topup | approve_topup | confirm_selow
+// Actions (POST): send | extract_topup | notify_topup | approve_topup | confirm_selow | notify_finance_done
 // GET: ?action=approve&id=xxx&token=yyy → halaman konfirmasi approve
 import { createClient } from '@supabase/supabase-js';
 
@@ -266,11 +266,16 @@ export default async function handler(req, res) {
         const { data: acc } = await sb.from('topup_ad_accounts').select('linebank_card_id').eq('id', rows.topup_ad_account_id).single();
         if (acc?.linebank_card_id) {
           const { data: card } = await sb.from('linebank_cards').select('label, nomor_kartu').eq('id', acc.linebank_card_id).single();
-          if (card) cardLine = `<div class="row"><span class="lbl">💳 Kartu</span><span class="val">${card.label || '-'}${card.nomor_kartu ? ' · ····' + card.nomor_kartu.replace(/\\s/g,'').slice(-4) : ''}</span></div>`;
+          if (card) cardLine = `<div class="row"><span class="lbl">💳 Kartu</span><span class="val">${card.label || '-'}${card.nomor_kartu ? ' · ····' + card.nomor_kartu.replace(/\s/g,'').slice(-4) : ''}</span></div>`;
         }
       }
+      // Fallback: pakai kartu dari billing_data
+      if (!cardLine && rows.billing_data?.kartu_kredit_nama) {
+        const bd = rows.billing_data;
+        cardLine = `<div class="row"><span class="lbl">💳 Kartu</span><span class="val">${bd.kartu_kredit_nama}${bd.kartu_kredit_nomor ? ' · ····' + bd.kartu_kredit_nomor : ''}</span></div>`;
+      }
 
-      return res.send(`<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Konfirmasi Transfer Selow.id</title>
+      return res.send(`<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Konfirmasi Transfer</title>
 <style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6fa;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}.card{background:#fff;border-radius:20px;padding:36px 28px;max-width:420px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08);}h1{font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;}.sub{font-size:13px;color:#64748b;margin-bottom:20px;}.info{background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:16px;}.row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px solid #f1f5f9;}.row:last-child{border-bottom:none;}.lbl{color:#64748b;}.val{font-weight:600;color:#1e293b;display:flex;align-items:center;gap:8px;}.btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;background:#10b981;color:#fff;transition:background .2s;}.btn:hover{background:#059669;}.btn:disabled{background:#94a3b8;cursor:not-allowed;}.note{font-size:11px;color:#94a3b8;text-align:center;margin-top:12px;}</style></head>
 <body><div class="card">
   <h1>💳 Konfirmasi Transfer Selow</h1>
@@ -757,112 +762,111 @@ Field tidak ditemukan = null.` }
       } catch (_) {}
     }
 
-    // Notif WA balik ke advertiser
-    try {
-      const { data: userCfg } = await sb.from('app_config')
-        .select('wa_target')
-        .eq('user_id', req_data.user_id)
-        .single();
+    // ── Kirim WA advertiser + finance PARALLEL (cegah Vercel 10s timeout) ──
+    // Fetch shared data dulu (1 query fonnte_token, 1 query wa_target — parallel)
+    const [{ data: userCfg }, { data: adminCfg }, { data: gs }] = await Promise.all([
+      sb.from('app_config').select('wa_target').eq('user_id', req_data.user_id).maybeSingle(),
+      sb.from('app_config').select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle(),
+      sb.from('global_settings').select('topup_wa_targets, selow_wa_group').eq('id', '00000000-0000-0000-0000-000000000001').maybeSingle()
+    ]);
+    const fonnteToken = adminCfg?.fonnte_token || process.env.FONNTE_TOKEN;
 
-      const { data: adminCfg } = await sb.from('app_config')
-        .select('fonnte_token')
-        .not('fonnte_token', 'is', null)
-        .limit(1)
-        .maybeSingle();
+    const waJobs = [];
 
-      const fonnteToken = adminCfg?.fonnte_token || process.env.FONNTE_TOKEN;
-      const noWa = userCfg?.wa_target;
+    // Job 1: WA ke advertiser
+    if (fonnteToken && userCfg?.wa_target) {
+      waJobs.push((async () => {
+        try {
+          const target = formatWaTarget(userCfg.wa_target);
+          const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
+          const approvedNominal = fmtNum(nominal_disetujui || req_data.nominal_request);
 
-      if (fonnteToken && noWa) {
-        const target = formatWaTarget(noWa);
-        const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
+          const pesan = reject
+            ? [
+                `⚠️ *Top Up Tidak Disetujui*`,
+                ``,
+                `Halo *${req_data.user_name}*,`,
+                `Mohon maaf, request top up kamu sebesar *Rp ${fmtNum(req_data.nominal_request)}* belum bisa kami setujui saat ini.`,
+                catatan ? `\n📝 *Keterangan:*\n${catatan}` : null,
+                ``,
+                `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+              ].filter(Boolean).join('\n')
+            : [
+                `✅ *Top Up Disetujui!*`,
+                ``,
+                `Halo *${req_data.user_name}*,`,
+                `Request top up kamu sudah disetujui!`,
+                `💰 *Nominal disetujui: Rp ${approvedNominal}*`,
+                catatan ? `\n📝 Catatan: ${catatan}` : null,
+                ``,
+                `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+              ].filter(Boolean).join('\n');
 
-        const isSelow = req_data.extracted_data?.payment_method === 'selow';
-        const approvedNominal = fmtNum(nominal_disetujui || req_data.nominal_request);
-
-        const pesan = reject
-          ? [
-              `⚠️ *Top Up Tidak Disetujui*`,
-              ``,
-              `Halo *${req_data.user_name}*,`,
-              `Mohon maaf, request top up kamu sebesar *Rp ${fmtNum(req_data.nominal_request)}* belum bisa kami setujui saat ini.`,
-              catatan ? `\n📝 *Keterangan:*\n${catatan}` : null,
-              ``,
-              `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
-            ].filter(Boolean).join('\n')
-          : [
-              `✅ *Top Up Disetujui!*`,
-              ``,
-              `Halo *${req_data.user_name}*,`,
-              `Request top up kamu sudah disetujui!`,
-              `💰 *Nominal disetujui: Rp ${approvedNominal}*`,
-              catatan ? `\n📝 Catatan: ${catatan}` : null,
-              ``,
-              `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
-            ].filter(Boolean).join('\n');
-
-        await fetch('https://api.fonnte.com/send', {
-          method: 'POST',
-          headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target, message: pesan, countryCode: '62' })
-        });
-      }
-    } catch (_) {}
-
-    // ── Selow: auto kirim WA ke group finance saat approve ──
-    if (!reject && req_data.extracted_data?.payment_method === 'selow') {
-      try {
-        const { data: gs } = await sb.from('global_settings')
-          .select('topup_wa_targets, selow_wa_group').eq('id', '00000000-0000-0000-0000-000000000001').single();
-        const waTargets = gs?.selow_wa_group ? [gs.selow_wa_group] : (gs?.topup_wa_targets || []);
-
-        if (waTargets.length) {
-          const { data: cfgFonnte } = await sb.from('app_config')
-            .select('fonnte_token').not('fonnte_token', 'is', null).neq('fonnte_token', '').limit(1).maybeSingle();
-          const fonnteTokenFinance = cfgFonnte?.fonnte_token || process.env.FONNTE_TOKEN;
-
-          if (fonnteTokenFinance) {
-            // Ambil info kartu dari topup_ad_accounts → linebank_cards
-            let cardLabel = '';
-            let cardNomor = '';
-            if (req_data.topup_ad_account_id) {
-              const { data: acc } = await sb.from('topup_ad_accounts').select('linebank_card_id').eq('id', req_data.topup_ad_account_id).single();
-              if (acc?.linebank_card_id) {
-                const { data: card } = await sb.from('linebank_cards').select('label, nomor_kartu').eq('id', acc.linebank_card_id).single();
-                if (card) { cardLabel = card.label || ''; cardNomor = card.nomor_kartu ? '····' + card.nomor_kartu.replace(/\s/g,'').slice(-4) : ''; }
-              }
-            }
-
-            const fmtN = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
-            const baseUrl = process.env.APP_URL || 'https://adsy-autopilot.vercel.app';
-            const confirmLink = `${baseUrl}/api/notify-wa?action=confirm_selow&id=${id}&token=${req_data.approve_token}`;
-
-            const pesanFinance = [
-              `💳 *Top Up Selow*`,
-              ``,
-              `👤 Advertiser: *${req_data.user_name}*`,
-              req_data.ad_account_name ? `🖥️ Akun Iklan: ${req_data.ad_account_name}` : null,
-              cardLabel ? `💳 Kartu: ${cardLabel}${cardNomor ? ' ' + cardNomor : ''}` : null,
-              `💰 *Nominal: Rp ${fmtN(nominal_disetujui || req_data.nominal_request)}*`,
-              ``,
-              `🔗 Konfirmasi setelah transfer:\n${confirmLink}`,
-              `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
-            ].filter(Boolean).join('\n');
-
-            await Promise.all(waTargets.map(async no => {
-              const target = formatWaTarget(no);
-              try {
-                await fetch('https://api.fonnte.com/send', {
-                  method: 'POST',
-                  headers: { 'Authorization': fonnteTokenFinance, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ target, message: pesanFinance })
-                });
-              } catch (_) {}
-            }));
-          }
-        }
-      } catch (_) {}
+          await fetch('https://api.fonnte.com/send', {
+            method: 'POST',
+            headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target, message: pesan, countryCode: '62' })
+          });
+        } catch (_) {}
+      })());
     }
+
+    // Job 2: WA ke group finance (saat approve, semua metode)
+    if (!reject && fonnteToken) {
+      waJobs.push((async () => {
+        try {
+          const isSelow = req_data.extracted_data?.payment_method === 'selow';
+          const waTargets = isSelow && gs?.selow_wa_group ? [gs.selow_wa_group] : (gs?.topup_wa_targets || []);
+          if (!waTargets.length) return;
+
+          // Ambil info kartu dari topup_ad_accounts → linebank_cards
+          let cardLabel = '';
+          let cardNomor = '';
+          if (req_data.topup_ad_account_id) {
+            const { data: acc } = await sb.from('topup_ad_accounts').select('linebank_card_id').eq('id', req_data.topup_ad_account_id).single();
+            if (acc?.linebank_card_id) {
+              const { data: card } = await sb.from('linebank_cards').select('label, nomor_kartu').eq('id', acc.linebank_card_id).single();
+              if (card) { cardLabel = card.label || ''; cardNomor = card.nomor_kartu ? '····' + card.nomor_kartu.replace(/\s/g,'').slice(-4) : ''; }
+            }
+          }
+          // Fallback: pakai kartu dari billing_data kalau linebank_cards kosong
+          if (!cardLabel && req_data.billing_data?.kartu_kredit_nama) {
+            cardLabel = req_data.billing_data.kartu_kredit_nama;
+            cardNomor = req_data.billing_data.kartu_kredit_nomor ? '····' + req_data.billing_data.kartu_kredit_nomor : '';
+          }
+
+          const fmtN = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
+          const baseUrl = process.env.APP_URL || 'https://adsy-autopilot.vercel.app';
+          const confirmLink = `${baseUrl}/api/notify-wa?action=confirm_selow&id=${id}&token=${req_data.approve_token}`;
+
+          const pesanFinance = [
+            `💳 *Top Up Selow*`,
+            ``,
+            `👤 Advertiser: *${req_data.user_name}*`,
+            req_data.ad_account_name ? `🖥️ Akun Iklan: ${req_data.ad_account_name}` : null,
+            cardLabel ? `💳 Kartu: ${cardLabel}${cardNomor ? ' ' + cardNomor : ''}` : null,
+            `💰 *Nominal: Rp ${fmtN(nominal_disetujui || req_data.nominal_request)}*`,
+            ``,
+            `🔗 Konfirmasi setelah transfer:\n${confirmLink}`,
+            `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+          ].filter(Boolean).join('\n');
+
+          await Promise.all(waTargets.map(async no => {
+            const target = formatWaTarget(no);
+            try {
+              await fetch('https://api.fonnte.com/send', {
+                method: 'POST',
+                headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target, message: pesanFinance })
+              });
+            } catch (_) {}
+          }));
+        } catch (_) {}
+      })());
+    }
+
+    // Jalankan semua WA jobs parallel
+    await Promise.all(waJobs);
 
     return res.json({ ok: true, status: newStatus });
   }
@@ -900,6 +904,47 @@ Field tidak ditemukan = null.` }
       if (fonnteToken && noWa) {
         const target = formatWaTarget(noWa);
 
+        const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
+        const pesan = [
+          `✅ *Transfer Budget Selesai!*`,
+          ``,
+          `Halo *${req_data.user_name}*,`,
+          `Finance sudah melakukan transfer budget ke akun Meta Ads kamu.`,
+          `💰 *Nominal: Rp ${fmtNum(req_data.nominal_disetujui || req_data.nominal_request)}*`,
+          ``,
+          `Silakan cek kartu dan lakukan pembayaran ke Meta Ads.`,
+          `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
+        ].join('\n');
+
+        await fetch('https://api.fonnte.com/send', {
+          method: 'POST',
+          headers: { 'Authorization': fonnteToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target, message: pesan, countryCode: '62' })
+        });
+      }
+    } catch (_) {}
+
+    return res.json({ ok: true });
+  }
+
+  // ── notify_finance_done: kirim WA ke advertiser bahwa finance sudah transfer (dipanggil dari web accFinance) ──
+  if (action === 'notify_finance_done') {
+    const { id, token } = body;
+    if (!id || !token) return res.status(400).json({ error: 'id dan token diperlukan' });
+
+    const { data: req_data } = await sb.from('topup_requests')
+      .select('*').eq('id', id).eq('approve_token', token).single();
+    if (!req_data) return res.status(404).json({ error: 'Request tidak ditemukan atau token salah' });
+
+    // Kirim notif WA ke advertiser (tanpa cek finance_acc — dipanggil SETELAH update di frontend)
+    try {
+      const { data: userCfg } = await sb.from('app_config').select('wa_target').eq('user_id', req_data.user_id).single();
+      const { data: adminCfg } = await sb.from('app_config').select('fonnte_token').not('fonnte_token', 'is', null).limit(1).maybeSingle();
+      const fonnteToken = adminCfg?.fonnte_token || process.env.FONNTE_TOKEN;
+      const noWa = userCfg?.wa_target;
+
+      if (fonnteToken && noWa) {
+        const target = formatWaTarget(noWa);
         const fmtNum = n => n != null ? Number(n).toLocaleString('id-ID') : '-';
         const pesan = [
           `✅ *Transfer Budget Selesai!*`,
@@ -1209,5 +1254,5 @@ Field tidak ditemukan = null.` }
     }
   }
 
-  return res.status(400).json({ error: 'Invalid action. Use: send | extract_topup | notify_topup | approve_topup | confirm_selow | notify_kartu_request | notify_kartu_info | notify_akun_pro_request | notify_akun_pro_info | chat_message' });
+  return res.status(400).json({ error: 'Invalid action. Use: send | extract_topup | notify_topup | approve_topup | confirm_selow | notify_finance_done | notify_kartu_request | notify_kartu_info | notify_akun_pro_request | notify_akun_pro_info | chat_message' });
 }
