@@ -1641,6 +1641,14 @@
             kartu_kredit_nomor: acc.kartu_kredit_nomor,
             kartu_kredit_nama: acc.kartu_kredit_nama
           };
+          // Tambahkan info linebank card ke billingData (untuk Selow)
+          if (acc.linebank_card_id) {
+            const lbCard = linebankCards.find(c => c.id === acc.linebank_card_id);
+            if (lbCard) {
+              billingData.kartu_kredit_nama = lbCard.label || billingData.kartu_kredit_nama;
+              billingData.kartu_kredit_nomor = lbCard.nomor_kartu ? lbCard.nomor_kartu.replace(/\s/g,'').slice(-4) : billingData.kartu_kredit_nomor;
+            }
+          }
         }
       }
 
@@ -1831,7 +1839,7 @@
     const weekWIB = new Date(Date.now() + WIB - 7 * 86400000).toISOString().slice(0, 10);
 
     let query = sb.from('topup_requests')
-      .select('id, user_name, nominal_request, nominal_disetujui, status, created_at, updated_at, finance_acc, finance_acc_at, finance_acc_by, ad_account_name, topup_time, extracted_data, topup_ad_account_id, products(name)')
+      .select('id, user_name, nominal_request, nominal_disetujui, status, created_at, updated_at, finance_acc, finance_acc_at, finance_acc_by, ad_account_name, topup_time, extracted_data, topup_ad_account_id, billing_data, products(name)')
       .eq('status', 'approved')
       .order('updated_at', { ascending: false });
 
@@ -1904,11 +1912,15 @@
       ? '<span style="background:#eff6ff;color:#1d4ed8;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;">🔵 Selow.id</span>'
       : '<span style="background:#f3f4f6;color:#374151;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;">💳 Kartu/LB</span>';
 
-    // Info kartu (enriched dari loadFinanceList)
+    // Info kartu (enriched dari loadFinanceList, fallback ke billing_data)
     const card = r._card;
-    const cardInfo = card
-      ? `<div class="fin-card-row"><span class="lbl">💳 Kartu</span><span class="val">${card.label || '-'}${card.nomor_kartu ? ' · ••••' + card.nomor_kartu.replace(/\\s/g,'').slice(-4) : ''}</span></div>`
-      : '';
+    const bd = r.billing_data || {};
+    let cardInfo = '';
+    if (card) {
+      cardInfo = `<div class="fin-card-row"><span class="lbl">💳 Kartu</span><span class="val">${card.label || '-'}${card.nomor_kartu ? ' · ••••' + card.nomor_kartu.replace(/\s/g,'').slice(-4) : ''}</span></div>`;
+    } else if (bd.kartu_kredit_nama) {
+      cardInfo = `<div class="fin-card-row"><span class="lbl">💳 Kartu</span><span class="val">${bd.kartu_kredit_nama}${bd.kartu_kredit_nomor ? ' · ••••' + bd.kartu_kredit_nomor : ''}</span></div>`;
+    }
 
     let actionBtn = '';
     if (isDone) {
@@ -1955,6 +1967,9 @@
     if (btn) { btn.disabled = true; btn.textContent = 'Memproses...'; }
 
     try {
+      // Ambil token SEBELUM update finance_acc, supaya confirm_selow tidak skip
+      const { data: reqRow } = await sb.from('topup_requests').select('approve_token').eq('id', id).single();
+
       const { error } = await sb.from('topup_requests').update({
         finance_acc: true,
         finance_acc_at: new Date().toISOString(),
@@ -1963,14 +1978,15 @@
 
       if (error) throw error;
 
-      // Kirim WA notif ke advertiser bahwa transfer selesai (fire & forget)
-      const { data: reqRow } = await sb.from('topup_requests').select('approve_token').eq('id', id).single();
+      // Kirim WA notif ke advertiser bahwa transfer selesai
       if (reqRow?.approve_token) {
-        fetch('/api/notify-wa', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'confirm_selow', id, token: reqRow.approve_token })
-        }).catch(() => {});
+        try {
+          await fetch('/api/notify-wa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'notify_finance_done', id, token: reqRow.approve_token })
+          });
+        } catch (_) {}
       }
 
       showToast('Transfer tercatat!', 'success');
