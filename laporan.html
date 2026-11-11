@@ -1325,7 +1325,7 @@
         <td>${money(budget)}</td>
         <td>${tax}%</td>
         <td class="money">${money(Math.round(total))}</td>
-        <td><button class="la-text-btn" onclick="editAds('${a.id}')">Edit</button></td>
+        <td><button class="la-text-btn" onclick="editAds('${a.id}')">Edit</button> <button class="la-text-btn" style="color:#a35343" onclick="deleteAds('${a.id}')">Hapus</button></td>
       </tr>`;
     }).join('');
   }
@@ -1368,6 +1368,19 @@
 
   window.editAds = function(id) { window.openAdsModal(id); };
   window.closeAdsModal = function() { document.getElementById('modal-ads').classList.remove('open'); };
+
+  window.deleteAds = async function(id) {
+    const ad = state.ads.find(a => a.id === id);
+    if (!ad) return;
+    if (!confirm('Hapus biaya iklan ' + ad.date + ' ' + ad.product + ' ' + ad.channel + '?\nData yang dihapus tidak bisa dikembalikan.')) return;
+    try {
+      await apiFetch('delete-ad', {}, 'POST', { adId: id });
+      showToast('Biaya iklan berhasil dihapus!', 'success');
+      await loadData();
+    } catch (err) {
+      showToast('Gagal: ' + err.message, 'error');
+    }
+  };
 
   window.saveAds = async function() {
     const date = document.getElementById('ads-date').value;
