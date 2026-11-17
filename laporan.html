@@ -554,7 +554,7 @@
         </select>
       </label>
       <label>Budget (Rp) <span style="color:#a35343;">*</span>
-        <input type="text" id="ads-budget" inputmode="numeric" placeholder="0" onfocus="this.select()" oninput="formatBudgetInput(this)" />
+        <input type="text" id="ads-budget" inputmode="numeric" placeholder="0" onfocus="this.select()" />
       </label>
       <label>Pajak (%)
         <input type="number" id="ads-tax" min="0" max="100" value="11" onfocus="this.select()" />
@@ -912,6 +912,9 @@
     document.getElementById('la-chart-channel').addEventListener('change', renderChartData);
 
     // Live total preview in modal
+    document.getElementById('ads-budget').addEventListener('input', function() {
+      formatBudgetInput(this);
+    });
     document.getElementById('ads-tax').addEventListener('input', updateTotalPreview);
     document.getElementById('ads-date').addEventListener('change', updateDateDay);
 
