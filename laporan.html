@@ -554,7 +554,7 @@
         </select>
       </label>
       <label>Budget (Rp) <span style="color:#a35343;">*</span>
-        <input type="number" id="ads-budget" min="0" placeholder="0" onfocus="this.select()" />
+        <input type="text" id="ads-budget" inputmode="numeric" placeholder="0" onfocus="this.select()" oninput="formatBudgetInput(this)" />
       </label>
       <label>Pajak (%)
         <input type="number" id="ads-tax" min="0" max="100" value="11" onfocus="this.select()" />
@@ -912,7 +912,6 @@
     document.getElementById('la-chart-channel').addEventListener('change', renderChartData);
 
     // Live total preview in modal
-    document.getElementById('ads-budget').addEventListener('input', updateTotalPreview);
     document.getElementById('ads-tax').addEventListener('input', updateTotalPreview);
     document.getElementById('ads-date').addEventListener('change', updateDateDay);
 
@@ -938,8 +937,16 @@
     reloadTimer = setTimeout(() => loadData(true), 500);
   }
 
+  function parseBudget(val) {
+    return Number(String(val).replace(/\./g, '').replace(/,/g, '')) || 0;
+  }
+  function formatBudgetInput(el) {
+    const raw = el.value.replace(/[^\d]/g, '');
+    el.value = raw ? Number(raw).toLocaleString('id-ID') : '';
+    updateTotalPreview();
+  }
   function updateTotalPreview() {
-    const budget = Number(document.getElementById('ads-budget').value) || 0;
+    const budget = parseBudget(document.getElementById('ads-budget').value);
     const tax = Number(document.getElementById('ads-tax').value) || 0;
     document.getElementById('ads-total-preview').textContent = money(budget * (1 + tax / 100));
   }
@@ -1352,7 +1359,7 @@
       if (ad) {
         document.getElementById('ads-date').value = ad.date;
         sel.value = `${ad.product}|||${ad.channel}|||${ad.platform||'Meta'}`;
-        document.getElementById('ads-budget').value = ad.budget || 0;
+        document.getElementById('ads-budget').value = ad.budget ? Number(ad.budget).toLocaleString('id-ID') : '0';
         document.getElementById('ads-tax').value = ad.tax ?? 11;
       }
     } else {
@@ -1397,7 +1404,7 @@
 
     try {
       await apiFetch('save-ads', {}, 'POST', {
-        ad: { date, product, channel, platform, budget: Number(budget) || 0, tax: Number(tax) ?? 11 }
+        ad: { date, product, channel, platform, budget: parseBudget(budget), tax: Number(tax) ?? 11 }
       });
       showToast('Biaya iklan berhasil disimpan!', 'success');
       window.closeAdsModal();
