@@ -1688,13 +1688,15 @@
   function renderExtractResult(ext) {
     const fmtNum = n => n != null ? 'Rp ' + Number(n).toLocaleString('id-ID') : null;
     const adType = selectedAccount?.ad_type || 'form';
+    const platformLabel = ext.platform === 'google' ? 'Google Ads' : 'Meta Ads';
     const rows = [
+      ext.platform ? ['🏷️ Platform', platformLabel] : null,
       ext.date_range ? ['📅 Periode', ext.date_range] : null,
       ext.spend != null ? ['💸 Spend', fmtNum(ext.spend)] : null,
       ext.results != null ? ['📊 Results', Number(ext.results).toLocaleString('id-ID')] : null,
       adType === 'ctwa'
         ? (ext.cpc != null ? ['💬 CPC', fmtNum(ext.cpc)] : null)
-        : (ext.cpr != null ? ['💰 CPR', fmtNum(ext.cpr)] : null),
+        : (ext.cpr != null ? ['💰 CPR', fmtNum(ext.cpr)] : (ext.cpc != null ? ['💰 Biaya/konv.', fmtNum(ext.cpc)] : null)),
       ext.ctr != null ? ['📈 CTR', Number(ext.ctr).toFixed(2) + '%'] : null,
     ].filter(Boolean);
 
