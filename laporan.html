@@ -981,11 +981,6 @@
     document.getElementById('la-chart-channel').addEventListener('change', renderChart);
     document.getElementById('la-chart-platform').addEventListener('change', renderChart);
 
-    // Live total preview in modal (single/fallback mode)
-    document.getElementById('ads-budget').addEventListener('input', function() {
-      formatBudgetInput(this);
-    });
-    document.getElementById('ads-tax').addEventListener('input', updateTotalPreview);
     document.getElementById('ads-date').addEventListener('change', updateDateDay);
 
     // When assignment changes, fetch linked ad accounts
@@ -1112,9 +1107,7 @@
   }
 
   function updateTotalPreview() {
-    const budget = parseBudget(document.getElementById('ads-budget').value);
-    const tax = Number(document.getElementById('ads-tax').value) || 0;
-    document.getElementById('ads-total-preview-single').textContent = money(budget * (1 + tax / 100));
+    // Only multi-account mode now — handled by updateMultiTotal()
   }
 
   const HARI = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
