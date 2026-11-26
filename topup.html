@@ -268,7 +268,7 @@
           <div class="form-group" id="tp-adaccount-group" style="display:none;">
             <label class="form-label">Akun Iklan</label>
             <select class="form-input form-select" id="tp-adaccount" onchange="onAdAccountChange()">
-              <option value="">— Pilih Akun Iklan (opsional) —</option>
+              <option value="">— Pilih Akun Iklan —</option>
             </select>
             <div class="form-hint">
               Belum ada? <a href="#" style="color:var(--primary);font-weight:600;" onclick="switchTab('akun-iklan');return false;">Tambah di tab Akun Iklan</a>
@@ -1037,7 +1037,7 @@
     // populate ad account dropdown filtered by product
     const aaGroup = document.getElementById('tp-adaccount-group');
     const aaSel = document.getElementById('tp-adaccount');
-    aaSel.innerHTML = '<option value="">— Pilih Akun Iklan (opsional) —</option>';
+    aaSel.innerHTML = '<option value="">— Pilih Akun Iklan —</option>';
 
     const filtered = adAccounts.filter(a => a.product_id === productId);
     if (filtered.length) {
@@ -1914,7 +1914,8 @@
     const hasProduct = !!document.getElementById('tp-product').value;
     const hasFile = !!selectedFile;
     const hasOmset = document.getElementById('tp-omset').value.trim() !== '';
-    document.getElementById('tp-submit').disabled = !(hasProduct && hasFile && hasOmset && adsCheckPassed);
+    const hasAccount = !!selectedAccountId;
+    document.getElementById('tp-submit').disabled = !(hasProduct && hasFile && hasOmset && hasAccount && adsCheckPassed);
   }
   window.checkSubmitEnabled = checkSubmitEnabled;
 
