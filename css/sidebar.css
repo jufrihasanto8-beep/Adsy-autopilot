@@ -1,7 +1,7 @@
 
 /* ── SIDEBAR ── */
 .sidebar {
-  width: var(--sidebar-w);
+  width: 260px;
   background: var(--white);
   border-right: 1px solid var(--gray-3);
   position: fixed;
@@ -12,7 +12,7 @@
   flex-direction: column;
   z-index: 200;
   overflow-y: auto;
-  transition: width 0.25s ease;
+  transition: width 0.3s ease;
 }
 
 .sidebar-logo {
@@ -266,6 +266,9 @@ body.sidebar-collapsed {
   --sidebar-w: 64px;
 }
 
+body.sidebar-collapsed .sidebar {
+  width: 64px;
+}
 body.sidebar-collapsed .sidebar-logo {
   justify-content: center;
   padding: 14px 0;
@@ -315,8 +318,22 @@ body.sidebar-collapsed .nav-item[data-label]:hover::after {
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 body.sidebar-collapsed .nav-item[data-label]:hover::before {
-  /* Override the active left-bar pseudo — tooltip takes priority */
-  z-index: 1;
+  content: '';
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: var(--text);
+  z-index: 300;
+  width: 0;
+  height: 0;
+  background: none;
+  border-radius: 0;
+}
+
+body.sidebar-collapsed .main-content {
+  margin-left: 64px;
 }
 
 body.sidebar-collapsed .sidebar-user-info { display: none; }
@@ -365,6 +382,7 @@ body.sidebar-collapsed .autopilot-status { display: none; }
   body.sidebar-collapsed {
     --sidebar-w: 260px;
   }
+  body.sidebar-collapsed .sidebar { width: 260px; }
   body.sidebar-collapsed .sidebar-logo { justify-content: flex-start; padding: 24px 20px 20px; gap: 10px; }
   body.sidebar-collapsed .sidebar-logo-text { display: block; }
   body.sidebar-collapsed .nav-section-label { display: block; }
