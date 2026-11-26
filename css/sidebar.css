@@ -12,6 +12,7 @@
   flex-direction: column;
   z-index: 200;
   overflow-y: auto;
+  transition: width 0.25s ease;
 }
 
 .sidebar-logo {
