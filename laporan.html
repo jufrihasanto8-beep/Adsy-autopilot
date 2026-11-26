@@ -20,7 +20,7 @@
     .la-topbar p { font-size:13px; color:#587488; margin-top:2px; }
 
     /* Content */
-    .la-content { padding:25px 30px; max-width:1400px; }
+    .la-content { padding:25px 30px; }
 
     /* Filter */
     .la-filter { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-bottom:21px; }
@@ -412,6 +412,12 @@
               <option value="Web">Web</option>
               <option value="CTWA">CTWA</option>
             </select>
+            <select id="la-rekap-platform">
+              <option value="">Semua platform</option>
+              <option value="Meta">Meta</option>
+              <option value="Google">Google</option>
+              <option value="TikTok">TikTok</option>
+            </select>
           </div>
           <div class="la-table-wrap" style="max-height:480px; overflow:auto;">
             <table class="la-table rekap" id="la-rekap-table">
@@ -482,6 +488,12 @@
               <option value="">Semua channel</option>
               <option value="Web">Web</option>
               <option value="CTWA">CTWA</option>
+            </select>
+            <select id="la-chart-platform">
+              <option value="">Semua platform</option>
+              <option value="Meta">Meta</option>
+              <option value="Google">Google</option>
+              <option value="TikTok">TikTok</option>
             </select>
           </div>
           <div class="la-chart-grid" id="la-chart-grid"></div>
@@ -927,13 +939,15 @@
     // Chart date picker default: bulan ini
     drpStart = new Date(y, now.getMonth(), 1, 12);
     drpEnd = new Date(now); drpEnd.setHours(12,0,0,0);
-    document.getElementById('la-product').addEventListener('change', render);
-    document.getElementById('la-channel').addEventListener('change', render);
-    document.getElementById('la-platform').addEventListener('change', render);
+    document.getElementById('la-product').addEventListener('change', () => { syncGlobalFilter(); render(); });
+    document.getElementById('la-channel').addEventListener('change', () => { syncGlobalFilter(); render(); });
+    document.getElementById('la-platform').addEventListener('change', () => { syncGlobalFilter(); render(); });
     document.getElementById('la-rekap-product').addEventListener('change', renderRekap);
     document.getElementById('la-rekap-channel').addEventListener('change', renderRekap);
-    document.getElementById('la-chart-product').addEventListener('change', renderChartData);
-    document.getElementById('la-chart-channel').addEventListener('change', renderChartData);
+    document.getElementById('la-rekap-platform').addEventListener('change', renderRekap);
+    document.getElementById('la-chart-product').addEventListener('change', renderChart);
+    document.getElementById('la-chart-channel').addEventListener('change', renderChart);
+    document.getElementById('la-chart-platform').addEventListener('change', renderChart);
 
     // Live total preview in modal (single/fallback mode)
     document.getElementById('ads-budget').addEventListener('input', function() {
@@ -1149,6 +1163,26 @@
     }
   }
 
+  function syncGlobalFilter() {
+    const prod = document.getElementById('la-product').value;
+    const ch = document.getElementById('la-channel').value;
+    const plat = document.getElementById('la-platform').value;
+    // Sync ke rekap filter
+    const rProd = document.getElementById('la-rekap-product');
+    const rCh = document.getElementById('la-rekap-channel');
+    const rPlat = document.getElementById('la-rekap-platform');
+    if (rProd && rProd.querySelector(`option[value="${prod}"]`)) rProd.value = prod;
+    if (rCh) rCh.value = ch;
+    if (rPlat) rPlat.value = plat;
+    // Sync ke chart filter
+    const cProd = document.getElementById('la-chart-product');
+    const cCh = document.getElementById('la-chart-channel');
+    const cPlat = document.getElementById('la-chart-platform');
+    if (cProd && cProd.querySelector(`option[value="${prod}"]`)) cProd.value = prod;
+    if (cCh) cCh.value = ch;
+    if (cPlat) cPlat.value = plat;
+  }
+
   function getFilteredReports() {
     const ch = document.getElementById('la-channel').value;
     const prod = document.getElementById('la-product').value;
@@ -1200,6 +1234,7 @@
     const end = document.getElementById('la-end').value;
     const prod = document.getElementById('la-rekap-product').value;
     const ch = document.getElementById('la-rekap-channel').value;
+    const plat = document.getElementById('la-rekap-platform').value;
 
     if (!start || !end) { tbody.innerHTML = ''; tfoot.innerHTML = ''; return; }
 
@@ -1212,9 +1247,9 @@
       d.setDate(d.getDate() + 1);
     }
 
-    // Filter reports & ads by product+channel selection
-    const reps = state.reports.filter(r => (!prod || r.product === prod) && (!ch || r.channel === ch));
-    const adsList = state.ads.filter(a => (!prod || a.product === prod) && (!ch || a.channel === ch));
+    // Filter reports & ads by product+channel+platform selection
+    const reps = state.reports.filter(r => (!prod || r.product === prod) && (!ch || r.channel === ch) && (!plat || (r.platform||'Meta') === plat));
+    const adsList = state.ads.filter(a => (!prod || a.product === prod) && (!ch || a.channel === ch) && (!plat || (a.platform||'Meta') === plat));
 
     // Totals for footer
     let totBudget=0, totLeads=0, totClosing=0, totUnits=0, totRevenue=0;
@@ -1296,7 +1331,8 @@
   function renderChart() {
     const prod = document.getElementById('la-chart-product').value;
     const ch = document.getElementById('la-chart-channel').value;
-    const reps = chartReports.filter(r => (!prod || r.product === prod) && (!ch || r.channel === ch));
+    const plat = document.getElementById('la-chart-platform').value;
+    const reps = chartReports.filter(r => (!prod || r.product === prod) && (!ch || r.channel === ch) && (!plat || (r.platform||'Meta') === plat));
 
     // Aggregate per CS
     const byCS = {};
