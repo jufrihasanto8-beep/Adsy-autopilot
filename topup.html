@@ -1104,7 +1104,11 @@
     const isAdmin = ['admin','superadmin'].includes(currentProfile?.role);
     if (!isAdmin) {
       if (!selectedAccount?.laporan_assignment) {
-        showAdsWarning(`Akun iklan <b>${selectedAccount?.nama_akun || '—'}</b> belum dihubungkan ke Penugasan Laporan. Silakan hubungkan terlebih dahulu di menu Akun Iklan.`);
+        showAdsWarning(`Akun iklan <b>${selectedAccount?.nama_akun || '—'}</b> belum dihubungkan ke Penugasan Laporan. Silakan hubungkan terlebih dahulu di menu Akun Iklan.`, { href: '#', label: 'Buka Akun Iklan' });
+        // Scroll ke section akun iklan saat klik link
+        const banner = document.getElementById('ads-warning-banner');
+        const aLink = banner?.querySelector('a');
+        if (aLink) aLink.onclick = (e) => { e.preventDefault(); switchTab('akun-iklan'); document.getElementById('panel-akun-iklan')?.scrollIntoView({ behavior: 'smooth' }); };
       } else {
         await checkAdsForAccount(selectedAccount);
       }
@@ -1169,7 +1173,7 @@
     }
   }
 
-  function showAdsWarning(msg) {
+  function showAdsWarning(msg, link) {
     adsCheckPassed = false;
     let banner = document.getElementById('ads-warning-banner');
     if (!banner) {
@@ -1179,7 +1183,8 @@
       const submitBtn = document.getElementById('tp-submit');
       submitBtn.parentElement.insertBefore(banner, submitBtn);
     }
-    banner.innerHTML = `⚠️ ${msg}<br><a href="laporan.html" style="color:#1d4ed8;font-weight:600;text-decoration:underline;margin-top:4px;display:inline-block;">→ Buka Laporan Akuisisi</a>`;
+    const { href, label } = link || { href: 'laporan.html', label: 'Buka Laporan Akuisisi' };
+    banner.innerHTML = `⚠️ ${msg}<br><a href="${href}" style="color:#1d4ed8;font-weight:600;text-decoration:underline;margin-top:4px;display:inline-block;">→ ${label}</a>`;
     banner.style.display = 'block';
     checkSubmitEnabled();
   }
