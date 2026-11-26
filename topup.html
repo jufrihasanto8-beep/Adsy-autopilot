@@ -1721,10 +1721,8 @@
 
     const caq = (spend / omset) * 100;
     let bg, color, icon, label;
-    if (caq <= 15) {
+    if (caq <= 55) {
       bg = '#d1fae5'; color = '#065f46'; icon = '🟢'; label = 'Murah';
-    } else if (caq <= 25) {
-      bg = '#fef3c7'; color = '#92400e'; icon = '🟡'; label = 'Cukup';
     } else {
       bg = '#fee2e2'; color = '#991b1b'; icon = '🔴'; label = 'Mahal';
     }
@@ -2205,8 +2203,8 @@
     let caqChipHtml = '';
     if (ext.caq_pct != null) {
       const caq = ext.caq_pct;
-      const cls = caq <= 15 ? 'rec-good' : caq <= 25 ? 'rec-moderate' : 'rec-poor';
-      const lbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
+      const cls = caq <= 55 ? 'rec-good' : 'rec-poor';
+      const lbl = caq <= 55 ? 'Murah' : 'Mahal';
       caqChipHtml = '<span class="chip ' + cls + '">📉 CAQ ' + caq.toFixed(1) + '% — ' + lbl + '</span>';
     }
     let recChipHtml = '';
@@ -2321,8 +2319,8 @@
     let caqModalHtml = '';
     if (req?.extracted_data?.caq_pct != null) {
       const caq = req.extracted_data.caq_pct;
-      const caqColor = caq <= 15 ? '#065f46' : caq <= 25 ? '#92400e' : '#991b1b';
-      const caqLbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
+      const caqColor = caq <= 55 ? '#065f46' : '#991b1b';
+      const caqLbl = caq <= 55 ? 'Murah' : 'Mahal';
       caqModalHtml = '<div><strong>CAQ:</strong> <span style="color:' + caqColor + ';font-weight:700;">' + caq.toFixed(1) + '% — ' + caqLbl + '</span></div>';
     }
 
