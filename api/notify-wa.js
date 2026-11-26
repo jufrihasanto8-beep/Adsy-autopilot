@@ -89,8 +89,8 @@ const htmlConfirm = (r, id, token) => {
     ${ext.omset != null ? (() => {
       if (ext.caq_pct != null) {
         const caq = ext.caq_pct;
-        const color = caq <= 15 ? '#10b981' : caq <= 25 ? '#f59e0b' : '#ef4444';
-        const lbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
+        const color = caq <= 55 ? '#10b981' : '#ef4444';
+        const lbl = caq <= 55 ? 'Murah' : 'Mahal';
         return `<div class="info-row"><span class="lbl">CAQ</span><span class="val" style="color:${color}">${caq.toFixed(1)}% — ${lbl}</span></div>`;
       }
       return `<div class="info-row"><span class="lbl">CAQ</span><span class="val" style="color:#6b7280">— (spend belum tersedia)</span></div>`;
@@ -383,7 +383,7 @@ async function doConfirm() {
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 800,
+          max_tokens: 400,
           messages: [{
             role: 'user',
             content: [
@@ -393,30 +393,23 @@ async function doConfirm() {
               },
               {
                 type: 'text',
-                text: `Ekstrak data performa iklan dari screenshot. Screenshot bisa dari Meta Ads Manager ATAU Google Ads.
+                text: `Baca screenshot dashboard iklan. Ambil HANYA angka dari label yang tepat.
 
-DETEKSI PLATFORM:
-- Meta Ads: ada tabel dengan baris "Hasil dari X kampanye", kolom: Hasil | Jangkauan | Biaya per hasil | Jumlah yang dibelanjakan
-- Google Ads: ada card/ringkasan di atas dengan label seperti "Konversi", "Biaya/konv.", "CPC rata2", "Biaya", dan tanggal di pojok kanan atas
+PLATFORM META ADS (tabel dengan baris total "Hasil dari X kampanye"):
+- spend → cari kolom yang labelnya DIAWALI kata "Jumlah yang..." (contoh: "Jumlah yang dibelanjakan", "Jumlah yang dipakai", dll). Ambil angka pada baris TOTAL paling bawah. JANGAN ambil dari kolom lain.
+- results → ambil angka di kolom berlabel "Hasil" pada baris TOTAL. JANGAN ambil dari "Jangkauan" (itu reach, bukan hasil).
+- ${kpiField} → ambil angka di kolom berlabel "${isCtwa ? 'Biaya per klik (semua)' : 'Biaya per hasil'}" pada baris TOTAL.
+- date_range → tanggal di pojok kanan atas.
 
-JIKA META ADS:
-Cari baris paling bawah "Hasil dari X kampanye".
-Urutan kolom: No. | Kampanye | Hasil | Jangkauan | Frekuensi | Biaya per hasil | Anggaran | Jumlah yang dibelanjakan | Omset | CAQ
-1. Kolom ke-3 "Hasil" → results. Tiap sel: baris atas = angka atau "—", baris bawah = nama event (abaikan). "—" → null.
-2. Kolom ke-6 "${isCtwa ? 'Biaya per klik (semua)' : 'Biaya per hasil'}" → ${kpiField}. "—" → null.
-3. Kolom ke-8 "Jumlah yang dibelanjakan" → spend. "—" → null.
-4. Tanggal di pojok kanan atas → date_range.
-INGAT: kolom "Jangkauan" = reach audiens, BUKAN hasil konversi.
+PLATFORM GOOGLE ADS (card ringkasan di atas):
+- spend → angka di card berlabel "Biaya".
+- results → angka di card berlabel "Konversi". Bulatkan ke integer.
+- ${kpiField} → angka di card berlabel "${isCtwa ? 'CPC rata2' : 'Biaya/konv.'}".
+- date_range → tanggal di pojok kanan atas.
 
-JIKA GOOGLE ADS:
-1. Card "Biaya" → spend (total biaya iklan).
-2. Card "Konversi" → results (jumlah konversi/lead). Angka desimal "0,00" = 0. Bulatkan ke integer.
-3. Card "Biaya/konv." → ${kpiField} (biaya per konversi). "Rp0" dengan 0 konversi → null.
-4. Tanggal di pojok kanan atas (misal "26 Nov 2026") → date_range.
+ATURAN ANGKA: Format Indonesia, titik = ribuan, koma = desimal. "Rp 49.947" = 49947, "Rp1.344.000" = 1344000. Return integer tanpa titik/koma. "—" atau tidak ada → null.
 
-FORMAT ANGKA INDONESIA: "Rp 49.947" = 49947, "Rp1.344.000" = 1344000, "0,00" = 0 (titik = ribuan, koma = desimal). Return integer tanpa titik/koma.
-
-Return HANYA valid JSON:
+Return HANYA JSON, tanpa teks lain:
 {"platform":"meta" atau "google","date_range":"...","spend":...,"results":...,"${kpiField}":...}`
               }
             ]
@@ -552,7 +545,7 @@ Field tidak ditemukan = null.` }
       extracted?.omset != null ? `• Omset: Rp ${fmtNum(extracted.omset)}` : null,
       extracted?.omset != null ? (extracted?.caq_pct != null ? (() => {
         const caq = extracted.caq_pct;
-        const lbl = caq <= 15 ? 'Murah ✅' : caq <= 25 ? 'Cukup ⚠️' : 'Mahal ❌';
+        const lbl = caq <= 55 ? 'Murah ✅' : 'Mahal ❌';
         return `• CAQ: ${caq.toFixed(1)}% — ${lbl}`;
       })() : `• CAQ: — (spend belum tersedia)`) : null,
       ``,
