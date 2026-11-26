@@ -93,7 +93,7 @@ const htmlConfirm = (r, id, token) => {
         const lbl = caq <= 15 ? 'Murah' : caq <= 25 ? 'Cukup' : 'Mahal';
         return `<div class="info-row"><span class="lbl">CAQ</span><span class="val" style="color:${color}">${caq.toFixed(1)}% — ${lbl}</span></div>`;
       }
-      return `<div class="info-row"><span class="lbl">CAQ</span><span class="val" style="color:#6b7280">— (omset 0)</span></div>`;
+      return `<div class="info-row"><span class="lbl">CAQ</span><span class="val" style="color:#6b7280">— (spend belum tersedia)</span></div>`;
     })() : ''}
   </div>
 
@@ -371,8 +371,7 @@ async function doConfirm() {
 
     const isCtwa = ad_type === 'ctwa';
     const effectiveTarget = target_kpi || target_cpr; // backward compat
-    const resultsLabel = isCtwa ? 'percakapan/chat yang dimulai' : 'lead/konversi';
-    const kpiLabel = isCtwa ? 'CPC (cost per chat)' : 'CPR (cost per lead)';
+    const kpiField = isCtwa ? 'cpc' : 'cpr';
 
     try {
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -394,25 +393,31 @@ async function doConfirm() {
               },
               {
                 type: 'text',
-                text: `Ekstrak data dari screenshot Meta Ads Manager.
+                text: `Ekstrak data performa iklan dari screenshot. Screenshot bisa dari Meta Ads Manager ATAU Google Ads.
 
-Cari baris paling bawah bertulisan "Hasil dari X kampanye".
+DETEKSI PLATFORM:
+- Meta Ads: ada tabel dengan baris "Hasil dari X kampanye", kolom: Hasil | Jangkauan | Biaya per hasil | Jumlah yang dibelanjakan
+- Google Ads: ada card/ringkasan di atas dengan label seperti "Konversi", "Biaya/konv.", "CPC rata2", "Biaya", dan tanggal di pojok kanan atas
 
-Urutan kolom di tabel Meta Ads dari kiri ke kanan adalah:
-No. | Kampanye | Hasil | Jangkauan | Frekuensi | Biaya per hasil | Anggaran | Jumlah yang dibelanjakan | Omset | CAQ
-
-Dari baris "Hasil dari X kampanye", baca:
-1. Kolom ke-3 = "Hasil" → results. Tiap sel di kolom ini menampilkan 2 baris: baris atas = angka atau "—", baris bawah = nama event (abaikan). Jika baris atas "—" → null.
-2. Kolom ke-6 = "${isCtwa ? 'Biaya per klik (semua)' : 'Biaya per hasil'}" → ${isCtwa ? 'cpc' : 'cpr'}. Jika "—" → null.
-3. Kolom ke-8 = "Jumlah yang dibelanjakan" → spend. Jika "—" → null.
+JIKA META ADS:
+Cari baris paling bawah "Hasil dari X kampanye".
+Urutan kolom: No. | Kampanye | Hasil | Jangkauan | Frekuensi | Biaya per hasil | Anggaran | Jumlah yang dibelanjakan | Omset | CAQ
+1. Kolom ke-3 "Hasil" → results. Tiap sel: baris atas = angka atau "—", baris bawah = nama event (abaikan). "—" → null.
+2. Kolom ke-6 "${isCtwa ? 'Biaya per klik (semua)' : 'Biaya per hasil'}" → ${kpiField}. "—" → null.
+3. Kolom ke-8 "Jumlah yang dibelanjakan" → spend. "—" → null.
 4. Tanggal di pojok kanan atas → date_range.
+INGAT: kolom "Jangkauan" = reach audiens, BUKAN hasil konversi.
 
-INGAT: kolom ke-4 "Jangkauan" adalah reach/jangkauan audiens — BUKAN hasil konversi, jangan masukkan ke results.
+JIKA GOOGLE ADS:
+1. Card "Biaya" → spend (total biaya iklan).
+2. Card "Konversi" → results (jumlah konversi/lead). Angka desimal "0,00" = 0. Bulatkan ke integer.
+3. Card "Biaya/konv." → ${kpiField} (biaya per konversi). "Rp0" dengan 0 konversi → null.
+4. Tanggal di pojok kanan atas (misal "26 Nov 2026") → date_range.
 
-Angka format Indonesia: "Rp 49.947" = 49947 (integer, tanpa titik).
+FORMAT ANGKA INDONESIA: "Rp 49.947" = 49947, "Rp1.344.000" = 1344000, "0,00" = 0 (titik = ribuan, koma = desimal). Return integer tanpa titik/koma.
 
-Return JSON saja:
-${isCtwa ? '{"date_range":"...","spend":...,"results":...,"cpc":...}' : '{"date_range":"...","spend":...,"results":...,"cpr":...}'}`
+Return HANYA valid JSON:
+{"platform":"meta" atau "google","date_range":"...","spend":...,"results":...,"${kpiField}":...}`
               }
             ]
           }]
@@ -538,17 +543,18 @@ Field tidak ditemukan = null.` }
       ad_account_name ? `🖥️ Akun Iklan: ${ad_account_name}` : null,
       billing.kartu_kredit_nama ? `💳 Kartu: ${billing.kartu_kredit_nama} ····${billing.kartu_kredit_nomor || ''}` : null,
       ``,
-      `📊 *Performa (Meta Ads):*`,
+      `📊 *Performa (${extracted?.platform === 'google' ? 'Google Ads' : 'Meta Ads'}):*`,
       extracted?.date_range ? `• Periode: ${extracted.date_range}` : null,
       extracted?.spend != null ? `• Spend: Rp ${fmtNum(extracted.spend)}` : null,
       extracted?.results != null ? `• Hasil (Lead): ${fmtNum(extracted.results)}` : null,
       extracted?.cpr != null ? `• CPR: Rp ${fmtNum(extracted.cpr)}` : null,
+      extracted?.cpc != null && !extracted?.cpr ? `• CPC: Rp ${fmtNum(extracted.cpc)}` : null,
       extracted?.omset != null ? `• Omset: Rp ${fmtNum(extracted.omset)}` : null,
       extracted?.omset != null ? (extracted?.caq_pct != null ? (() => {
         const caq = extracted.caq_pct;
         const lbl = caq <= 15 ? 'Murah ✅' : caq <= 25 ? 'Cukup ⚠️' : 'Mahal ❌';
         return `• CAQ: ${caq.toFixed(1)}% — ${lbl}`;
-      })() : `• CAQ: — (omset 0)`) : null,
+      })() : `• CAQ: — (spend belum tersedia)`) : null,
       ``,
       rec.level ? `⚡ *${levelLabel}*` : null,
       rec.recommendation_pct ? `💡 Rekomendasi performa: Top up ${rec.recommendation_pct}%` : null,
