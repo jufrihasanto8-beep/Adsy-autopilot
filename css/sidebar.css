@@ -13,7 +13,9 @@
   z-index: 200;
   overflow-y: auto;
   transition: width 0.3s ease;
+  scrollbar-width: none;
 }
+.sidebar::-webkit-scrollbar { display: none; }
 
 .sidebar-logo {
   padding: 24px 20px 20px;
@@ -53,7 +55,7 @@
 
 /* ── NAV ── */
 .sidebar-nav {
-  padding: 16px 12px;
+  padding: 8px 0;
   flex: 1;
 }
 
@@ -61,24 +63,25 @@
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.2px;
   color: var(--gray-5);
-  padding: 12px 8px 8px;
+  padding: 16px 24px 8px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 12px;
-  border-radius: var(--radius-sm);
+  padding: 11px 16px;
   cursor: pointer;
-  transition: var(--transition);
   color: var(--text-sub);
   font-size: 13px;
   font-weight: 500;
-  margin-bottom: 2px;
   position: relative;
+  transition: all 0.15s;
+  margin: 1px 12px;
+  border-radius: 10px;
+  z-index: 1;
 }
 
 .nav-item:hover {
@@ -86,22 +89,47 @@
   color: var(--text);
 }
 
+/* ── ACTIVE ITEM — Adsy teal bubble + curved notch ── */
 .nav-item.active {
-  background: var(--primary-light);
-  color: var(--primary);
+  color: #fff;
   font-weight: 600;
+  background: #00a8df;
+  border-radius: 20px 0 0 20px;
+  margin: 0;
+  margin-left: 14px;
+  padding-left: 16px;
+  padding-right: 24px;
 }
+.nav-item.active:hover {
+  color: #fff;
+  background: #00a8df;
+}
+.nav-item.active svg { stroke: #fff; }
 
+/* Curved notch top */
 .nav-item.active::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
+  right: 0;
+  bottom: 100%;
+  width: 20px;
   height: 20px;
-  background: var(--primary);
-  border-radius: 0 4px 4px 0;
+  background: transparent;
+  border-bottom-right-radius: 14px;
+  box-shadow: 6px 6px 0 6px #00a8df;
+}
+
+/* Curved notch bottom */
+.nav-item.active::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border-top-right-radius: 14px;
+  box-shadow: 6px -6px 0 6px #00a8df;
 }
 
 .nav-icon {
@@ -113,6 +141,7 @@
   font-size: 16px;
   flex-shrink: 0;
 }
+.nav-item.active .nav-icon { filter: brightness(10); }
 
 .nav-badge {
   margin-left: auto;
@@ -126,6 +155,9 @@
   text-align: center;
 }
 
+.nav-item.active .nav-badge {
+  background: rgba(255,255,255,0.3);
+}
 .nav-badge.red { background: var(--danger); }
 .nav-badge.green { background: var(--success); }
 
@@ -287,6 +319,8 @@ body.sidebar-collapsed .nav-item {
   padding: 11px 0;
   font-size: 0; /* hides text nodes */
   position: relative;
+  margin: 1px 8px;
+  border-radius: 10px;
 }
 body.sidebar-collapsed .nav-item .nav-icon {
   font-size: 18px;
@@ -294,8 +328,15 @@ body.sidebar-collapsed .nav-item .nav-icon {
   width: 24px;
   height: 24px;
 }
-body.sidebar-collapsed .nav-item.active::before {
-  height: 24px;
+/* Collapsed active: simple teal circle, no curved notch */
+body.sidebar-collapsed .nav-item.active {
+  border-radius: 10px;
+  margin: 1px 8px;
+  padding: 11px 0;
+}
+body.sidebar-collapsed .nav-item.active::before,
+body.sidebar-collapsed .nav-item.active::after {
+  display: none;
 }
 body.sidebar-collapsed .nav-badge { display: none; }
 
@@ -355,7 +396,10 @@ body.sidebar-collapsed .autopilot-status { display: none; }
   body.sidebar-collapsed .sidebar-logo { justify-content: flex-start; padding: 24px 20px 20px; gap: 10px; }
   body.sidebar-collapsed .sidebar-logo-text { display: block; }
   body.sidebar-collapsed .nav-section-label { display: block; }
-  body.sidebar-collapsed .nav-item { justify-content: flex-start; padding: 11px 12px; font-size: 13px; }
+  body.sidebar-collapsed .nav-item { justify-content: flex-start; padding: 11px 16px; font-size: 13px; margin: 1px 12px; border-radius: 10px; }
+  body.sidebar-collapsed .nav-item.active { border-radius: 20px 0 0 20px; margin: 0; margin-left: 14px; padding-left: 16px; padding-right: 24px; }
+  body.sidebar-collapsed .nav-item.active::before,
+  body.sidebar-collapsed .nav-item.active::after { display: block; }
   body.sidebar-collapsed .nav-badge { display: inline-flex; }
   body.sidebar-collapsed .autopilot-status { display: block; }
   body.sidebar-collapsed .sidebar-user-info { display: block; }
