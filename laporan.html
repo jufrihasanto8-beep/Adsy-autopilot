@@ -951,7 +951,7 @@
     document.getElementById('la-start').value = drpISO(drpMainStart);
     document.getElementById('la-end').value = drpISO(drpMainEnd);
     drpMainClose();
-    loadData();
+    loadData(!!state.advName);
   };
 
   async function init() {
