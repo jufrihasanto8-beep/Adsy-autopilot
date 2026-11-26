@@ -946,8 +946,13 @@
     document.getElementById('drp-main-label').textContent = label ? label.textContent : `${drpFmt(drpMainStart)} - ${drpFmt(drpMainEnd)}`;
     document.getElementById('la-start').value = drpISO(drpMainStart);
     document.getElementById('la-end').value = drpISO(drpMainEnd);
+    // Sync ke Performa CS date range
+    drpStart = new Date(drpMainStart);
+    drpEnd = new Date(drpMainEnd);
+    document.getElementById('drp-label').textContent = document.getElementById('drp-main-label').textContent;
     drpMainClose();
     loadData(!!state.advName);
+    renderChartData();
   };
 
   async function init() {
