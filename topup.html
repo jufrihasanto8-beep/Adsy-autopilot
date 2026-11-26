@@ -1102,8 +1102,12 @@
 
     // Check biaya iklan kemarin (hanya advertiser, bukan admin)
     const isAdmin = ['admin','superadmin'].includes(currentProfile?.role);
-    if (!isAdmin && selectedAccount?.laporan_assignment) {
-      await checkAdsForAccount(selectedAccount);
+    if (!isAdmin) {
+      if (!selectedAccount?.laporan_assignment) {
+        showAdsWarning(`Akun iklan <b>${selectedAccount?.nama_akun || '—'}</b> belum dihubungkan ke Penugasan Laporan. Silakan hubungkan terlebih dahulu di menu Akun Iklan.`);
+      } else {
+        await checkAdsForAccount(selectedAccount);
+      }
     } else {
       hideAdsWarning();
     }
