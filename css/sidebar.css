@@ -268,11 +268,6 @@ body.sidebar-collapsed {
 
 body.sidebar-collapsed .sidebar {
   width: 64px;
-  overflow: visible;
-}
-body.sidebar-collapsed .sidebar-nav {
-  overflow-y: auto;
-  max-height: calc(100vh - 120px);
 }
 body.sidebar-collapsed .sidebar-logo {
   justify-content: center;
@@ -304,38 +299,7 @@ body.sidebar-collapsed .nav-item.active::before {
 }
 body.sidebar-collapsed .nav-badge { display: none; }
 
-/* Tooltip on hover when collapsed */
-body.sidebar-collapsed .nav-item[data-label]:hover::after {
-  content: attr(data-label);
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 50%;
-  transform: translateY(-50%);
-  background: var(--text);
-  color: white;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  padding: 6px 10px;
-  border-radius: 7px;
-  z-index: 300;
-  pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-body.sidebar-collapsed .nav-item[data-label]:hover::before {
-  content: '';
-  position: absolute;
-  left: calc(100% + 4px);
-  top: 50%;
-  transform: translateY(-50%);
-  border: 5px solid transparent;
-  border-right-color: var(--text);
-  z-index: 300;
-  width: 0;
-  height: 0;
-  background: none;
-  border-radius: 0;
-}
+/* Tooltip via JS — appended to body, see sidebar.js */
 
 body.sidebar-collapsed .main-content {
   margin-left: 64px;
