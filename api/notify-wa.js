@@ -534,7 +534,7 @@ Field tidak ditemukan = null.` }
     const timeLabel = topup_time === 'sore' ? '🌆 Top Up Sore (spend hari ini)' : '🌅 Top Up Pagi (spend kemarin)';
 
     const pesan = [
-      `🔔 *Request Top Up — Adsy Autopilot*`,
+      `🔔 *Request Top Up — Adv Adsy*`,
       `${timeLabel}`,
       ``,
       `👤 *${user_name}* minta top up:`,
@@ -919,7 +919,7 @@ Field tidak ditemukan = null.` }
           `💰 *Nominal: Rp ${fmtNum(req_data.nominal_disetujui || req_data.nominal_request)}*`,
           ``,
           `Cek dulu apakah kartu dan dana nya sudah sesuai, lalu lakukan pembayaran ke Meta Ads.`,
-          `Semoga hari ini iklannya lebih murah lagi! 🚀`,
+          `Semangat, semoga hari ini bisa lebih maksimal closingnya! 🚀`,
           `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
         ].join('\n');
 
@@ -961,7 +961,7 @@ Field tidak ditemukan = null.` }
           `💰 *Nominal: Rp ${fmtNum(req_data.nominal_disetujui || req_data.nominal_request)}*`,
           ``,
           `Cek dulu apakah kartu dan dana nya sudah sesuai, lalu lakukan pembayaran ke Meta Ads.`,
-          `Semoga hari ini iklannya lebih murah lagi! 🚀`,
+          `Semangat, semoga hari ini bisa lebih maksimal closingnya! 🚀`,
           `_${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}_`
         ].join('\n');
 
@@ -991,7 +991,7 @@ Field tidak ditemukan = null.` }
     if (!waTargets.length) return res.json({ ok: false, warn: 'Belum ada nomor penerima notif di Settings' });
 
     const pesan = [
-      `💳 *Request Kartu Baru — Adsy Autopilot*`,
+      `💳 *Request Kartu Baru — Adv Adsy*`,
       ``,
       `👤 *${user_name}* mengajukan request kartu:`,
       `📛 Nama: ${nama}`,
@@ -1098,7 +1098,7 @@ Field tidak ditemukan = null.` }
     const baseUrl = process.env.APP_URL || 'https://adsy-autopilot.vercel.app';
     const target = formatWaTarget(noWa);
     const pesan = [
-      `💬 *Pesan dari ${sender_name} — Adsy Autopilot*`,
+      `💬 *Pesan dari ${sender_name} — Adv Adsy*`,
       ``,
       `_"${message_preview}"_`,
       ``,
@@ -1146,7 +1146,7 @@ Field tidak ditemukan = null.` }
 
     const baseUrl = process.env.APP_URL || 'https://adsy-autopilot.vercel.app';
     const pesan = [
-      `💬 *Pesan Baru — Adsy Autopilot*`,
+      `💬 *Pesan Baru — Adv Adsy*`,
       ``,
       `👤 *${sender_name}* mengirim pesan:`,
       `_"${message_preview}"_`,
@@ -1186,7 +1186,7 @@ Field tidak ditemukan = null.` }
     if (!waTargets.length) return res.json({ ok: false, warn: 'Belum ada nomor penerima notif di Settings' });
 
     const pesan = [
-      `🌟 *Request Akun Pro — Adsy Autopilot*`,
+      `🌟 *Request Akun Pro — Adv Adsy*`,
       ``,
       `👤 *${user_name}* mengajukan request:`,
       `📛 Nama: ${nama}`,
