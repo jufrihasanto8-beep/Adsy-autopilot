@@ -52,6 +52,40 @@ function toggleSidebarCollapse() {
   });
 }
 
+// ── COLLAPSED TOOLTIP (JS, appended to body so never clipped) ──
+let _tip = null;
+function _showTip(e) {
+  if (!document.body.classList.contains('sidebar-collapsed')) return;
+  const label = e.currentTarget.dataset.label;
+  if (!label) return;
+  if (!_tip) {
+    _tip = document.createElement('div');
+    Object.assign(_tip.style, {
+      position:'fixed', background:'#1a2b3c', color:'#fff', fontSize:'12px',
+      fontWeight:'500', padding:'6px 10px', borderRadius:'7px', whiteSpace:'nowrap',
+      pointerEvents:'none', zIndex:'9999', boxShadow:'0 4px 12px rgba(0,0,0,0.15)',
+      transition:'opacity 0.12s', fontFamily:'DM Sans, Inter, sans-serif'
+    });
+    document.body.appendChild(_tip);
+  }
+  _tip.textContent = label;
+  const rect = e.currentTarget.getBoundingClientRect();
+  _tip.style.left = (rect.right + 10) + 'px';
+  _tip.style.top = (rect.top + rect.height / 2) + 'px';
+  _tip.style.transform = 'translateY(-50%)';
+  _tip.style.opacity = '1';
+  _tip.style.display = 'block';
+}
+function _hideTip() {
+  if (_tip) { _tip.style.opacity = '0'; _tip.style.display = 'none'; }
+}
+function _initTooltips() {
+  document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+    item.addEventListener('mouseenter', _showTip);
+    item.addEventListener('mouseleave', _hideTip);
+  });
+}
+
 // ── MOBILE MENU HELPERS ──
 function openMobileMenu() {
   document.querySelector('.sidebar')?.classList.add('open');
@@ -133,6 +167,7 @@ export function initSidebar() {
     });
   }
 
+  _initTooltips();
   injectProfileModal();
   injectChatNavItem();
   injectLaporanNavItem();
