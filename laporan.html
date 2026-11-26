@@ -397,6 +397,42 @@
           </div>
         </div>
 
+        <!-- PERTUMBUHAN & KONTRIBUSI CHARTS -->
+        <div style="display:grid; grid-template-columns:2fr 1fr; gap:18px; margin-bottom:22px;">
+          <!-- Line chart: Omzet & Biaya Iklan harian -->
+          <div class="la-card" style="margin-bottom:0;">
+            <div class="la-card-head">
+              <div>
+                <h3>Pertumbuhan akuisisi</h3>
+                <p>Omzet dan biaya iklan harian</p>
+              </div>
+            </div>
+            <div style="padding:0 22px 22px; position:relative;">
+              <canvas id="la-growth-chart" height="260"></canvas>
+            </div>
+          </div>
+          <!-- Donut chart: Kontribusi produk -->
+          <div class="la-card" style="margin-bottom:0;">
+            <div class="la-card-head">
+              <div>
+                <h3>Kontribusi produk</h3>
+                <p>Berdasarkan omzet bersih</p>
+              </div>
+            </div>
+            <div style="padding:0 22px 22px; display:flex; align-items:center; justify-content:center; gap:24px; min-height:260px;">
+              <div style="position:relative; width:180px; height:180px;">
+                <canvas id="la-donut-chart"></canvas>
+                <div id="la-donut-center" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+                  <span style="font-size:11px;color:#587488;">Total produk</span>
+                  <span id="la-donut-count" style="font-family:Manrope;font-size:28px;font-weight:750;color:#073b56;">0</span>
+                  <span style="font-size:10px;color:#587488;">produk aktif</span>
+                </div>
+              </div>
+              <div id="la-donut-legend" style="font-size:13px;color:#073b56;line-height:2;"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- REKAP HARIAN (spreadsheet-style) -->
         <div class="la-card">
           <div class="la-card-head">
@@ -1141,9 +1177,8 @@
 
       const rekapSel = document.getElementById('la-rekap-product');
       const curRekap = rekapSel.value;
-      rekapSel.innerHTML = (products.length > 1 ? '<option value="">Semua produk</option>' : '') + prodOpts;
+      rekapSel.innerHTML = '<option value="">Semua produk</option>' + prodOpts;
       if (curRekap) rekapSel.value = curRekap;
-      else if (products.length) rekapSel.value = products[0];
 
       const chartProdSel = document.getElementById('la-chart-product');
       const curChartProd = chartProdSel.value;
@@ -1218,6 +1253,8 @@
     document.getElementById('la-leads-note').textContent = `${formatNumber(totalLeads)} leads ditangani tim`;
     document.getElementById('la-caq').textContent = caq;
 
+    renderGrowthChart(reports, ads);
+    renderDonutChart(reports);
     renderChartData();
     renderRekap();
     renderBEF(reports);
@@ -1226,6 +1263,83 @@
 
   const DAYS_ID = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
   const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
+  // ── PERTUMBUHAN AKUISISI (line chart) ──
+  let growthChart = null;
+  function renderGrowthChart(reports, ads) {
+    const start = document.getElementById('la-start').value;
+    const end = document.getElementById('la-end').value;
+    if (!start || !end) return;
+
+    const days = [];
+    const d = new Date(start + 'T12:00:00');
+    const endD = new Date(end + 'T12:00:00');
+    while (d <= endD) { days.push(d.toISOString().split('T')[0]); d.setDate(d.getDate() + 1); }
+
+    const labels = days.map(dt => {
+      const p = dt.split('-');
+      return String(parseInt(p[2])) + ' ' + SHORT_MONTHS[parseInt(p[1]) - 1];
+    });
+    const omzetData = days.map(dt => reports.filter(r => r.date === dt).reduce((s, r) => s + (r.revenue || 0), 0));
+    const spendData = days.map(dt => ads.filter(a => a.date === dt).reduce((s, a) => s + (a.budget || 0) * (1 + (a.tax ?? 11) / 100), 0));
+
+    const ctx = document.getElementById('la-growth-chart');
+    if (growthChart) growthChart.destroy();
+    growthChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Omzet', data: omzetData, borderColor: '#00789f', backgroundColor: 'rgba(0,120,159,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#00789f' },
+          { label: 'Biaya iklan', data: spendData, borderColor: '#ffc107', backgroundColor: 'transparent', fill: false, tension: 0.3, borderWidth: 2, pointRadius: 2, pointBackgroundColor: '#ffc107' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', align: 'end', labels: { usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 8, padding: 16, font: { family: 'DM Sans', size: 12 } } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + money(Math.round(ctx.parsed.y)) } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#587488', maxRotation: 0, autoSkipPadding: 20 } },
+          y: { grid: { color: '#eaf4fa' }, border: { display: false }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#587488', callback: v => v >= 1e9 ? (v/1e9).toFixed(1)+'M' : v >= 1e6 ? (v/1e6).toFixed(1)+' jt' : v >= 1e3 ? (v/1e3).toFixed(1)+' rb' : v } }
+        }
+      }
+    });
+  }
+
+  // ── KONTRIBUSI PRODUK (donut chart) ──
+  let donutChart = null;
+  const DONUT_COLORS = ['#073b56','#00a8df','#ffc107','#80deea','#c5d3dd','#285d92','#ff8a65','#a5d6a7','#ce93d8','#90a4ae'];
+  function renderDonutChart(reports) {
+    const byProd = {};
+    reports.forEach(r => { byProd[r.product] = (byProd[r.product] || 0) + (r.revenue || 0); });
+    const sorted = Object.entries(byProd).sort((a, b) => b[1] - a[1]);
+    const totalRev = sorted.reduce((s, e) => s + e[1], 0);
+
+    document.getElementById('la-donut-count').textContent = sorted.length;
+
+    const legend = document.getElementById('la-donut-legend');
+    legend.innerHTML = sorted.map((e, i) => {
+      const pct = totalRev > 0 ? ((e[1] / totalRev) * 100).toFixed(1) : '0.0';
+      return `<div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;border-radius:50%;background:${DONUT_COLORS[i % DONUT_COLORS.length]};flex-shrink:0;"></span><span style="flex:1;">${e[0]}</span><strong>${pct}%</strong></div>`;
+    }).join('');
+
+    const ctx = document.getElementById('la-donut-chart');
+    if (donutChart) donutChart.destroy();
+    donutChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: sorted.map(e => e[0]),
+        datasets: [{ data: sorted.map(e => e[1]), backgroundColor: sorted.map((_, i) => DONUT_COLORS[i % DONUT_COLORS.length]), borderWidth: 2, borderColor: '#fff' }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true, cutout: '68%',
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.label + ': ' + money(Math.round(ctx.parsed)) + ' (' + (totalRev > 0 ? ((ctx.parsed / totalRev) * 100).toFixed(1) : 0) + '%)' } } }
+      }
+    });
+  }
 
   function renderRekap() {
     const tbody = document.getElementById('la-rekap-body');
