@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laporan Akuisisi — Adv Adsy</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="/assets/autopilot.ico" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <style>
+    /* ── Laporan Akuisisi theme override ── */
+    .la-page { font-family:'DM Sans',sans-serif; color:#073b56; }
+    .la-page *{ box-sizing:border-box; }
+
+    /* Topbar override */
+    .la-topbar { height:60px; background:#fff; border-bottom:1px solid #d8e7f0; display:flex; align-items:center; justify-content:space-between; padding:0 30px; position:sticky; top:0; z-index:100; }
+    .la-topbar h2 { font-family:Manrope; font-size:18px; font-weight:750; color:#073b56; letter-spacing:-.3px; }
+    .la-topbar p { font-size:13px; color:#587488; margin-top:2px; }
+
+    /* Content */
+    .la-content { padding:25px 30px; }
+
+    /* Filter */
+    .la-filter { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-bottom:21px; }
+    .la-filter-item { display:flex; align-items:center; gap:7px; border:1px solid #cce0ec; border-radius:6px; padding:8px 10px; background:#f8fcff; color:#1d5c7b; }
+    .la-filter-item select, .la-filter-item input { background:none; border:0; outline:none; font-size:13px; cursor:pointer; color:#1d5c7b; font-family:'DM Sans'; }
+    .la-filter-item input[type="date"] { max-width:130px; }
+
+    /* Stats */
+    .la-stats { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:15px; margin-bottom:22px; }
+    .la-stat { border:1px solid #cce0ec; border-radius:9px; background:#fff; padding:17px 19px 18px; min-height:130px; box-shadow:0 2px 3px #073b5602; }
+    .la-stat-top { display:flex; align-items:center; justify-content:space-between; font-size:13px; color:#587488; }
+    .la-stat-icon { width:29px; height:29px; border-radius:7px; display:grid; place-items:center; font-size:14px; }
+    .la-stat-icon.green { background:#e4f6fc; color:#00789f; }
+    .la-stat-icon.orange { background:#fff5cd; color:#906900; }
+    .la-stat-icon.blue { background:#e7f0fa; color:#285d92; }
+    .la-stat-icon.violet { background:#eef1fc; color:#5866a1; }
+    .la-stat strong { display:block; font-family:Manrope; font-size:24px; font-weight:750; letter-spacing:-.8px; margin:9px 0 13px; color:#073b56; }
+    .la-stat-note { display:flex; align-items:center; gap:6px; font-size:12px; color:#587488; }
+    .la-stat-note i { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+    .la-stat-note i.green { background:#00a8df; }
+    .la-stat-note i.orange { background:#ffd12a; }
+    .la-stat-note i.blue { background:#236ca2; }
+    .la-stat-note i.violet { background:#7b89c4; }
+
+    /* Cards */
+    .la-card { border:1px solid #cce0ec; border-radius:9px; background:#fff; box-shadow:0 2px 3px #073b5602; overflow:hidden; margin-bottom:22px; position:relative; }
+    .la-card.no-clip { overflow:visible; }
+    .la-card-head { padding:21px 22px 17px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+    .la-card-head h3 { font-family:Manrope; font-weight:750; font-size:15px; letter-spacing:-.15px; color:#073b56; }
+    .la-card-head p { font-size:13px; color:#587488; margin-top:6px; }
+
+    /* Tables */
+    .la-table-wrap { overflow:auto; }
+    .la-table { width:100%; border-collapse:collapse; text-align:left; white-space:nowrap; }
+    .la-table th { font-size:12px; letter-spacing:.15px; color:#587488; background:#eaf4fa; padding:13px 20px; border-top:1px solid #eaf4fa; border-bottom:1px solid #eaf4fa; font-weight:500; }
+    .la-table td { padding:14px 20px; font-size:13px; color:#1d5c7b; border-bottom:1px solid #eaf4fa; }
+    .la-table tr:last-child td { border-bottom:none; }
+    .la-table tbody tr:hover { background:#f8fcff; }
+    .la-table .money { color:#1d5c7b; font-weight:550; }
+
+    /* Badges */
+    .la-badge { display:inline-flex; align-items:center; gap:4px; border:1px solid; border-radius:4px; padding:4px 6px; font-size:11px; }
+    .la-badge.ctwa { color:#287947; background:#eaf8ef; border-color:#cfe8d8; }
+    .la-badge.web { color:#356987; background:#edf5fc; border-color:#d6e6f3; }
+
+    /* Lead BEF grid */
+    .la-lead-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(115px,1fr)); gap:10px; padding:16px 22px; }
+    .la-lead-card { border:1px solid #cce0ec; background:#fff; border-radius:8px; padding:14px; text-align:center; border-top:3px solid #00a8df; }
+    .la-lead-card:nth-child(3n) { border-top-color:#ffd12a; }
+    .la-lead-card .num { font-family:Manrope; font-size:23px; font-weight:750; color:#073b56; }
+    .la-lead-card .lbl { display:block; font-size:13px; color:#587488; margin-top:6px; }
+    .la-lead-card.total { border-top-color:#073b56; background:#eaf4fa; }
+    .la-lead-card.total .num { color:#073b56; }
+
+    /* Buttons - Laporan Akuisisi style */
+    .la-btn { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid #cce0ec; border-radius:6px; font-size:13px; font-weight:550; font-family:'DM Sans'; white-space:nowrap; color:#1d5c7b; background:#fff; cursor:pointer; }
+    .la-btn:hover { background:#eaf4fa; }
+    .la-btn.primary { background:#00789f; border-color:#00789f; color:#fff; }
+    .la-btn.primary:hover { background:#006889; }
+    .la-btn.primary:disabled { opacity:.45; cursor:not-allowed; }
+    .la-text-btn { font-size:13px; color:#00799f; background:none; border:0; padding:5px 0; cursor:pointer; font-family:'DM Sans'; }
+    .la-text-btn:hover { text-decoration:underline; }
+
+    /* Empty state */
+    .la-empty { min-height:120px; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#587488; gap:8px; font-size:14px; padding:30px; }
+
+    /* Loading */
+    .la-loading { text-align:center; padding:60px 20px; color:#587488; font-size:13px; }
+
+    /* Error */
+    .la-error { background:#fbefeb; color:#a35343; border:1px solid #f1d7ce; border-radius:6px; padding:12px; font-size:14px; line-height:1.6; margin-bottom:17px; }
+
+    /* Modal */
+    .la-modal-backdrop { display:none; position:fixed; inset:0; background:#073b5666; backdrop-filter:blur(3px); z-index:200; align-items:center; justify-content:center; }
+    .la-modal-backdrop.open { display:flex; }
+    .la-modal { background:#fff; border-radius:13px; width:90%; max-width:480px; max-height:92vh; overflow:auto; box-shadow:0 20px 80px #073b5633; }
+    .la-modal header { padding:26px 27px 20px; border-bottom:1px solid #eaf4fa; }
+    .la-modal header h3 { font-family:Manrope; font-size:21px; letter-spacing:-.5px; color:#073b56; margin:0; }
+    .la-modal-body { padding:22px 27px; }
+    .la-modal-body label { font-size:13px; color:#1d5c7b; display:block; margin-bottom:14px; }
+    .la-modal-body label > input,
+    .la-modal-body label > select { display:block; width:100%; border:1px solid #cce0ec; background:#fff; border-radius:6px; padding:10px 11px; margin-top:7px; font-size:14px; outline:none; font-family:'DM Sans'; color:#073b56; }
+    .la-modal-body label > input:focus,
+    .la-modal-body label > select:focus { border-color:#00a8df; box-shadow:0 0 0 3px rgba(0,168,223,0.1); }
+    .la-modal-body .form-summary { display:flex; align-items:center; justify-content:space-between; border-radius:6px; background:#edf6fc; padding:14px; margin:17px 0; font-size:13px; color:#426c83; }
+    .la-modal-body .form-summary b { color:#073b56; margin-left:8px; }
+    .la-modal-actions { display:flex; gap:10px; justify-content:flex-end; padding:0 27px 22px; }
+
+    /* Account rows in modal */
+    .ads-acct-row { border:1px solid #cce0ec; border-radius:8px; padding:12px 14px; margin-bottom:10px; background:#f8fcff; }
+    .ads-acct-row .acct-name { font-size:14px; font-weight:650; color:#073b56; margin-bottom:8px; }
+    .ads-acct-row .acct-fields { display:grid; grid-template-columns:1fr 80px; gap:10px; align-items:end; }
+    .ads-acct-row .acct-fields label { font-size:13px; color:#587488; margin-bottom:0; }
+    .ads-acct-row .acct-fields input { display:block; width:100%; border:1px solid #cce0ec; background:#fff; border-radius:6px; padding:8px 10px; margin-top:4px; font-size:14px; outline:none; font-family:'DM Sans'; color:#073b56; }
+    .ads-acct-row .acct-fields input:focus { border-color:#00a8df; box-shadow:0 0 0 3px rgba(0,168,223,0.1); }
+
+    /* Rekap Harian */
+    .la-rekap-head { display:flex; align-items:center; gap:10px; padding:0 22px 14px; flex-wrap:wrap; }
+    .la-rekap-head select { border:1px solid #cce0ec; border-radius:6px; padding:7px 10px; font-size:13px; background:#f8fcff; color:#1d5c7b; font-family:'DM Sans'; }
+    .la-table.rekap th { font-size:11px; padding:10px 12px; text-align:right; white-space:normal; line-height:1.4; position:sticky; top:0; z-index:2; }
+    .la-table.rekap th:first-child { text-align:left; }
+    .la-table.rekap td { font-size:13px; padding:10px 12px; text-align:right; font-variant-numeric:tabular-nums; }
+    .la-table.rekap td:first-child { text-align:left; white-space:nowrap; }
+    .la-table.rekap tr.has-data { background:#f0faf4; }
+    .la-table.rekap .zero { color:#c5d3dd; }
+    .la-table.rekap .eval-good { color:#227148; font-weight:600; }
+    .la-table.rekap .eval-warn { color:#906900; font-weight:600; }
+    .la-table.rekap .eval-bad { color:#a35343; font-weight:600; }
+    .la-table.rekap tfoot td { font-weight:650; background:#eaf4fa; border-top:2px solid #cce0ec; color:#073b56; }
+
+    /* Chart */
+    .la-chart-filters { display:flex; align-items:center; gap:10px; padding:0 22px 16px; flex-wrap:wrap; }
+    .la-chart-filters select { border:1px solid #cce0ec; border-radius:6px; padding:7px 10px; font-size:13px; background:#f8fcff; color:#1d5c7b; font-family:'DM Sans'; }
+    .la-chart-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:18px; padding:6px 22px 22px; }
+    .la-chart-item { text-align:center; }
+    .la-chart-item canvas { max-width:140px; max-height:140px; margin:0 auto; }
+    .la-chart-item .cs-name { font-family:Manrope; font-size:14px; font-weight:650; color:#073b56; margin-top:10px; }
+    .la-chart-item .cs-meta { font-size:13px; color:#587488; margin-top:3px; }
+    .la-chart-item .cs-rate { font-family:Manrope; font-size:20px; font-weight:750; letter-spacing:-.5px; margin-top:6px; }
+    .la-chart-item .cs-rate.good { color:#227148; }
+    .la-chart-item .cs-rate.mid { color:#906900; }
+    .la-chart-item .cs-rate.low { color:#a35343; }
+
+    /* Date Range Picker */
+    .la-drp-wrap { position:relative; }
+    .la-drp-trigger { display:inline-flex; align-items:center; gap:7px; border:1px solid #cce0ec; border-radius:6px; padding:7px 12px; font-size:13px; font-family:'DM Sans'; font-weight:550; background:#f8fcff; color:#1d5c7b; cursor:pointer; white-space:nowrap; }
+    .la-drp-trigger:hover { border-color:#00a8df; }
+    .la-drp-dropdown { display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:150; background:#fff; border:1px solid #cce0ec; border-radius:10px; box-shadow:0 12px 40px rgba(7,59,86,.14); min-width:480px; }
+    .la-drp-dropdown.open { display:flex; }
+    .la-drp-presets { width:150px; border-right:1px solid #eaf4fa; padding:10px 0; flex-shrink:0; }
+    .la-drp-preset { display:block; width:100%; text-align:left; border:none; background:none; padding:8px 16px; font-size:13px; font-family:'DM Sans'; color:#587488; cursor:pointer; }
+    .la-drp-preset:hover { background:#f8fcff; color:#073b56; }
+    .la-drp-preset.active { color:#00789f; font-weight:650; background:#edf6fc; }
+    .la-drp-cal { padding:14px 18px 8px; flex:1; }
+    .la-drp-cal-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .la-drp-cal-hdr span { font-family:Manrope; font-size:13px; font-weight:700; color:#073b56; }
+    .la-drp-nav { width:28px; height:28px; border-radius:6px; border:1px solid #cce0ec; background:#fff; display:grid; place-items:center; cursor:pointer; font-size:12px; color:#587488; }
+    .la-drp-nav:hover { border-color:#00a8df; color:#073b56; }
+    .la-drp-days-hdr { display:grid; grid-template-columns:repeat(7,1fr); text-align:center; margin-bottom:4px; }
+    .la-drp-days-hdr span { font-size:13px; font-weight:600; color:#587488; padding:4px 0; }
+    .la-drp-days { display:grid; grid-template-columns:repeat(7,1fr); text-align:center; gap:2px; }
+    .la-drp-day { padding:7px 0; font-size:13px; border-radius:6px; cursor:pointer; color:#1d5c7b; border:none; background:none; font-family:'DM Sans'; }
+    .la-drp-day:hover { background:#edf6fc; }
+    .la-drp-day.other { color:#c5d3dd; }
+    .la-drp-day.today { font-weight:700; color:#00789f; }
+    .la-drp-day.selected, .la-drp-day.range-start, .la-drp-day.range-end { background:#073b56; color:#fff; border-radius:6px; font-weight:600; }
+    .la-drp-day.in-range { background:#edf6fc; color:#073b56; border-radius:0; }
+    .la-drp-day.range-start { border-radius:6px 0 0 6px; }
+    .la-drp-day.range-end { border-radius:0 6px 6px 0; }
+    .la-drp-footer { display:flex; align-items:center; justify-content:space-between; padding:10px 18px 14px; border-top:1px solid #eaf4fa; }
+    .la-drp-sel-txt { font-size:10px; color:#587488; display:flex; align-items:center; gap:5px; }
+    .la-drp-footer-btns { display:flex; gap:6px; }
+    .la-drp-cancel { border:1px solid #cce0ec; border-radius:6px; padding:7px 14px; font-size:11px; font-family:'DM Sans'; background:#fff; color:#587488; cursor:pointer; }
+    .la-drp-cancel:hover { background:#f8fcff; }
+    .la-drp-apply { border:none; border-radius:6px; padding:7px 16px; font-size:11px; font-family:'DM Sans'; font-weight:600; background:#073b56; color:#fff; cursor:pointer; }
+    .la-drp-apply:hover { background:#0a4d6e; }
+    @media(max-width:700px) {
+      .la-drp-dropdown { min-width:auto; width:calc(100vw - 28px); flex-direction:column; }
+      .la-drp-presets { width:auto; border-right:none; border-bottom:1px solid #eaf4fa; display:flex; flex-wrap:wrap; gap:2px; padding:8px; }
+      .la-drp-preset { width:auto; padding:6px 10px; font-size:10px; border-radius:4px; }
+    }
+
+    /* Responsive */
+    @media(max-width:1200px) {
+      .la-stats { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .la-stat strong { font-size:21px; }
+    }
+    @media(max-width:960px) {
+      .la-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
+    @media(max-width:700px) {
+      .la-content { padding:22px 14px; }
+      .la-topbar { height:52px; padding:0 14px; }
+      .la-topbar h2 { font-size:16px; }
+      .la-stats { gap:10px; }
+      .la-stat { padding:14px 12px; min-height:120px; }
+      .la-stat strong { font-size:20px; }
+      .la-stat-top { font-size:10px; }
+      .la-stat-note { font-size:8px; }
+      .la-card-head { padding:17px 15px; }
+      .la-card-head h3 { font-size:12px; }
+      .la-table th { padding:11px 14px; font-size:8px; }
+      .la-table td { padding:12px 14px; font-size:10px; }
+      .la-filter-item { padding:6px 8px; }
+      .la-filter-item select, .la-filter-item input { font-size:10px; }
+      .la-lead-grid { grid-template-columns:repeat(auto-fill, minmax(95px,1fr)); gap:8px; padding:14px; }
+      .la-lead-card { padding:11px 8px; }
+      .la-lead-card .num { font-size:18px; }
+      .la-lead-card .lbl { font-size:10px; }
+      .la-modal-backdrop { padding:12px 0 0; align-items:flex-end; }
+      .la-modal { width:100%; max-width:none; max-height:calc(100dvh - 12px); border-radius:16px 16px 0 0; }
+      .la-modal header { padding:20px 19px 16px; }
+      .la-modal header h3 { font-size:18px; }
+      .la-modal-body { padding:18px; }
+      .la-modal-body label > input, .la-modal-body label > select { font-size:16px; min-height:46px; padding:11px 12px; }
+      .la-modal-actions { padding:0 18px 24px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="/assets/autopilot.png" style="width:36px;height:36px;object-fit:contain;border-radius:8px;" alt="Adsy" />
+      <div class="sidebar-logo-text"><strong>Adv Adsy</strong><span>Akuisisi</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Iklan</div>
+      <div class="nav-item" data-page="dashboard.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg> Dashboard</div>
+      <div class="nav-item" data-page="campaigns.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg> Kampanye</div>
+      <div class="nav-item" data-page="create-ad.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Buat Iklan</div>
+      <div class="nav-item" data-page="ctwa.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="9" y1="11" x2="15" y2="11"/></svg> Buat Iklan CTWA</div>
+      <div class="nav-item" data-page="boost-post.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg> Boost Post</div>
+      <div class="nav-item" data-page="library.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg> Library Konten</div>
+      <div class="nav-item" data-page="generate-image.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg> Generate Gambar</div>
+      <div class="nav-item" data-page="autopilot.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 18h.01"/><path d="M10 18h.01"/><path d="m2 14 3.5-3.5a2.12 2.12 0 0 1 3 0L12 14"/><path d="m14.5 12.5 3-3a2.12 2.12 0 0 1 3 0L22 11"/></svg> Autopilot Rules</div>
+      <div class="nav-item" data-page="reports.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Laporan</div>
+      <div class="nav-section-label" style="margin-top:18px;">Laporan</div>
+      <div class="nav-item active" data-page="laporan.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Laporan Akuisisi</div>
+      <div class="nav-item" data-page="topup.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Top Up Budget</div>
+      <div class="nav-item" data-page="card.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> Kartu Iklan Adsy</div>
+      <div class="nav-item" data-page="settings.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg> Pengaturan</div>
+      <div class="nav-item" data-page="chat.html" data-admin-only style="display:none;"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat</div>
+      <div class="nav-item" data-page="products.html"><svg style="width:20px;height:20px;flex-shrink:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> Produk</div>
+    </nav>
+    <div class="autopilot-status">
+      <div class="autopilot-status-header">
+        <span>Autopilot</span>
+        <div class="autopilot-toggle" id="autopilot-toggle"></div>
+      </div>
+      <strong>Status Sistem</strong>
+      <p id="autopilot-status-text">Tidak aktif</p>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="btn-logout">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <strong id="sidebar-user-name">Loading...</strong>
+          <span id="sidebar-user-role">-</span>
+        </div>
+        <span class="sidebar-user-more">⏏</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content la-page">
+    <div class="la-topbar">
+      <div>
+        <h2>Laporan Akuisisi</h2>
+        <p>Ringkasan performa CS, leads & biaya iklan</p>
+      </div>
+    </div>
+
+    <div class="la-content">
+      <!-- FILTER -->
+      <input type="hidden" id="la-start" />
+      <input type="hidden" id="la-end" />
+      <div class="la-filter">
+        <div class="la-drp-wrap">
+          <button class="la-drp-trigger" id="drp-main-trigger" onclick="drpMainToggle()">
+            📅 <span id="drp-main-label">Bulan Ini</span> <span style="color:#c5d3dd;">▾</span>
+          </button>
+          <div class="la-drp-dropdown" id="drp-main-dropdown">
+            <div class="la-drp-presets">
+              <button class="la-drp-preset" onclick="drpMainPreset(0,'Hari Ini',this)">Hari Ini</button>
+              <button class="la-drp-preset" onclick="drpMainPresetYesterday(this)">Kemarin</button>
+              <hr style="border:none;border-top:1px solid #eaf4fa;margin:4px 0;">
+              <button class="la-drp-preset" onclick="drpMainPreset(7,'7 Hari Terakhir',this)">7 Hari Terakhir</button>
+              <button class="la-drp-preset" onclick="drpMainPreset(14,'14 Hari Terakhir',this)">14 Hari Terakhir</button>
+              <button class="la-drp-preset" onclick="drpMainPreset(30,'30 Hari Terakhir',this)">30 Hari Terakhir</button>
+              <hr style="border:none;border-top:1px solid #eaf4fa;margin:4px 0;">
+              <button class="la-drp-preset active" onclick="drpMainPresetThisMonth(this)">Bulan Ini</button>
+              <button class="la-drp-preset" onclick="drpMainPresetLastMonth(this)">Bulan Lalu</button>
+            </div>
+            <div style="display:flex;flex-direction:column;flex:1;">
+              <div class="la-drp-cal" id="drp-main-cal"></div>
+              <div class="la-drp-footer">
+                <div class="la-drp-sel-txt">
+                  <span id="drp-main-sel-start">—</span> → <span id="drp-main-sel-end">—</span>
+                </div>
+                <div class="la-drp-footer-btns">
+                  <button class="la-drp-cancel" onclick="drpMainClose()">Batal</button>
+                  <button class="la-drp-apply" onclick="drpMainApply()">Terapkan</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="la-filter-item">
+          <select id="la-product">
+            <option value="">Semua produk</option>
+          </select>
+        </div>
+        <div class="la-filter-item">
+          <select id="la-channel">
+            <option value="">Semua channel</option>
+            <option value="Web">Web</option>
+            <option value="CTWA">CTWA</option>
+          </select>
+        </div>
+        <div class="la-filter-item">
+          <select id="la-platform">
+            <option value="">Semua platform</option>
+            <option value="Meta">Meta</option>
+            <option value="Google">Google</option>
+            <option value="TikTok">TikTok</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- LOADING -->
+      <div id="la-loading" class="la-loading" style="display:none;">
+        Menghubungkan ke Laporan Akuisisi...
+      </div>
+
+      <!-- ERROR -->
+      <div id="la-error" class="la-error" style="display:none;"></div>
+
+      <!-- CONTENT -->
+      <div id="la-content" style="display:none;">
+
+        <!-- HEADING + INPUT BUTTON -->
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px;">
+          <div>
+            <div style="font-size:9px; font-weight:650; letter-spacing:1.7px; color:#587488; margin-bottom:7px;">AKUISISI ADSY TEAM</div>
+            <h1 style="font-family:Manrope; font-weight:750; font-size:24px; letter-spacing:-.7px; color:#073b56;">Ringkasan performa <span id="la-adv-name" style="color:#00789f;"></span></h1>
+            <p style="font-size:11px; color:#587488; margin-top:7px;">Semua laporan sesuai filter periode dan channel.</p>
+          </div>
+          <button class="la-btn primary" onclick="openAdsModal()">+ Input Biaya Iklan</button>
+        </div>
+
+        <!-- STATS (5 cards like advertiser dashboard) -->
+        <div class="la-stats">
+          <div class="la-stat">
+            <div class="la-stat-top">
+              <span>Total omzet</span>
+              <span class="la-stat-icon green">💰</span>
+            </div>
+            <strong id="la-omzet">-</strong>
+            <div class="la-stat-note"><i class="green"></i>Dihitung dari order dan harga paket</div>
+          </div>
+          <div class="la-stat">
+            <div class="la-stat-top">
+              <span>Biaya iklan + pajak</span>
+              <span class="la-stat-icon orange">📣</span>
+            </div>
+            <strong id="la-spend">-</strong>
+            <div class="la-stat-note"><i class="orange"></i>Terhubung dari laporan advertiser</div>
+          </div>
+          <div class="la-stat">
+            <div class="la-stat-top">
+              <span>Total closing bersih</span>
+              <span class="la-stat-icon blue">🎯</span>
+            </div>
+            <strong id="la-closing">-</strong>
+            <div class="la-stat-note"><i class="blue"></i><span id="la-units-note">0 botol / box terjual</span></div>
+          </div>
+          <div class="la-stat">
+            <div class="la-stat-top">
+              <span>Closing rate</span>
+              <span class="la-stat-icon violet">📊</span>
+            </div>
+            <strong id="la-cr">-</strong>
+            <div class="la-stat-note"><i class="violet"></i><span id="la-leads-note">0 leads ditangani tim</span></div>
+          </div>
+          <div class="la-stat">
+            <div class="la-stat-top">
+              <span>CAQ</span>
+              <span class="la-stat-icon green">💰</span>
+            </div>
+            <strong id="la-caq">-</strong>
+            <div class="la-stat-note"><i class="green"></i>Biaya iklan + pajak ÷ omzet</div>
+          </div>
+        </div>
+
+        <!-- PERTUMBUHAN & KONTRIBUSI CHARTS -->
+        <div style="display:grid; grid-template-columns:2fr 1fr; gap:18px; margin-bottom:22px;">
+          <!-- Line chart: Omzet & Biaya Iklan harian -->
+          <div class="la-card" style="margin-bottom:0;">
+            <div class="la-card-head">
+              <div>
+                <h3>Pertumbuhan akuisisi</h3>
+                <p>Omzet dan biaya iklan harian</p>
+              </div>
+            </div>
+            <div style="padding:0 22px 22px; position:relative;">
+              <canvas id="la-growth-chart" height="260"></canvas>
+            </div>
+          </div>
+          <!-- Donut chart: Kontribusi produk -->
+          <div class="la-card" style="margin-bottom:0;">
+            <div class="la-card-head">
+              <div>
+                <h3>Kontribusi produk</h3>
+                <p>Berdasarkan omzet bersih</p>
+              </div>
+            </div>
+            <div style="padding:0 22px 22px; display:flex; align-items:center; justify-content:center; gap:24px; min-height:260px;">
+              <div style="position:relative; width:180px; height:180px;">
+                <canvas id="la-donut-chart"></canvas>
+                <div id="la-donut-center" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+                  <span style="font-size:11px;color:#587488;">Total produk</span>
+                  <span id="la-donut-count" style="font-family:Manrope;font-size:28px;font-weight:750;color:#073b56;">0</span>
+                  <span style="font-size:10px;color:#587488;">produk aktif</span>
+                </div>
+              </div>
+              <div id="la-donut-legend" style="font-size:13px;color:#073b56;line-height:2;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- REKAP HARIAN (spreadsheet-style) -->
+        <div class="la-card">
+          <div class="la-card-head">
+            <div>
+              <h3>Rekap Harian Advertiser</h3>
+              <p>Riwayat harian per produk — semua kolom seperti spreadsheet</p>
+            </div>
+          </div>
+          <div class="la-rekap-head">
+            <select id="la-rekap-product"></select>
+            <select id="la-rekap-channel">
+              <option value="">Semua channel</option>
+              <option value="Web">Web</option>
+              <option value="CTWA">CTWA</option>
+            </select>
+            <select id="la-rekap-platform">
+              <option value="">Semua platform</option>
+              <option value="Meta">Meta</option>
+              <option value="Google">Google</option>
+              <option value="TikTok">TikTok</option>
+            </select>
+          </div>
+          <div class="la-table-wrap" style="max-height:480px; overflow:auto;">
+            <table class="la-table rekap" id="la-rekap-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left;">Date</th>
+                  <th>Budget Iklan+Pajak</th>
+                  <th>Jumlah Lead</th>
+                  <th>Closing</th>
+                  <th>Closing Botol</th>
+                  <th>Closing Rate</th>
+                  <th>Biaya Akuisisi Lead</th>
+                  <th>Biaya Akuisisi Customer</th>
+                  <th>Biaya Akuisisi Botol</th>
+                  <th>CAQ</th>
+                  <th>Omset</th>
+                  <th>Rekomendasi</th>
+                </tr>
+              </thead>
+              <tbody id="la-rekap-body"></tbody>
+              <tfoot id="la-rekap-foot"></tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- PERFORMA CS -->
+        <div class="la-card no-clip">
+          <div class="la-card-head">
+            <div>
+              <h3>Performa CS</h3>
+              <p>Grafik performa CS — leads, closing & omzet per CS</p>
+            </div>
+          </div>
+          <div class="la-chart-filters">
+            <div class="la-drp-wrap">
+              <button class="la-drp-trigger" id="drp-trigger" onclick="drpToggle()">
+                📅 <span id="drp-label">Bulan Ini</span> <span style="color:#c5d3dd;">▾</span>
+              </button>
+              <div class="la-drp-dropdown" id="drp-dropdown">
+                <div class="la-drp-presets">
+                  <button class="la-drp-preset" onclick="drpPreset(0,'Hari Ini',this)">Hari Ini</button>
+                  <button class="la-drp-preset" onclick="drpPresetYesterday(this)">Kemarin</button>
+                  <hr style="border:none;border-top:1px solid #eaf4fa;margin:4px 0;">
+                  <button class="la-drp-preset" onclick="drpPreset(7,'7 Hari Terakhir',this)">7 Hari Terakhir</button>
+                  <button class="la-drp-preset" onclick="drpPreset(14,'14 Hari Terakhir',this)">14 Hari Terakhir</button>
+                  <button class="la-drp-preset" onclick="drpPreset(30,'30 Hari Terakhir',this)">30 Hari Terakhir</button>
+                  <hr style="border:none;border-top:1px solid #eaf4fa;margin:4px 0;">
+                  <button class="la-drp-preset active" onclick="drpPresetThisMonth(this)">Bulan Ini</button>
+                  <button class="la-drp-preset" onclick="drpPresetLastMonth(this)">Bulan Lalu</button>
+                </div>
+                <div style="display:flex;flex-direction:column;flex:1;">
+                  <div class="la-drp-cal" id="drp-cal"></div>
+                  <div class="la-drp-footer">
+                    <div class="la-drp-sel-txt">
+                      <span id="drp-sel-start">—</span> → <span id="drp-sel-end">—</span>
+                    </div>
+                    <div class="la-drp-footer-btns">
+                      <button class="la-drp-cancel" onclick="drpClose()">Batal</button>
+                      <button class="la-drp-apply" onclick="drpApply()">Terapkan</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <select id="la-chart-product">
+              <option value="">Semua produk</option>
+            </select>
+            <select id="la-chart-channel">
+              <option value="">Semua channel</option>
+              <option value="Web">Web</option>
+              <option value="CTWA">CTWA</option>
+            </select>
+            <select id="la-chart-platform">
+              <option value="">Semua platform</option>
+              <option value="Meta">Meta</option>
+              <option value="Google">Google</option>
+              <option value="TikTok">TikTok</option>
+            </select>
+          </div>
+          <div class="la-chart-grid" id="la-chart-grid"></div>
+          <div class="la-table-wrap">
+            <table class="la-table">
+              <thead>
+                <tr>
+                  <th>CS</th>
+                  <th>Leads</th>
+                  <th>Closing</th>
+                  <th>Units</th>
+                  <th>Closing Rate</th>
+                  <th>Omzet</th>
+                </tr>
+              </thead>
+              <tbody id="la-reports-table">
+                <tr><td colspan="6"><div class="la-empty">Memuat...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- REPORT LEAD BEF -->
+        <div class="la-card">
+          <div class="la-card-head">
+            <div>
+              <h3>Report Lead BEF</h3>
+              <p>Breakdown leads per kategori</p>
+            </div>
+          </div>
+          <div id="la-bef-content">
+            <div class="la-empty">Memuat...</div>
+          </div>
+        </div>
+
+        <!-- BIAYA IKLAN -->
+        <div class="la-card">
+          <div class="la-card-head">
+            <div>
+              <h3>Biaya Iklan</h3>
+              <p>Riwayat input biaya iklan</p>
+            </div>
+          </div>
+          <div class="la-table-wrap">
+            <table class="la-table">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Produk</th>
+                  <th>Channel</th>
+                  <th>Platform</th>
+                  <th>Akun Iklan</th>
+                  <th>Budget</th>
+                  <th>Pajak</th>
+                  <th>Total biaya</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="la-ads-table">
+                <tr><td colspan="8"><div class="la-empty">Memuat...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- #la-content -->
+    </div>
+  </main>
+</div>
+
+<!-- MODAL INPUT BIAYA IKLAN -->
+<div class="la-modal-backdrop" id="modal-ads">
+  <div class="la-modal" style="max-width:540px;">
+    <header><h3>Input Biaya Iklan</h3></header>
+    <div class="la-modal-body">
+      <label>Tanggal <span style="color:#a35343;">*</span>
+        <input type="date" id="ads-date" />
+      </label>
+      <div id="ads-date-day" style="font-size:11px;color:#00789f;font-weight:550;margin:-8px 0 10px;"></div>
+      <label>Penugasan <span style="color:#a35343;">*</span>
+        <select id="ads-assignment">
+          <option value="">Pilih penugasan...</option>
+        </select>
+      </label>
+
+      <!-- Per-account rows (muncul setelah pilih penugasan) -->
+      <div id="ads-accounts-wrap" style="display:none; margin-top:14px;">
+        <div style="font-size:11px;font-weight:650;color:#073b56;margin-bottom:10px;">Akun Iklan</div>
+        <div id="ads-accounts-list"></div>
+        <div class="form-summary" style="margin-top:14px;">Total biaya termasuk pajak <b id="ads-total-preview">Rp 0</b></div>
+      </div>
+
+      <!-- Warning: belum ada akun iklan terdaftar -->
+      <div id="ads-no-account-warn" style="display:none; margin-top:14px; padding:14px 16px; background:#fef2f2; border:1px solid #fecaca; border-radius:10px; color:#991b1b; font-size:13px; line-height:1.6;">
+        <b>Belum ada akun iklan</b><br>
+        Penugasan ini belum memiliki akun iklan yang terdaftar. Daftarkan akun iklan terlebih dahulu di halaman <a href="topup.html" style="color:#00789f; font-weight:600;">Akun Iklan</a>.
+      </div>
+    </div>
+    <div class="la-modal-actions">
+      <button class="la-btn" onclick="closeAdsModal()">Batal</button>
+      <button class="la-btn primary" id="btn-save-ads" onclick="saveAds()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script type="module">
+  import { requireAuth, renderUserInfo } from './js/auth.js';
+  import { initSidebar, showToast, formatRupiah, formatNumber, formatDate } from './js/sidebar.js';
+  import { getSupabase } from './js/supabase.js';
+
+  const API_BASE = 'https://akuisisiadsy.vercel.app';
+
+  // Supabase B (Laporan Akuisisi) — anon key for realtime subscription only
+  const LAPORAN_SB_URL = 'https://kpgdhlyfdhflrrlpotrg.supabase.co';
+  const LAPORAN_SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwZ2RobHlmZGhmbHJybHBvdHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwNDY0MzIsImV4cCI6MjEwOTYyMjQzMn0.Omth7KwwLtuvdfcug7it_9xsLfBtBA5d8M30uQCN5vk';
+  let laporanSB = null;
+  const LEAD_LABELS = {
+    passive: 'Pasif', consultation: 'Konsultasi', priceShipping: 'Harga & Ongkir',
+    ooc: 'OOC', casual: 'Iseng', boughtElsewhere: 'Beli di Tempat Lain', other: 'Lainnya'
+  };
+  const LEAD_KEYS = Object.keys(LEAD_LABELS);
+  const money = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n||0);
+
+  let sb, accessToken;
+  let state = { assignments: [], catalog: [], reports: [], leadReports: [], ads: [], advName: '' };
+
+  // ── Date Range Picker state ──
+  const MONTHS_DRP = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  let drpStart, drpEnd; // committed range for chart
+  let drpSelStart, drpSelEnd, drpPickingEnd = false;
+  let drpViewYear, drpViewMonth;
+
+  function drpFmt(d) { return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; }
+  function drpISO(d) { return d.toISOString().split('T')[0]; }
+  function drpSame(a,b) { return a && b && a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+  window.drpToggle = function() {
+    const dd = document.getElementById('drp-dropdown');
+    if (dd.classList.contains('open')) { drpClose(); return; }
+    drpSelStart = drpStart ? new Date(drpStart) : null;
+    drpSelEnd = drpEnd ? new Date(drpEnd) : null;
+    drpPickingEnd = false;
+    const ref = drpSelStart || new Date();
+    drpViewYear = ref.getFullYear(); drpViewMonth = ref.getMonth();
+    drpRender(); drpUpdateSel();
+    dd.classList.add('open');
+    setTimeout(() => document.addEventListener('click', drpOutside), 0);
+  };
+  window.drpClose = function() {
+    document.getElementById('drp-dropdown').classList.remove('open');
+    document.removeEventListener('click', drpOutside);
+  };
+  let drpSkipOutside = false;
+  function drpOutside(e) {
+    if (drpSkipOutside) { drpSkipOutside = false; return; }
+    const dd = document.getElementById('drp-dropdown');
+    const tr = document.getElementById('drp-trigger');
+    if (!dd.contains(e.target) && !tr.contains(e.target)) drpClose();
+  }
+
+  function drpActivate(btn) {
+    document.querySelectorAll('#drp-dropdown .la-drp-preset').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+  }
+  window.drpPreset = function(days, label, btn) {
+    const now = new Date(); now.setHours(12,0,0,0);
+    if (days === 0) { drpSelStart = new Date(now); drpSelEnd = new Date(now); }
+    else { drpSelEnd = new Date(now); drpSelStart = new Date(now); drpSelStart.setDate(drpSelStart.getDate() - (days - 1)); }
+    drpViewYear = drpSelEnd.getFullYear(); drpViewMonth = drpSelEnd.getMonth();
+    drpPickingEnd = false; drpActivate(btn); drpRender(); drpUpdateSel();
+  };
+  window.drpPresetYesterday = function(btn) {
+    const d = new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate() - 1);
+    drpSelStart = new Date(d); drpSelEnd = new Date(d);
+    drpViewYear = d.getFullYear(); drpViewMonth = d.getMonth();
+    drpPickingEnd = false; drpActivate(btn); drpRender(); drpUpdateSel();
+  };
+  window.drpPresetThisMonth = function(btn) {
+    const now = new Date(); now.setHours(12,0,0,0);
+    drpSelStart = new Date(now.getFullYear(), now.getMonth(), 1, 12);
+    drpSelEnd = new Date(now);
+    drpViewYear = now.getFullYear(); drpViewMonth = now.getMonth();
+    drpPickingEnd = false; drpActivate(btn); drpRender(); drpUpdateSel();
+  };
+  window.drpPresetLastMonth = function(btn) {
+    const now = new Date();
+    const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const m = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    drpSelStart = new Date(y, m, 1, 12);
+    drpSelEnd = new Date(y, m + 1, 0, 12);
+    drpViewYear = y; drpViewMonth = m;
+    drpPickingEnd = false; drpActivate(btn); drpRender(); drpUpdateSel();
+  };
+
+  window.drpClickDay = function(y, m, d) {
+    drpSkipOutside = true;
+    const clicked = new Date(y, m, d, 12);
+    if (!drpPickingEnd || !drpSelStart) {
+      drpSelStart = clicked; drpSelEnd = null; drpPickingEnd = true;
+    } else {
+      if (clicked < drpSelStart) { drpSelEnd = new Date(drpSelStart); drpSelStart = clicked; }
+      else { drpSelEnd = clicked; }
+      drpPickingEnd = false;
+    }
+    drpActivate(null); drpRender(); drpUpdateSel();
+  };
+
+  window.drpNav = function(dir) {
+    drpSkipOutside = true;
+    drpViewMonth += dir;
+    if (drpViewMonth < 0) { drpViewMonth = 11; drpViewYear--; }
+    if (drpViewMonth > 11) { drpViewMonth = 0; drpViewYear++; }
+    drpRender();
+  };
+
+  function drpUpdateSel() {
+    document.getElementById('drp-sel-start').textContent = drpSelStart ? drpFmt(drpSelStart) : '—';
+    document.getElementById('drp-sel-end').textContent = drpSelEnd ? drpFmt(drpSelEnd) : '—';
+  }
+
+  function drpRender() {
+    const cal = document.getElementById('drp-cal');
+    const today = new Date(); today.setHours(12,0,0,0);
+    const first = new Date(drpViewYear, drpViewMonth, 1);
+    let startDay = first.getDay() - 1; if (startDay < 0) startDay = 6; // Mon=0
+    const daysInMonth = new Date(drpViewYear, drpViewMonth + 1, 0).getDate();
+
+    let html = `<div class="la-drp-cal-hdr">
+      <button class="la-drp-nav" onclick="drpNav(-1)">‹</button>
+      <span>${MONTHS_DRP[drpViewMonth]} ${drpViewYear}</span>
+      <button class="la-drp-nav" onclick="drpNav(1)">›</button>
+    </div>
+    <div class="la-drp-days-hdr"><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span></div>
+    <div class="la-drp-days">`;
+
+    // Previous month fill
+    const prevMonth = new Date(drpViewYear, drpViewMonth, 0);
+    for (let i = startDay - 1; i >= 0; i--) {
+      const d = prevMonth.getDate() - i;
+      const m = drpViewMonth - 1; const y = m < 0 ? drpViewYear - 1 : drpViewYear; const mf = m < 0 ? 11 : m;
+      html += `<button class="la-drp-day other" onclick="drpClickDay(${y},${mf},${d})">${d}</button>`;
+    }
+
+    // Current month
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(drpViewYear, drpViewMonth, d, 12);
+      let cls = 'la-drp-day';
+      if (drpSame(date, today)) cls += ' today';
+      if (drpSelStart && drpSelEnd) {
+        if (drpSame(date, drpSelStart) && drpSame(date, drpSelEnd)) cls += ' selected';
+        else if (drpSame(date, drpSelStart)) cls += ' range-start';
+        else if (drpSame(date, drpSelEnd)) cls += ' range-end';
+        else if (date > drpSelStart && date < drpSelEnd) cls += ' in-range';
+      } else if (drpSelStart && drpSame(date, drpSelStart)) cls += ' selected';
+      html += `<button class="${cls}" onclick="drpClickDay(${drpViewYear},${drpViewMonth},${d})">${d}</button>`;
+    }
+
+    // Next month fill
+    const totalCells = startDay + daysInMonth;
+    const remain = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+    for (let d = 1; d <= remain; d++) {
+      const m = drpViewMonth + 1; const y = m > 11 ? drpViewYear + 1 : drpViewYear; const mf = m > 11 ? 0 : m;
+      html += `<button class="la-drp-day other" onclick="drpClickDay(${y},${mf},${d})">${d}</button>`;
+    }
+
+    html += '</div>';
+    cal.innerHTML = html;
+  }
+
+  window.drpApply = function() {
+    if (!drpSelStart) return;
+    drpStart = new Date(drpSelStart);
+    drpEnd = drpSelEnd ? new Date(drpSelEnd) : new Date(drpSelStart);
+    const label = document.getElementById('drp-dropdown').querySelector('.la-drp-preset.active');
+    document.getElementById('drp-label').textContent = label ? label.textContent : `${drpFmt(drpStart)} - ${drpFmt(drpEnd)}`;
+    drpClose();
+    renderChartData();
+  };
+
+  // ── Main Date Range Picker (top filter) ──
+  let drpMainStart, drpMainEnd;
+  let drpMSelStart, drpMSelEnd, drpMPickingEnd = false;
+  let drpMViewYear, drpMViewMonth;
+  let drpMSkipOutside = false;
+
+  window.drpMainToggle = function() {
+    const dd = document.getElementById('drp-main-dropdown');
+    if (dd.classList.contains('open')) { drpMainClose(); return; }
+    drpMSelStart = drpMainStart ? new Date(drpMainStart) : null;
+    drpMSelEnd = drpMainEnd ? new Date(drpMainEnd) : null;
+    drpMPickingEnd = false;
+    const ref = drpMSelStart || new Date();
+    drpMViewYear = ref.getFullYear(); drpMViewMonth = ref.getMonth();
+    drpMRender(); drpMUpdateSel();
+    dd.classList.add('open');
+    setTimeout(() => document.addEventListener('click', drpMOutside), 0);
+  };
+  window.drpMainClose = function() {
+    document.getElementById('drp-main-dropdown').classList.remove('open');
+    document.removeEventListener('click', drpMOutside);
+  };
+  function drpMOutside(e) {
+    if (drpMSkipOutside) { drpMSkipOutside = false; return; }
+    const dd = document.getElementById('drp-main-dropdown');
+    const tr = document.getElementById('drp-main-trigger');
+    if (!dd.contains(e.target) && !tr.contains(e.target)) drpMainClose();
+  }
+  function drpMActivate(btn) {
+    document.querySelectorAll('#drp-main-dropdown .la-drp-preset').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+  }
+  window.drpMainPreset = function(days, label, btn) {
+    const now = new Date(); now.setHours(12,0,0,0);
+    if (days === 0) { drpMSelStart = new Date(now); drpMSelEnd = new Date(now); }
+    else { drpMSelEnd = new Date(now); drpMSelStart = new Date(now); drpMSelStart.setDate(drpMSelStart.getDate() - (days - 1)); }
+    drpMViewYear = drpMSelEnd.getFullYear(); drpMViewMonth = drpMSelEnd.getMonth();
+    drpMPickingEnd = false; drpMActivate(btn); drpMRender(); drpMUpdateSel();
+  };
+  window.drpMainPresetYesterday = function(btn) {
+    const d = new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate() - 1);
+    drpMSelStart = new Date(d); drpMSelEnd = new Date(d);
+    drpMViewYear = d.getFullYear(); drpMViewMonth = d.getMonth();
+    drpMPickingEnd = false; drpMActivate(btn); drpMRender(); drpMUpdateSel();
+  };
+  window.drpMainPresetThisMonth = function(btn) {
+    const now = new Date(); now.setHours(12,0,0,0);
+    drpMSelStart = new Date(now.getFullYear(), now.getMonth(), 1, 12);
+    drpMSelEnd = new Date(now);
+    drpMViewYear = now.getFullYear(); drpMViewMonth = now.getMonth();
+    drpMPickingEnd = false; drpMActivate(btn); drpMRender(); drpMUpdateSel();
+  };
+  window.drpMainPresetLastMonth = function(btn) {
+    const now = new Date();
+    const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const m = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    drpMSelStart = new Date(y, m, 1, 12);
+    drpMSelEnd = new Date(y, m + 1, 0, 12);
+    drpMViewYear = y; drpMViewMonth = m;
+    drpMPickingEnd = false; drpMActivate(btn); drpMRender(); drpMUpdateSel();
+  };
+  window.drpMClickDay = function(y, m, d) {
+    drpMSkipOutside = true;
+    const clicked = new Date(y, m, d, 12);
+    if (!drpMPickingEnd || !drpMSelStart) {
+      drpMSelStart = clicked; drpMSelEnd = null; drpMPickingEnd = true;
+    } else {
+      if (clicked < drpMSelStart) { drpMSelEnd = new Date(drpMSelStart); drpMSelStart = clicked; }
+      else { drpMSelEnd = clicked; }
+      drpMPickingEnd = false;
+    }
+    drpMActivate(null); drpMRender(); drpMUpdateSel();
+  };
+  window.drpMNav = function(dir) {
+    drpMSkipOutside = true;
+    drpMViewMonth += dir;
+    if (drpMViewMonth < 0) { drpMViewMonth = 11; drpMViewYear--; }
+    if (drpMViewMonth > 11) { drpMViewMonth = 0; drpMViewYear++; }
+    drpMRender();
+  };
+  function drpMUpdateSel() {
+    document.getElementById('drp-main-sel-start').textContent = drpMSelStart ? drpFmt(drpMSelStart) : '—';
+    document.getElementById('drp-main-sel-end').textContent = drpMSelEnd ? drpFmt(drpMSelEnd) : '—';
+  }
+  function drpMRender() {
+    const cal = document.getElementById('drp-main-cal');
+    const today = new Date(); today.setHours(12,0,0,0);
+    const first = new Date(drpMViewYear, drpMViewMonth, 1);
+    let startDay = first.getDay() - 1; if (startDay < 0) startDay = 6;
+    const dim = new Date(drpMViewYear, drpMViewMonth + 1, 0).getDate();
+    let html = `<div class="la-drp-cal-hdr">
+      <button class="la-drp-nav" onclick="drpMNav(-1)">‹</button>
+      <span>${MONTHS_DRP[drpMViewMonth]} ${drpMViewYear}</span>
+      <button class="la-drp-nav" onclick="drpMNav(1)">›</button>
+    </div>
+    <div class="la-drp-days-hdr"><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span></div>
+    <div class="la-drp-days">`;
+    const prevM = new Date(drpMViewYear, drpMViewMonth, 0);
+    for (let i = startDay - 1; i >= 0; i--) {
+      const d = prevM.getDate() - i;
+      const m = drpMViewMonth - 1; const yy = m < 0 ? drpMViewYear - 1 : drpMViewYear; const mf = m < 0 ? 11 : m;
+      html += `<button class="la-drp-day other" onclick="drpMClickDay(${yy},${mf},${d})">${d}</button>`;
+    }
+    for (let d = 1; d <= dim; d++) {
+      const date = new Date(drpMViewYear, drpMViewMonth, d, 12);
+      let cls = 'la-drp-day';
+      if (drpSame(date, today)) cls += ' today';
+      if (drpMSelStart && drpMSelEnd) {
+        if (drpSame(date, drpMSelStart) && drpSame(date, drpMSelEnd)) cls += ' selected';
+        else if (drpSame(date, drpMSelStart)) cls += ' range-start';
+        else if (drpSame(date, drpMSelEnd)) cls += ' range-end';
+        else if (date > drpMSelStart && date < drpMSelEnd) cls += ' in-range';
+      } else if (drpMSelStart && drpSame(date, drpMSelStart)) cls += ' selected';
+      html += `<button class="${cls}" onclick="drpMClickDay(${drpMViewYear},${drpMViewMonth},${d})">${d}</button>`;
+    }
+    const total = startDay + dim;
+    const remain = total % 7 === 0 ? 0 : 7 - (total % 7);
+    for (let d = 1; d <= remain; d++) {
+      const m = drpMViewMonth + 1; const yy = m > 11 ? drpMViewYear + 1 : drpMViewYear; const mf = m > 11 ? 0 : m;
+      html += `<button class="la-drp-day other" onclick="drpMClickDay(${yy},${mf},${d})">${d}</button>`;
+    }
+    html += '</div>';
+    cal.innerHTML = html;
+  }
+  window.drpMainApply = function() {
+    if (!drpMSelStart) return;
+    drpMainStart = new Date(drpMSelStart);
+    drpMainEnd = drpMSelEnd ? new Date(drpMSelEnd) : new Date(drpMSelStart);
+    const label = document.getElementById('drp-main-dropdown').querySelector('.la-drp-preset.active');
+    document.getElementById('drp-main-label').textContent = label ? label.textContent : `${drpFmt(drpMainStart)} - ${drpFmt(drpMainEnd)}`;
+    document.getElementById('la-start').value = drpISO(drpMainStart);
+    document.getElementById('la-end').value = drpISO(drpMainEnd);
+    // Sync ke Performa CS date range
+    drpStart = new Date(drpMainStart);
+    drpEnd = new Date(drpMainEnd);
+    document.getElementById('drp-label').textContent = document.getElementById('drp-main-label').textContent;
+    drpMainClose();
+    loadData(!!state.advName);
+    renderChartData();
+  };
+
+  async function init() {
+    sb = await getSupabase();
+    const session = await requireAuth();
+    if (!session) return;
+    await renderUserInfo();
+    initSidebar();
+
+    accessToken = session.access_token;
+
+    // Default filter: bulan ini
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    drpMainStart = new Date(y, now.getMonth(), 1, 12);
+    drpMainEnd = new Date(now); drpMainEnd.setHours(12,0,0,0);
+    document.getElementById('la-start').value = `${y}-${m}-01`;
+    document.getElementById('la-end').value = `${y}-${m}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // Chart date picker default: bulan ini
+    drpStart = new Date(y, now.getMonth(), 1, 12);
+    drpEnd = new Date(now); drpEnd.setHours(12,0,0,0);
+    document.getElementById('la-product').addEventListener('change', () => { syncGlobalFilter(); render(); });
+    document.getElementById('la-channel').addEventListener('change', () => { syncGlobalFilter(); render(); });
+    document.getElementById('la-platform').addEventListener('change', () => { syncGlobalFilter(); render(); });
+    document.getElementById('la-rekap-product').addEventListener('change', renderRekap);
+    document.getElementById('la-rekap-channel').addEventListener('change', renderRekap);
+    document.getElementById('la-rekap-platform').addEventListener('change', renderRekap);
+    document.getElementById('la-chart-product').addEventListener('change', renderChart);
+    document.getElementById('la-chart-channel').addEventListener('change', renderChart);
+    document.getElementById('la-chart-platform').addEventListener('change', renderChart);
+
+    document.getElementById('ads-date').addEventListener('change', updateDateDay);
+
+    // When assignment changes, fetch linked ad accounts
+    document.getElementById('ads-assignment').addEventListener('change', async function() {
+      const val = this.value;
+      const acctWrap = document.getElementById('ads-accounts-wrap');
+      const noAcctWarn = document.getElementById('ads-no-account-warn');
+      const saveBtn = document.getElementById('btn-save-ads');
+      if (!val) {
+        acctWrap.style.display = 'none';
+        noAcctWarn.style.display = 'none';
+        saveBtn.disabled = false;
+        modalAdAccounts = [];
+        return;
+      }
+      const [product, channel, platform] = val.split('|||');
+      const key = `${product}|||${channel}|||${platform}`;
+      const accounts = await fetchAdAccountsForAssignment(key);
+      modalAdAccounts = accounts;
+      if (accounts.length > 0) {
+        acctWrap.style.display = '';
+        noAcctWarn.style.display = 'none';
+        saveBtn.disabled = false;
+        const dateVal = document.getElementById('ads-date').value;
+        const existingAds = dateVal
+          ? state.ads.filter(a => a.date === dateVal && a.product === product && a.channel === channel && (a.platform || 'Meta') === platform)
+          : [];
+        renderAccountRows(accounts, existingAds);
+      } else {
+        acctWrap.style.display = 'none';
+        noAcctWarn.style.display = 'block';
+        saveBtn.disabled = true;
+      }
+    });
+
+    await loadData();
+
+    // Realtime: subscribe to Supabase B for live updates
+    if (LAPORAN_SB_URL !== 'GANTI_DENGAN_SUPABASE_B_URL' && LAPORAN_SB_ANON !== 'GANTI_DENGAN_SUPABASE_B_ANON_KEY') {
+      try {
+        laporanSB = window.supabase.createClient(LAPORAN_SB_URL, LAPORAN_SB_ANON);
+        const ch = laporanSB.channel('laporan-live')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => silentReload())
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'leadReports' }, () => silentReload())
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'ads' }, () => silentReload())
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments' }, () => silentReload())
+          .subscribe();
+      } catch (e) { console.warn('Realtime subscribe gagal:', e); }
+    }
+  }
+
+  let reloadTimer = null;
+  function silentReload() {
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(() => loadData(true), 500);
+  }
+
+  function parseBudget(val) {
+    return Number(String(val).replace(/\./g, '').replace(/,/g, '')) || 0;
+  }
+  function formatBudgetInput(el) {
+    const raw = el.value.replace(/[^\d]/g, '');
+    el.value = raw ? Number(raw).toLocaleString('id-ID') : '';
+    updateTotalPreview();
+  }
+  // Cached ad accounts per assignment key
+  let modalAdAccounts = [];
+
+  async function fetchAdAccountsForAssignment(assignmentKey) {
+    if (!assignmentKey || !sb) return [];
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return [];
+    const { data } = await sb.from('topup_ad_accounts')
+      .select('id, nama_akun, laporan_assignment')
+      .eq('user_id', user.id)
+      .eq('laporan_assignment', assignmentKey);
+    return data || [];
+  }
+
+  function renderAccountRows(accounts, existingAds) {
+    const wrap = document.getElementById('ads-accounts-list');
+    if (!accounts.length) {
+      wrap.innerHTML = '<div style="font-size:11px;color:#587488;padding:10px 0;">Tidak ada akun iklan terpasang untuk penugasan ini.<br>Pasangkan di <b>Top Up → Akun Iklan</b>.</div>';
+      return;
+    }
+    wrap.innerHTML = accounts.map((acc, i) => {
+      const existing = existingAds.find(a => a.ad_account_name === acc.nama_akun);
+      const budgetVal = existing ? Number(existing.budget).toLocaleString('id-ID') : '';
+      const taxVal = existing ? existing.tax : 11;
+      return `<div class="ads-acct-row" data-acct-name="${acc.nama_akun}">
+        <div class="acct-name">${acc.nama_akun}</div>
+        <div class="acct-fields">
+          <label>Budget (Rp)
+            <input type="text" class="acct-budget" inputmode="numeric" placeholder="0" value="${budgetVal}" onfocus="this.select()" />
+          </label>
+          <label>Pajak %
+            <input type="number" class="acct-tax" min="0" max="100" value="${taxVal}" onfocus="this.select()" />
+          </label>
+        </div>
+      </div>`;
+    }).join('');
+    // Attach listeners
+    wrap.querySelectorAll('.acct-budget').forEach(el => {
+      el.addEventListener('input', function() {
+        const raw = this.value.replace(/[^\d]/g, '');
+        this.value = raw ? Number(raw).toLocaleString('id-ID') : '';
+        updateTotalPreviewMulti();
+      });
+    });
+    wrap.querySelectorAll('.acct-tax').forEach(el => {
+      el.addEventListener('input', updateTotalPreviewMulti);
+    });
+    updateTotalPreviewMulti();
+  }
+
+  function updateTotalPreviewMulti() {
+    let total = 0;
+    document.querySelectorAll('#ads-accounts-list .ads-acct-row').forEach(row => {
+      const budget = parseBudget(row.querySelector('.acct-budget').value);
+      const tax = Number(row.querySelector('.acct-tax').value) || 0;
+      total += budget * (1 + tax / 100);
+    });
+    document.getElementById('ads-total-preview').textContent = money(Math.round(total));
+  }
+
+  function updateTotalPreview() {
+    // Only multi-account mode now — handled by updateMultiTotal()
+  }
+
+  const HARI = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  function updateDateDay() {
+    const v = document.getElementById('ads-date').value;
+    const el = document.getElementById('ads-date-day');
+    if (!v) { el.textContent = ''; return; }
+    const d = new Date(v + 'T12:00:00');
+    el.textContent = `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  async function apiFetch(action, params = {}, method = 'GET', body = null) {
+    const url = new URL(`${API_BASE}/api/laporan-bridge`);
+    url.searchParams.set('action', action);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    const opts = {
+      method,
+      headers: { 'X-Advertiser-Token': accessToken }
+    };
+    if (body) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(url, opts);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Gagal memuat data');
+    return json;
+  }
+
+  async function loadData(silent = false) {
+    const start = document.getElementById('la-start').value;
+    const end = document.getElementById('la-end').value;
+    if (!start || !end) return;
+
+    if (!silent) {
+      document.getElementById('la-loading').style.display = 'block';
+      document.getElementById('la-content').style.display = 'none';
+      document.getElementById('la-error').style.display = 'none';
+    }
+
+    try {
+      const data = await apiFetch('adv-init', { start, end });
+      state.advName = data.advertiser || '';
+      state.assignments = data.assignments || [];
+      state.catalog = data.catalog || [];
+      state.reports = data.reports || [];
+      state.leadReports = data.leadReports || [];
+      state.ads = data.ads || [];
+
+      // Populate product filters
+      const products = [...new Set([...state.reports.map(r=>r.product),...state.ads.map(a=>a.product),...state.assignments.map(a=>a.product)].filter(Boolean))].sort();
+      const prodOpts = products.map(p => `<option value="${p}">${p}</option>`).join('');
+
+      const prodSel = document.getElementById('la-product');
+      const curProd = prodSel.value;
+      prodSel.innerHTML = '<option value="">Semua produk</option>' + prodOpts;
+      if (curProd) prodSel.value = curProd;
+
+      const rekapSel = document.getElementById('la-rekap-product');
+      const curRekap = rekapSel.value;
+      rekapSel.innerHTML = '<option value="">Semua produk</option>' + prodOpts;
+      if (curRekap) rekapSel.value = curRekap;
+
+      const chartProdSel = document.getElementById('la-chart-product');
+      const curChartProd = chartProdSel.value;
+      chartProdSel.innerHTML = '<option value="">Semua produk</option>' + prodOpts;
+      if (curChartProd) chartProdSel.value = curChartProd;
+
+      if (!silent) {
+        document.getElementById('la-loading').style.display = 'none';
+        document.getElementById('la-content').style.display = 'block';
+      }
+      render();
+    } catch (err) {
+      if (silent) return;
+      document.getElementById('la-loading').style.display = 'none';
+      document.getElementById('la-error').textContent = err.message;
+      document.getElementById('la-error').style.display = 'block';
+    }
+  }
+
+  function syncGlobalFilter() {
+    const prod = document.getElementById('la-product').value;
+    const ch = document.getElementById('la-channel').value;
+    const plat = document.getElementById('la-platform').value;
+    // Sync ke rekap filter
+    const rProd = document.getElementById('la-rekap-product');
+    const rCh = document.getElementById('la-rekap-channel');
+    const rPlat = document.getElementById('la-rekap-platform');
+    if (rProd && rProd.querySelector(`option[value="${prod}"]`)) rProd.value = prod;
+    if (rCh) rCh.value = ch;
+    if (rPlat) rPlat.value = plat;
+    // Sync ke chart filter
+    const cProd = document.getElementById('la-chart-product');
+    const cCh = document.getElementById('la-chart-channel');
+    const cPlat = document.getElementById('la-chart-platform');
+    if (cProd && cProd.querySelector(`option[value="${prod}"]`)) cProd.value = prod;
+    if (cCh) cCh.value = ch;
+    if (cPlat) cPlat.value = plat;
+  }
+
+  function getFilteredReports() {
+    const ch = document.getElementById('la-channel').value;
+    const prod = document.getElementById('la-product').value;
+    const plat = document.getElementById('la-platform').value;
+    return state.reports.filter(r => (!ch || r.channel === ch) && (!prod || r.product === prod) && (!plat || (r.platform||'Meta') === plat));
+  }
+
+  function getFilteredAds() {
+    const ch = document.getElementById('la-channel').value;
+    const prod = document.getElementById('la-product').value;
+    const plat = document.getElementById('la-platform').value;
+    return state.ads.filter(a => (!ch || a.channel === ch) && (!prod || a.product === prod) && (!plat || (a.platform||'Meta') === plat));
+  }
+
+  function render() {
+    const reports = getFilteredReports();
+    const ads = getFilteredAds();
+
+    // Stats — field names match DB: revenue, closing (gross), invalid, units, invalidUnits
+    const totalRevenue = reports.reduce((s, r) => s + (r.revenue || 0), 0);
+    const totalLeads = reports.reduce((s, r) => s + (r.leads || 0), 0);
+    const totalClosing = reports.reduce((s, r) => s + ((r.closing || 0) - (r.invalid || 0)), 0);
+    const totalUnits = reports.reduce((s, r) => s + ((r.units || 0) - (r.invalidUnits || 0)), 0);
+    const totalSpend = ads.reduce((s, a) => s + ((a.budget || 0) * (1 + (a.tax ?? 11) / 100)), 0);
+    const cr = totalLeads > 0 ? ((totalClosing / totalLeads) * 100).toFixed(1) + '%' : '-';
+    const caqVal = totalRevenue > 0 ? (totalSpend / totalRevenue) * 100 : 0;
+    const caq = totalRevenue > 0 ? caqVal.toFixed(1) + '%' : '-';
+
+    document.getElementById('la-omzet').textContent = money(totalRevenue);
+    document.getElementById('la-spend').textContent = money(Math.round(totalSpend));
+    document.getElementById('la-closing').textContent = formatNumber(totalClosing);
+    document.getElementById('la-units-note').textContent = `${formatNumber(totalUnits)} botol / box terjual`;
+    document.getElementById('la-cr').textContent = cr;
+    document.getElementById('la-leads-note').textContent = `${formatNumber(totalLeads)} leads ditangani tim`;
+    const caqEl = document.getElementById('la-caq');
+    caqEl.textContent = caq;
+    caqEl.style.color = totalRevenue > 0 ? (caqVal > 55 ? '#dc2626' : '#16a34a') : '';
+
+    renderGrowthChart(reports, ads);
+    renderDonutChart(reports);
+    renderChartData();
+    renderRekap();
+    renderBEF(reports);
+    renderAds(ads);
+  }
+
+  const DAYS_ID = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
+  // ── PERTUMBUHAN AKUISISI (line chart) ──
+  let growthChart = null;
+  function renderGrowthChart(reports, ads) {
+    const start = document.getElementById('la-start').value;
+    const end = document.getElementById('la-end').value;
+    if (!start || !end) return;
+
+    const days = [];
+    const d = new Date(start + 'T12:00:00');
+    const endD = new Date(end + 'T12:00:00');
+    while (d <= endD) { days.push(d.toISOString().split('T')[0]); d.setDate(d.getDate() + 1); }
+
+    const labels = days.map(dt => {
+      const p = dt.split('-');
+      return String(parseInt(p[2])) + ' ' + SHORT_MONTHS[parseInt(p[1]) - 1];
+    });
+    const omzetData = days.map(dt => reports.filter(r => r.date === dt).reduce((s, r) => s + (r.revenue || 0), 0));
+    const spendData = days.map(dt => ads.filter(a => a.date === dt).reduce((s, a) => s + (a.budget || 0) * (1 + (a.tax ?? 11) / 100), 0));
+
+    const ctx = document.getElementById('la-growth-chart');
+    if (growthChart) growthChart.destroy();
+    growthChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Omzet', data: omzetData, borderColor: '#00789f', backgroundColor: 'rgba(0,120,159,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#00789f' },
+          { label: 'Biaya iklan', data: spendData, borderColor: '#ffc107', backgroundColor: 'transparent', fill: false, tension: 0.3, borderWidth: 2, pointRadius: 2, pointBackgroundColor: '#ffc107' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', align: 'end', labels: { usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 8, padding: 16, font: { family: 'DM Sans', size: 12 } } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + money(Math.round(ctx.parsed.y)) } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#587488', maxRotation: 0, autoSkipPadding: 20 } },
+          y: { grid: { color: '#eaf4fa' }, border: { display: false }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#587488', callback: v => v >= 1e9 ? (v/1e9).toFixed(1)+'M' : v >= 1e6 ? (v/1e6).toFixed(1)+' jt' : v >= 1e3 ? (v/1e3).toFixed(1)+' rb' : v } }
+        }
+      }
+    });
+  }
+
+  // ── KONTRIBUSI PRODUK (donut chart) ──
+  let donutChart = null;
+  const DONUT_COLORS = ['#073b56','#00a8df','#ffc107','#80deea','#c5d3dd','#285d92','#ff8a65','#a5d6a7','#ce93d8','#90a4ae'];
+  function renderDonutChart(reports) {
+    const byProd = {};
+    reports.forEach(r => { byProd[r.product] = (byProd[r.product] || 0) + (r.revenue || 0); });
+    const sorted = Object.entries(byProd).sort((a, b) => b[1] - a[1]);
+    const totalRev = sorted.reduce((s, e) => s + e[1], 0);
+
+    document.getElementById('la-donut-count').textContent = sorted.length;
+
+    const legend = document.getElementById('la-donut-legend');
+    legend.innerHTML = sorted.map((e, i) => {
+      const pct = totalRev > 0 ? ((e[1] / totalRev) * 100).toFixed(1) : '0.0';
+      return `<div style="display:flex;align-items:center;gap:8px;"><span style="width:10px;height:10px;border-radius:50%;background:${DONUT_COLORS[i % DONUT_COLORS.length]};flex-shrink:0;"></span><span style="flex:1;">${e[0]}</span><strong>${pct}%</strong></div>`;
+    }).join('');
+
+    const ctx = document.getElementById('la-donut-chart');
+    if (donutChart) donutChart.destroy();
+    donutChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: sorted.map(e => e[0]),
+        datasets: [{ data: sorted.map(e => e[1]), backgroundColor: sorted.map((_, i) => DONUT_COLORS[i % DONUT_COLORS.length]), borderWidth: 2, borderColor: '#fff' }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true, cutout: '68%',
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.label + ': ' + money(Math.round(ctx.parsed)) + ' (' + (totalRev > 0 ? ((ctx.parsed / totalRev) * 100).toFixed(1) : 0) + '%)' } } }
+      }
+    });
+  }
+
+  function renderRekap() {
+    const tbody = document.getElementById('la-rekap-body');
+    const tfoot = document.getElementById('la-rekap-foot');
+    const start = document.getElementById('la-start').value;
+    const end = document.getElementById('la-end').value;
+    const prod = document.getElementById('la-rekap-product').value;
+    const ch = document.getElementById('la-rekap-channel').value;
+    const plat = document.getElementById('la-rekap-platform').value;
+
+    if (!start || !end) { tbody.innerHTML = ''; tfoot.innerHTML = ''; return; }
+
+    // Generate all days in range
+    const days = [];
+    const d = new Date(start + 'T12:00:00');
+    const endD = new Date(end + 'T12:00:00');
+    while (d <= endD) {
+      days.push(d.toISOString().split('T')[0]);
+      d.setDate(d.getDate() + 1);
+    }
+
+    // Filter reports & ads by product+channel+platform selection
+    const reps = state.reports.filter(r => (!prod || r.product === prod) && (!ch || r.channel === ch) && (!plat || (r.platform||'Meta') === plat));
+    const adsList = state.ads.filter(a => (!prod || a.product === prod) && (!ch || a.channel === ch) && (!plat || (a.platform||'Meta') === plat));
+
+    // Totals for footer
+    let totBudget=0, totLeads=0, totClosing=0, totUnits=0, totRevenue=0;
+
+    const rows = days.map(date => {
+      const dayReps = reps.filter(r => r.date === date);
+      const dayAds = adsList.filter(a => a.date === date);
+
+      const spend = dayAds.reduce((s,a) => s + (a.budget||0) * (1 + (a.tax??11)/100), 0);
+      const leads = dayReps.reduce((s,r) => s + (r.leads||0), 0);
+      const closing = dayReps.reduce((s,r) => s + ((r.closing||0) - (r.invalid||0)), 0);
+      const units = dayReps.reduce((s,r) => s + ((r.units||0) - (r.invalidUnits||0)), 0);
+      const revenue = dayReps.reduce((s,r) => s + (r.revenue||0), 0);
+      const cr = leads > 0 ? ((closing / leads) * 100).toFixed(1) + '%' : '0,00%';
+      const calLead = leads > 0 ? spend / leads : 0;
+      const calCustomer = closing > 0 ? spend / closing : 0;
+      const calUnit = units > 0 ? spend / units : 0;
+
+      totBudget += spend; totLeads += leads; totClosing += closing; totUnits += units; totRevenue += revenue;
+
+      const hasData = leads > 0 || closing > 0 || spend > 0 || revenue > 0;
+      const dt = new Date(date + 'T12:00:00');
+      const dayLabel = `${DAYS_ID[dt.getDay()]}, ${String(dt.getDate()).padStart(2,'0')} ${MONTHS_ID[dt.getMonth()]} ${dt.getFullYear()}`;
+      const z = v => v === 0 ? '<span class="zero">0</span>' : v;
+      const zMoney = v => v === 0 ? '<span class="zero">Rp0</span>' : money(Math.round(v));
+
+      return `<tr class="${hasData ? 'has-data' : ''}">
+        <td>${dayLabel}</td>
+        <td>${zMoney(spend)}</td>
+        <td>${z(leads)}</td>
+        <td>${z(closing)}</td>
+        <td>${z(units)}</td>
+        <td>${leads > 0 ? cr : '<span class="zero">0,00%</span>'}</td>
+        <td>${zMoney(calLead)}</td>
+        <td>${zMoney(calCustomer)}</td>
+        <td>${zMoney(calUnit)}</td>
+        <td>${revenue > 0 ? (() => { const caqVal = (spend / revenue) * 100; return `<span style="color:${caqVal > 55 ? '#dc2626' : '#16a34a'}; font-weight:600;">${caqVal.toFixed(1)}%</span>`; })() : '<span class="zero">0,0%</span>'}</td>
+        <td>${zMoney(revenue)}</td>
+        <td>${revenue > 0 && spend > 0 ? (() => { const cq = (spend / revenue) * 100; return cq <= 55 ? '<span style="color:#16a34a;font-weight:600;">Scale</span>' : '<span style="color:#dc2626;font-weight:600;">Perbaiki Iklan</span>'; })() : '-'}</td>
+      </tr>`;
+    }).join('');
+
+    tbody.innerHTML = rows;
+
+    // Footer totals
+    const totCR = totLeads > 0 ? ((totClosing / totLeads) * 100).toFixed(1) + '%' : '0,00%';
+    const totCAL = totLeads > 0 ? money(Math.round(totBudget / totLeads)) : '-';
+    const totCAC = totClosing > 0 ? money(Math.round(totBudget / totClosing)) : '-';
+    const totCAU = totUnits > 0 ? money(Math.round(totBudget / totUnits)) : '-';
+    const totCAQVal = totRevenue > 0 ? (totBudget / totRevenue) * 100 : 0;
+    const totCAQ = totRevenue > 0 ? `<span style="color:${totCAQVal > 55 ? '#dc2626' : '#16a34a'}; font-weight:600;">${totCAQVal.toFixed(1)}%</span>` : '-';
+    tfoot.innerHTML = `<tr>
+      <td style="text-align:left;">TOTAL</td>
+      <td>${money(Math.round(totBudget))}</td>
+      <td>${totLeads}</td>
+      <td>${totClosing}</td>
+      <td>${totUnits}</td>
+      <td>${totCR}</td>
+      <td>${totCAL}</td>
+      <td>${totCAC}</td>
+      <td>${totCAU}</td>
+      <td>${totCAQ}</td>
+      <td>${money(Math.round(totRevenue))}</td>
+      <td>${totRevenue > 0 && totBudget > 0 ? (totCAQVal <= 55 ? '<span style="color:#16a34a;font-weight:600;">Scale</span>' : '<span style="color:#dc2626;font-weight:600;">Perbaiki Iklan</span>') : '-'}</td>
+    </tr>`;
+  }
+
+  let csCharts = [];
+  let chartReports = []; // separate data for chart section
+
+  async function renderChartData() {
+    if (!drpStart || !drpEnd) return;
+    const start = drpISO(drpStart);
+    const end = drpISO(drpEnd);
+    try {
+      const data = await apiFetch('adv-reports', { start, end });
+      chartReports = data.reports || [];
+    } catch { chartReports = []; }
+    renderChart();
+  }
+
+  function renderChart() {
+    const prod = document.getElementById('la-chart-product').value;
+    const ch = document.getElementById('la-chart-channel').value;
+    const plat = document.getElementById('la-chart-platform').value;
+    const reps = chartReports.filter(r => (!prod || r.product === prod) && (!ch || r.channel === ch) && (!plat || (r.platform||'Meta') === plat));
+
+    // Aggregate per CS
+    const byCS = {};
+    reps.forEach(r => {
+      if (!byCS[r.cs]) byCS[r.cs] = { leads:0, closing:0 };
+      byCS[r.cs].leads += (r.leads || 0);
+      byCS[r.cs].closing += (r.closing || 0) - (r.invalid || 0);
+    });
+
+    const grid = document.getElementById('la-chart-grid');
+    csCharts.forEach(c => c.destroy());
+    csCharts = [];
+
+    const entries = Object.entries(byCS).sort((a,b) => {
+      const rA = a[1].leads > 0 ? a[1].closing / a[1].leads : 0;
+      const rB = b[1].leads > 0 ? b[1].closing / b[1].leads : 0;
+      return rB - rA;
+    });
+
+    if (!entries.length) {
+      grid.innerHTML = '<div class="la-empty" style="grid-column:1/-1;">Belum ada data laporan CS</div>';
+      return;
+    }
+
+    grid.innerHTML = entries.map(([cs], i) => `
+      <div class="la-chart-item">
+        <canvas id="la-cs-chart-${i}"></canvas>
+        <div class="cs-name">${cs}</div>
+        <div class="cs-meta" id="la-cs-meta-${i}"></div>
+        <div class="cs-rate" id="la-cs-rate-${i}"></div>
+      </div>
+    `).join('');
+
+    entries.forEach(([cs, d], i) => {
+      const rate = d.leads > 0 ? (d.closing / d.leads * 100) : 0;
+      const sisa = Math.max(d.leads - d.closing, 0);
+      const rateClass = rate >= 15 ? 'good' : rate >= 8 ? 'mid' : 'low';
+
+      document.getElementById(`la-cs-meta-${i}`).textContent = `${d.closing} closing / ${d.leads} leads`;
+      const rateEl = document.getElementById(`la-cs-rate-${i}`);
+      rateEl.textContent = rate.toFixed(1) + '%';
+      rateEl.className = 'cs-rate ' + rateClass;
+
+      const chart = new Chart(document.getElementById(`la-cs-chart-${i}`), {
+        type: 'doughnut',
+        data: {
+          labels: ['Closing', 'Belum closing'],
+          datasets: [{
+            data: [d.closing, sisa],
+            backgroundColor: ['#073b56', '#e2ecf2'],
+            borderWidth: 0,
+            cutout: '72%'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: item => `${item.label}: ${item.raw} (${d.leads > 0 ? (item.raw / d.leads * 100).toFixed(1) : 0}%)`
+              }
+            }
+          }
+        }
+      });
+      csCharts.push(chart);
+    });
+
+    // Update summary table with same filtered data
+    renderReports(reps);
+  }
+
+  function renderReports(reports) {
+    const tbody = document.getElementById('la-reports-table');
+    if (!reports.length) {
+      tbody.innerHTML = '<tr><td colspan="6"><div class="la-empty">Belum ada data laporan di periode ini</div></td></tr>';
+      return;
+    }
+    const byCS = {};
+    reports.forEach(r => {
+      if (!byCS[r.cs]) byCS[r.cs] = { leads:0, closing:0, units:0, revenue:0 };
+      const c = byCS[r.cs];
+      c.leads += (r.leads || 0);
+      c.closing += (r.closing || 0) - (r.invalid || 0);
+      c.units += (r.units || 0) - (r.invalidUnits || 0);
+      c.revenue += (r.revenue || 0);
+    });
+    tbody.innerHTML = Object.entries(byCS)
+      .sort((a,b) => b[1].revenue - a[1].revenue)
+      .map(([cs, d]) => {
+        const cr = d.leads > 0 ? (d.closing / d.leads * 100).toFixed(1) + '%' : '-';
+        return `<tr>
+          <td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:24px;height:24px;border-radius:50%;background:#eaf4fa;display:grid;place-items:center;font-size:8px;color:#587488;">${(cs||'?').slice(0,2).toUpperCase()}</span>${cs}</span></td>
+          <td>${d.leads}</td>
+          <td>${d.closing}</td>
+          <td>${d.units}</td>
+          <td>${cr}</td>
+          <td class="money">${money(d.revenue)}</td>
+        </tr>`;
+      }).join('');
+  }
+
+  function renderBEF(reports) {
+    const container = document.getElementById('la-bef-content');
+    const reportIds = reports.map(r => r.id);
+    const relevant = state.leadReports.filter(lr => reportIds.includes(lr.reportId));
+
+    if (!relevant.length) {
+      container.innerHTML = '<div class="la-empty">Belum ada data lead BEF di periode ini</div>';
+      return;
+    }
+
+    const totals = {};
+    LEAD_KEYS.forEach(k => totals[k] = 0);
+    relevant.forEach(lr => {
+      LEAD_KEYS.forEach(k => totals[k] += (lr[k] || 0));
+    });
+    const grandTotal = LEAD_KEYS.reduce((s, k) => s + totals[k], 0);
+
+    container.innerHTML = `
+      <div class="la-lead-grid">
+        ${LEAD_KEYS.map(k => `
+          <div class="la-lead-card">
+            <div class="num">${totals[k]}</div>
+            <div class="lbl">${LEAD_LABELS[k]}</div>
+          </div>
+        `).join('')}
+        <div class="la-lead-card total">
+          <div class="num">${grandTotal}</div>
+          <div class="lbl" style="font-weight:600;">Total</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderAds(ads) {
+    const tbody = document.getElementById('la-ads-table');
+    if (!ads.length) {
+      tbody.innerHTML = '<tr><td colspan="9"><div class="la-empty">Belum ada data biaya iklan di periode ini</div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = ads.map(a => {
+      const budget = a.budget || 0;
+      const tax = a.tax ?? 11;
+      const total = budget * (1 + tax / 100);
+      return `<tr>
+        <td style="white-space:nowrap;">${a.date ? a.date.split('-').reverse().join('/') : '-'}</td>
+        <td><strong style="font-weight:550;">${a.product || '-'}</strong></td>
+        <td><span class="la-badge ${a.channel === 'CTWA' ? 'ctwa' : 'web'}">${a.channel || '-'}</span></td>
+        <td>${a.platform || 'Meta'}</td>
+        <td style="font-size:10px;color:#587488;">${a.ad_account_name || '-'}</td>
+        <td>${money(budget)}</td>
+        <td>${tax}%</td>
+        <td class="money">${money(Math.round(total))}</td>
+        <td><button class="la-text-btn" onclick="editAds('${a.id}')">Edit</button> <button class="la-text-btn" style="color:#a35343" onclick="deleteAds('${a.id}')">Hapus</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Modal Biaya Iklan ──
+  window.openAdsModal = function(editId) {
+    const modal = document.getElementById('modal-ads');
+    const sel = document.getElementById('ads-assignment');
+    const acctWrap = document.getElementById('ads-accounts-wrap');
+    const noAcctWarn = document.getElementById('ads-no-account-warn');
+    const saveBtn = document.getElementById('btn-save-ads');
+
+    // Reset
+    acctWrap.style.display = 'none';
+    noAcctWarn.style.display = 'none';
+    saveBtn.disabled = false;
+    modalAdAccounts = [];
+    document.getElementById('ads-accounts-list').innerHTML = '';
+
+    sel.innerHTML = '<option value="">Pilih penugasan...</option>';
+    const seen = new Set();
+    state.assignments.forEach(a => {
+      const plat = a.platform || 'Meta';
+      const key = `${a.product}|||${a.channel}|||${plat}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const csNames = state.assignments.filter(x => x.product === a.product && x.channel === a.channel && (x.platform||'Meta') === plat).map(x => x.cs).join(', ');
+      sel.innerHTML += `<option value="${key}">${a.product} · ${a.channel} · ${plat} (${csNames})</option>`;
+    });
+
+    if (editId) {
+      const ad = state.ads.find(a => a.id === editId);
+      if (ad) {
+        document.getElementById('ads-date').value = ad.date;
+        sel.value = `${ad.product}|||${ad.channel}|||${ad.platform||'Meta'}`;
+        sel.dispatchEvent(new Event('change'));
+      }
+    } else {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yy = yesterday.getFullYear(), ym = String(yesterday.getMonth()+1).padStart(2,'0'), yd = String(yesterday.getDate()).padStart(2,'0');
+      document.getElementById('ads-date').value = `${yy}-${ym}-${yd}`;
+    }
+
+    updateTotalPreview();
+    updateDateDay();
+    modal.classList.add('open');
+  };
+
+  window.editAds = function(id) { window.openAdsModal(id); };
+  window.closeAdsModal = function() { document.getElementById('modal-ads').classList.remove('open'); };
+
+  window.deleteAds = async function(id) {
+    const ad = state.ads.find(a => a.id === id);
+    if (!ad) return;
+    if (!confirm('Hapus biaya iklan ' + ad.date + ' ' + ad.product + ' ' + ad.channel + '?\nData yang dihapus tidak bisa dikembalikan.')) return;
+    try {
+      await apiFetch('delete-ad', {}, 'POST', { adId: id });
+      showToast('Biaya iklan berhasil dihapus!', 'success');
+      await loadData();
+    } catch (err) {
+      showToast('Gagal: ' + err.message, 'error');
+    }
+  };
+
+  window.saveAds = async function() {
+    const date = document.getElementById('ads-date').value;
+    const assignVal = document.getElementById('ads-assignment').value;
+
+    if (!date || !assignVal) return showToast('Lengkapi tanggal dan penugasan.', 'warning');
+    const [product, channel, platform] = assignVal.split('|||');
+    if (!product || !channel || !platform) return showToast('Penugasan tidak valid.', 'error');
+
+    const btn = document.getElementById('btn-save-ads');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    try {
+      if (!modalAdAccounts.length) return showToast('Belum ada akun iklan terdaftar untuk penugasan ini.', 'error');
+      const adsArr = [];
+      document.querySelectorAll('#ads-accounts-list .ads-acct-row').forEach(row => {
+        const acctName = row.dataset.acctName;
+        const budget = parseBudget(row.querySelector('.acct-budget').value);
+        const tax = Number(row.querySelector('.acct-tax').value) ?? 11;
+        adsArr.push({ date, product, channel, platform, budget, tax, ad_account_name: acctName });
+      });
+      await apiFetch('save-ads', {}, 'POST', { ads: adsArr });
+      showToast('Biaya iklan berhasil disimpan!', 'success');
+      window.closeAdsModal();
+      await loadData();
+    } catch (err) {
+      showToast('Gagal: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Simpan';
+    }
+  };
+
+  document.getElementById('modal-ads').addEventListener('click', e => {
+    if (e.target === e.currentTarget) window.closeAdsModal();
+  });
+
+  init();
+</script>
+</body>
+</html>
