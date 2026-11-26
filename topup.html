@@ -662,9 +662,9 @@
 
       <!-- Penugasan Laporan -->
       <div class="modal-field">
-        <label>Penugasan Laporan <span style="color:var(--text-sub);font-weight:400;">(opsional — untuk validasi biaya iklan)</span></label>
+        <label>Penugasan Laporan <span style="color:var(--danger)">*</span></label>
         <select class="form-input form-select" id="aa-laporan-assignment">
-          <option value="">— Tidak dipasangkan —</option>
+          <option value="">— Pilih penugasan —</option>
         </select>
         <div style="font-size:10px;color:var(--text-sub);margin-top:4px;">Hubungkan akun ini ke penugasan di Laporan Akuisisi</div>
       </div>
@@ -1550,6 +1550,7 @@
 
     if (!productId) { errEl.textContent = 'Pilih produk terlebih dahulu.'; errEl.style.display = 'block'; return; }
     if (!nama) { errEl.textContent = 'Masukkan nama akun iklan.'; errEl.style.display = 'block'; return; }
+    if (!laporanAssignment) { errEl.textContent = 'Pilih penugasan laporan.'; errEl.style.display = 'block'; return; }
 
     const btn = document.getElementById('aa-save-btn');
     btn.disabled = true; btn.textContent = 'Menyimpan...';
