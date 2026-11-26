@@ -470,6 +470,7 @@
                   <th>Biaya Akuisisi Botol</th>
                   <th>CAQ</th>
                   <th>Omset</th>
+                  <th>Rekomendasi</th>
                 </tr>
               </thead>
               <tbody id="la-rekap-body"></tbody>
@@ -622,15 +623,10 @@
         <div class="form-summary" style="margin-top:14px;">Total biaya termasuk pajak <b id="ads-total-preview">Rp 0</b></div>
       </div>
 
-      <!-- Fallback: single budget (kalau tidak ada akun terpasang) -->
-      <div id="ads-single-wrap">
-        <label>Budget (Rp) <span style="color:#a35343;">*</span>
-          <input type="text" id="ads-budget" inputmode="numeric" placeholder="0" onfocus="this.select()" />
-        </label>
-        <label>Pajak (%)
-          <input type="number" id="ads-tax" min="0" max="100" value="11" onfocus="this.select()" />
-        </label>
-        <div class="form-summary">Total biaya termasuk pajak <b id="ads-total-preview-single">Rp 0</b></div>
+      <!-- Warning: belum ada akun iklan terdaftar -->
+      <div id="ads-no-account-warn" style="display:none; margin-top:14px; padding:14px 16px; background:#fef2f2; border:1px solid #fecaca; border-radius:10px; color:#991b1b; font-size:13px; line-height:1.6;">
+        <b>Belum ada akun iklan</b><br>
+        Penugasan ini belum memiliki akun iklan yang terdaftar. Daftarkan akun iklan terlebih dahulu di halaman <a href="topup.html" style="color:#00789f; font-weight:600;">Akun Iklan</a>.
       </div>
     </div>
     <div class="la-modal-actions">
@@ -996,10 +992,12 @@
     document.getElementById('ads-assignment').addEventListener('change', async function() {
       const val = this.value;
       const acctWrap = document.getElementById('ads-accounts-wrap');
-      const singleWrap = document.getElementById('ads-single-wrap');
+      const noAcctWarn = document.getElementById('ads-no-account-warn');
+      const saveBtn = document.getElementById('btn-save-ads');
       if (!val) {
         acctWrap.style.display = 'none';
-        singleWrap.style.display = '';
+        noAcctWarn.style.display = 'none';
+        saveBtn.disabled = false;
         modalAdAccounts = [];
         return;
       }
@@ -1009,8 +1007,8 @@
       modalAdAccounts = accounts;
       if (accounts.length > 0) {
         acctWrap.style.display = '';
-        singleWrap.style.display = 'none';
-        // Find existing ads for this date+assignment to pre-fill
+        noAcctWarn.style.display = 'none';
+        saveBtn.disabled = false;
         const dateVal = document.getElementById('ads-date').value;
         const existingAds = dateVal
           ? state.ads.filter(a => a.date === dateVal && a.product === product && a.channel === channel && (a.platform || 'Meta') === platform)
@@ -1018,7 +1016,8 @@
         renderAccountRows(accounts, existingAds);
       } else {
         acctWrap.style.display = 'none';
-        singleWrap.style.display = '';
+        noAcctWarn.style.display = 'block';
+        saveBtn.disabled = true;
       }
     });
 
@@ -1243,7 +1242,8 @@
     const totalUnits = reports.reduce((s, r) => s + ((r.units || 0) - (r.invalidUnits || 0)), 0);
     const totalSpend = ads.reduce((s, a) => s + ((a.budget || 0) * (1 + (a.tax ?? 11) / 100)), 0);
     const cr = totalLeads > 0 ? ((totalClosing / totalLeads) * 100).toFixed(1) + '%' : '-';
-    const caq = totalRevenue > 0 ? ((totalSpend / totalRevenue) * 100).toFixed(1) + '%' : '-';
+    const caqVal = totalRevenue > 0 ? (totalSpend / totalRevenue) * 100 : 0;
+    const caq = totalRevenue > 0 ? caqVal.toFixed(1) + '%' : '-';
 
     document.getElementById('la-omzet').textContent = money(totalRevenue);
     document.getElementById('la-spend').textContent = money(Math.round(totalSpend));
@@ -1251,7 +1251,9 @@
     document.getElementById('la-units-note').textContent = `${formatNumber(totalUnits)} botol / box terjual`;
     document.getElementById('la-cr').textContent = cr;
     document.getElementById('la-leads-note').textContent = `${formatNumber(totalLeads)} leads ditangani tim`;
-    document.getElementById('la-caq').textContent = caq;
+    const caqEl = document.getElementById('la-caq');
+    caqEl.textContent = caq;
+    caqEl.style.color = totalRevenue > 0 ? (caqVal > 55 ? '#dc2626' : '#16a34a') : '';
 
     renderGrowthChart(reports, ads);
     renderDonutChart(reports);
@@ -1400,8 +1402,9 @@
         <td>${zMoney(calLead)}</td>
         <td>${zMoney(calCustomer)}</td>
         <td>${zMoney(calUnit)}</td>
-        <td>${revenue > 0 ? ((spend / revenue) * 100).toFixed(1) + '%' : '<span class="zero">0,0%</span>'}</td>
+        <td>${revenue > 0 ? (() => { const caqVal = (spend / revenue) * 100; return `<span style="color:${caqVal > 55 ? '#dc2626' : '#16a34a'}; font-weight:600;">${caqVal.toFixed(1)}%</span>`; })() : '<span class="zero">0,0%</span>'}</td>
         <td>${zMoney(revenue)}</td>
+        <td>${revenue > 0 && spend > 0 ? (() => { const cq = (spend / revenue) * 100; return cq <= 55 ? '<span style="color:#16a34a;font-weight:600;">Scale</span>' : '<span style="color:#dc2626;font-weight:600;">Perbaiki Iklan</span>'; })() : '-'}</td>
       </tr>`;
     }).join('');
 
@@ -1412,7 +1415,8 @@
     const totCAL = totLeads > 0 ? money(Math.round(totBudget / totLeads)) : '-';
     const totCAC = totClosing > 0 ? money(Math.round(totBudget / totClosing)) : '-';
     const totCAU = totUnits > 0 ? money(Math.round(totBudget / totUnits)) : '-';
-    const totCAQ = totRevenue > 0 ? ((totBudget / totRevenue) * 100).toFixed(1) + '%' : '-';
+    const totCAQVal = totRevenue > 0 ? (totBudget / totRevenue) * 100 : 0;
+    const totCAQ = totRevenue > 0 ? `<span style="color:${totCAQVal > 55 ? '#dc2626' : '#16a34a'}; font-weight:600;">${totCAQVal.toFixed(1)}%</span>` : '-';
     tfoot.innerHTML = `<tr>
       <td style="text-align:left;">TOTAL</td>
       <td>${money(Math.round(totBudget))}</td>
@@ -1425,6 +1429,7 @@
       <td>${totCAU}</td>
       <td>${totCAQ}</td>
       <td>${money(Math.round(totRevenue))}</td>
+      <td>${totRevenue > 0 && totBudget > 0 ? (totCAQVal <= 55 ? '<span style="color:#16a34a;font-weight:600;">Scale</span>' : '<span style="color:#dc2626;font-weight:600;">Perbaiki Iklan</span>') : '-'}</td>
     </tr>`;
   }
 
@@ -1613,16 +1618,17 @@
     const modal = document.getElementById('modal-ads');
     const sel = document.getElementById('ads-assignment');
     const acctWrap = document.getElementById('ads-accounts-wrap');
-    const singleWrap = document.getElementById('ads-single-wrap');
+    const noAcctWarn = document.getElementById('ads-no-account-warn');
+    const saveBtn = document.getElementById('btn-save-ads');
 
-    // Reset to single mode
+    // Reset
     acctWrap.style.display = 'none';
-    singleWrap.style.display = '';
+    noAcctWarn.style.display = 'none';
+    saveBtn.disabled = false;
     modalAdAccounts = [];
     document.getElementById('ads-accounts-list').innerHTML = '';
 
     sel.innerHTML = '<option value="">Pilih penugasan...</option>';
-    // Deduplicate by product+channel+platform — ad cost is per product+channel+platform, not per CS
     const seen = new Set();
     state.assignments.forEach(a => {
       const plat = a.platform || 'Meta';
@@ -1638,17 +1644,11 @@
       if (ad) {
         document.getElementById('ads-date').value = ad.date;
         sel.value = `${ad.product}|||${ad.channel}|||${ad.platform||'Meta'}`;
-        document.getElementById('ads-budget').value = ad.budget ? Number(ad.budget).toLocaleString('id-ID') : '0';
-        document.getElementById('ads-tax').value = ad.tax ?? 11;
-        // Trigger assignment change to load accounts (will pre-fill from existing ads)
         sel.dispatchEvent(new Event('change'));
       }
     } else {
-      // Default: kemarin
       const yesterday = new Date(Date.now() - 86400000);
       document.getElementById('ads-date').value = yesterday.toISOString().split('T')[0];
-      document.getElementById('ads-budget').value = '';
-      document.getElementById('ads-tax').value = 11;
     }
 
     updateTotalPreview();
@@ -1684,24 +1684,15 @@
     btn.disabled = true; btn.textContent = 'Menyimpan...';
 
     try {
-      // Multi-account mode
-      if (modalAdAccounts.length > 0) {
-        const adsArr = [];
-        document.querySelectorAll('#ads-accounts-list .ads-acct-row').forEach(row => {
-          const acctName = row.dataset.acctName;
-          const budget = parseBudget(row.querySelector('.acct-budget').value);
-          const tax = Number(row.querySelector('.acct-tax').value) ?? 11;
-          adsArr.push({ date, product, channel, platform, budget, tax, ad_account_name: acctName });
-        });
-        await apiFetch('save-ads', {}, 'POST', { ads: adsArr });
-      } else {
-        // Single/fallback mode
-        const budget = document.getElementById('ads-budget').value;
-        const tax = document.getElementById('ads-tax').value;
-        await apiFetch('save-ads', {}, 'POST', {
-          ad: { date, product, channel, platform, budget: parseBudget(budget), tax: Number(tax) ?? 11 }
-        });
-      }
+      if (!modalAdAccounts.length) return showToast('Belum ada akun iklan terdaftar untuk penugasan ini.', 'error');
+      const adsArr = [];
+      document.querySelectorAll('#ads-accounts-list .ads-acct-row').forEach(row => {
+        const acctName = row.dataset.acctName;
+        const budget = parseBudget(row.querySelector('.acct-budget').value);
+        const tax = Number(row.querySelector('.acct-tax').value) ?? 11;
+        adsArr.push({ date, product, channel, platform, budget, tax, ad_account_name: acctName });
+      });
+      await apiFetch('save-ads', {}, 'POST', { ads: adsArr });
       showToast('Biaya iklan berhasil disimpan!', 'success');
       window.closeAdsModal();
       await loadData();
