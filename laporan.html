@@ -1645,8 +1645,10 @@
         sel.dispatchEvent(new Event('change'));
       }
     } else {
-      const yesterday = new Date(Date.now() - 86400000);
-      document.getElementById('ads-date').value = yesterday.toISOString().split('T')[0];
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yy = yesterday.getFullYear(), ym = String(yesterday.getMonth()+1).padStart(2,'0'), yd = String(yesterday.getDate()).padStart(2,'0');
+      document.getElementById('ads-date').value = `${yy}-${ym}-${yd}`;
     }
 
     updateTotalPreview();

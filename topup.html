@@ -914,8 +914,9 @@
 
   async function checkAdsYesterday(accessToken) {
     try {
-      const y = new Date(Date.now() - 86400000);
-      const dateStr = y.toISOString().split('T')[0];
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      const dateStr = `${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,'0')}-${String(y.getDate()).padStart(2,'0')}`;
       const url = new URL(`${LAPORAN_API}/api/laporan-bridge`);
       url.searchParams.set('action', 'check-ads');
       url.searchParams.set('date', dateStr);
@@ -1153,7 +1154,8 @@
       if (found) {
         hideAdsWarning();
       } else {
-        const yesterday = new Date(Date.now() - 86400000);
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
         const dateStr = yesterday.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
         showAdsWarning(`Biaya iklan akun <b>${account.nama_akun}</b> untuk tanggal <b>${dateStr}</b> belum dilaporkan. Silakan isi di halaman Laporan Akuisisi terlebih dahulu.`);
       }
