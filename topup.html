@@ -660,6 +660,15 @@
         <input type="text" class="form-input" id="aa-nama" placeholder="Contoh: Akun Utama Meta Ads" />
       </div>
 
+      <!-- Penugasan Laporan -->
+      <div class="modal-field">
+        <label>Penugasan Laporan <span style="color:var(--text-sub);font-weight:400;">(opsional — untuk validasi biaya iklan)</span></label>
+        <select class="form-input form-select" id="aa-laporan-assignment">
+          <option value="">— Tidak dipasangkan —</option>
+        </select>
+        <div style="font-size:10px;color:var(--text-sub);margin-top:4px;">Hubungkan akun ini ke penugasan di Laporan Akuisisi</div>
+      </div>
+
       <!-- Screenshot Billing -->
       <div class="modal-field">
         <label>Screenshot Billing Meta Ads <span style="color:var(--text-sub);font-weight:400;">(opsional — auto-isi saldo)</span></label>
@@ -888,6 +897,42 @@
   // billing SS state (in add-account modal)
   let billingFile = null;
 
+  // Laporan Akuisisi API — untuk fetch assignments & cek biaya iklan
+  const LAPORAN_API = 'https://akuisisiadsy.vercel.app';
+  let laporanAssignments = []; // cached assignments dari laporan
+
+  async function fetchLaporanAssignments() {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return [];
+      const url = new URL(`${LAPORAN_API}/api/laporan-bridge`);
+      url.searchParams.set('action', 'adv-init');
+      const now = new Date();
+      const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0');
+      url.searchParams.set('start', `${y}-${m}-01`);
+      url.searchParams.set('end', now.toISOString().split('T')[0]);
+      const res = await fetch(url, { headers: { 'X-Advertiser-Token': session.access_token } });
+      if (!res.ok) return [];
+      const data = await res.json();
+      laporanAssignments = data.assignments || [];
+      return laporanAssignments;
+    } catch { return []; }
+  }
+
+  async function checkAdsYesterday(accessToken) {
+    try {
+      const y = new Date(Date.now() - 86400000);
+      const dateStr = y.toISOString().split('T')[0];
+      const url = new URL(`${LAPORAN_API}/api/laporan-bridge`);
+      url.searchParams.set('action', 'check-ads');
+      url.searchParams.set('date', dateStr);
+      const res = await fetch(url, { headers: { 'X-Advertiser-Token': accessToken } });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.ads || [];
+    } catch { return []; }
+  }
+
   // ── Init ──
   (async () => {
     const session = await requireAuth();
@@ -1040,14 +1085,25 @@
     }
   }
 
-  window.onAdAccountChange = function() {
+  // Track ads check state
+  let adsCheckPassed = true;
+
+  window.onAdAccountChange = async function() {
     const sel = document.getElementById('tp-adaccount');
     const opt = sel.options[sel.selectedIndex];
-    if (!opt?.value) { hideBillingBar(); selectedAccountId = null; selectedAccount = null; updateKpiHint(); return; }
+    if (!opt?.value) { hideBillingBar(); selectedAccountId = null; selectedAccount = null; updateKpiHint(); hideAdsWarning(); return; }
 
     selectedAccountId = opt.value;
     selectedAccount = adAccounts.find(a => a.id === selectedAccountId) || null;
     updateKpiHint();
+
+    // Check biaya iklan kemarin (hanya advertiser, bukan admin)
+    const isAdmin = ['admin','superadmin'].includes(currentProfile?.role);
+    if (!isAdmin && selectedAccount?.laporan_assignment) {
+      await checkAdsForAccount(selectedAccount);
+    } else {
+      hideAdsWarning();
+    }
 
     const saldo = selectedAccount?.saldo_saat_ini;
     const jangkauan = selectedAccount?.jangkauan_saldo;
@@ -1083,6 +1139,49 @@
 
   function hideBillingBar() {
     document.getElementById('billing-info-bar').style.display = 'none';
+  }
+
+  async function checkAdsForAccount(account) {
+    if (!account?.laporan_assignment) { hideAdsWarning(); return; }
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return;
+      const yesterdayAds = await checkAdsYesterday(session.access_token);
+      // Check if this specific account name has reported
+      const found = yesterdayAds.some(a => a.ad_account_name === account.nama_akun);
+      if (found) {
+        hideAdsWarning();
+      } else {
+        const yesterday = new Date(Date.now() - 86400000);
+        const dateStr = yesterday.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+        showAdsWarning(`Biaya iklan akun <b>${account.nama_akun}</b> untuk tanggal <b>${dateStr}</b> belum dilaporkan. Silakan isi di halaman Laporan Akuisisi terlebih dahulu.`);
+      }
+    } catch (e) {
+      console.warn('Gagal cek biaya iklan:', e);
+      hideAdsWarning();
+    }
+  }
+
+  function showAdsWarning(msg) {
+    adsCheckPassed = false;
+    let banner = document.getElementById('ads-warning-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'ads-warning-banner';
+      banner.style.cssText = 'background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#991b1b;line-height:1.6;';
+      const submitBtn = document.getElementById('tp-submit');
+      submitBtn.parentElement.insertBefore(banner, submitBtn);
+    }
+    banner.innerHTML = `⚠️ ${msg}<br><a href="laporan.html" style="color:#1d4ed8;font-weight:600;text-decoration:underline;margin-top:4px;display:inline-block;">→ Buka Laporan Akuisisi</a>`;
+    banner.style.display = 'block';
+    checkSubmitEnabled();
+  }
+
+  function hideAdsWarning() {
+    adsCheckPassed = true;
+    const banner = document.getElementById('ads-warning-banner');
+    if (banner) banner.style.display = 'none';
+    checkSubmitEnabled();
   }
 
   // ── Ad Accounts ──
@@ -1260,10 +1359,13 @@
     const isAdminView = ['admin','superadmin'].includes(currentProfile?.role);
     const advertiserName = a.profiles?.name || a.profiles?.email || '';
 
+    const assignLabel = a.laporan_assignment ? a.laporan_assignment.replace(/\|\|\|/g, ' · ') : '';
+
     return `<div class="acct-card" id="acct-${a.id}">
       ${isAdminView && advertiserName ? `<div style="font-size:11px;font-weight:700;color:var(--primary);margin-bottom:4px;">👤 ${advertiserName}</div>` : ''}
       ${a.products?.name ? `<div style="font-size:10px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📦 ${a.products.name}</div>` : ''}
       <div class="acct-card-name">${a.nama_akun}${adTypeBadge}${pmBadge}</div>
+      ${assignLabel ? `<div style="font-size:10px;color:#0369a1;margin-top:4px;">📊 Laporan: ${assignLabel}</div>` : ''}
       <div class="acct-card-actions">
         <button onclick="openAddAccountModal('${a.id}')" title="Edit">✏️</button>
         <button onclick="deleteAdAccount('${a.id}')" title="Hapus" style="color:var(--danger)">🗑️</button>
@@ -1332,6 +1434,27 @@
         onPaymentMethodChange();
       }
     }
+
+    // Load laporan assignments into dropdown
+    const assignSel = document.getElementById('aa-laporan-assignment');
+    assignSel.innerHTML = '<option value="">— Tidak dipasangkan —</option>';
+    fetchLaporanAssignments().then(assignments => {
+      const seen = new Set();
+      assignments.forEach(a => {
+        const plat = a.platform || 'Meta';
+        const key = `${a.product}|||${a.channel}|||${plat}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = `${a.product} · ${a.channel} · ${plat}`;
+        assignSel.appendChild(opt);
+      });
+      if (editId) {
+        const ex = adAccounts.find(a => a.id === editId);
+        if (ex?.laporan_assignment) assignSel.value = ex.laporan_assignment;
+      }
+    });
 
     loadLinebankCards().then(() => {
       if (editId) {
@@ -1420,6 +1543,7 @@
     const jangkauan = parseInt(document.getElementById('aa-jangkauan').value.replace(/\D/g, '')) || null;
     const linebankCardId = paymentMethod === 'line_bank' ? (document.getElementById('aa-linebank-card').value || null) : null;
     const ccNomor = paymentMethod === 'selow' ? (document.getElementById('aa-cc-nomor').value.trim() || null) : null;
+    const laporanAssignment = document.getElementById('aa-laporan-assignment').value || null;
 
     const errEl = document.getElementById('aa-err');
     errEl.style.display = 'none';
@@ -1441,6 +1565,7 @@
         jangkauan_saldo: jangkauan,
         linebank_card_id: linebankCardId,
         kartu_kredit_nomor: ccNomor,
+        laporan_assignment: laporanAssignment,
         updated_at: new Date().toISOString()
       };
 
@@ -1782,7 +1907,7 @@
     const hasProduct = !!document.getElementById('tp-product').value;
     const hasFile = !!selectedFile;
     const hasOmset = document.getElementById('tp-omset').value.trim() !== '';
-    document.getElementById('tp-submit').disabled = !(hasProduct && hasFile && hasOmset);
+    document.getElementById('tp-submit').disabled = !(hasProduct && hasFile && hasOmset && adsCheckPassed);
   }
   window.checkSubmitEnabled = checkSubmitEnabled;
 

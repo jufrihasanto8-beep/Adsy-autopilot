@@ -109,6 +109,14 @@
     .la-modal-body .form-summary b { color:#073b56; margin-left:8px; }
     .la-modal-actions { display:flex; gap:10px; justify-content:flex-end; padding:0 27px 22px; }
 
+    /* Account rows in modal */
+    .ads-acct-row { border:1px solid #cce0ec; border-radius:8px; padding:12px 14px; margin-bottom:10px; background:#f8fcff; }
+    .ads-acct-row .acct-name { font-size:12px; font-weight:650; color:#073b56; margin-bottom:8px; }
+    .ads-acct-row .acct-fields { display:grid; grid-template-columns:1fr 80px; gap:10px; align-items:end; }
+    .ads-acct-row .acct-fields label { font-size:10px; color:#587488; margin-bottom:0; }
+    .ads-acct-row .acct-fields input { display:block; width:100%; border:1px solid #cce0ec; background:#fff; border-radius:6px; padding:8px 10px; margin-top:4px; font-size:12px; outline:none; font-family:'DM Sans'; color:#073b56; }
+    .ads-acct-row .acct-fields input:focus { border-color:#00a8df; box-shadow:0 0 0 3px rgba(0,168,223,0.1); }
+
     /* Rekap Harian */
     .la-rekap-head { display:flex; align-items:center; gap:10px; padding:0 22px 14px; flex-wrap:wrap; }
     .la-rekap-head select { border:1px solid #cce0ec; border-radius:6px; padding:7px 10px; font-size:11px; background:#f8fcff; color:#1d5c7b; font-family:'DM Sans'; }
@@ -521,6 +529,7 @@
                   <th>Produk</th>
                   <th>Channel</th>
                   <th>Platform</th>
+                  <th>Akun Iklan</th>
                   <th>Budget</th>
                   <th>Pajak</th>
                   <th>Total biaya</th>
@@ -541,7 +550,7 @@
 
 <!-- MODAL INPUT BIAYA IKLAN -->
 <div class="la-modal-backdrop" id="modal-ads">
-  <div class="la-modal">
+  <div class="la-modal" style="max-width:540px;">
     <header><h3>Input Biaya Iklan</h3></header>
     <div class="la-modal-body">
       <label>Tanggal <span style="color:#a35343;">*</span>
@@ -553,13 +562,24 @@
           <option value="">Pilih penugasan...</option>
         </select>
       </label>
-      <label>Budget (Rp) <span style="color:#a35343;">*</span>
-        <input type="text" id="ads-budget" inputmode="numeric" placeholder="0" onfocus="this.select()" />
-      </label>
-      <label>Pajak (%)
-        <input type="number" id="ads-tax" min="0" max="100" value="11" onfocus="this.select()" />
-      </label>
-      <div class="form-summary">Total biaya termasuk pajak <b id="ads-total-preview">Rp 0</b></div>
+
+      <!-- Per-account rows (muncul setelah pilih penugasan) -->
+      <div id="ads-accounts-wrap" style="display:none; margin-top:14px;">
+        <div style="font-size:11px;font-weight:650;color:#073b56;margin-bottom:10px;">Akun Iklan</div>
+        <div id="ads-accounts-list"></div>
+        <div class="form-summary" style="margin-top:14px;">Total biaya termasuk pajak <b id="ads-total-preview">Rp 0</b></div>
+      </div>
+
+      <!-- Fallback: single budget (kalau tidak ada akun terpasang) -->
+      <div id="ads-single-wrap">
+        <label>Budget (Rp) <span style="color:#a35343;">*</span>
+          <input type="text" id="ads-budget" inputmode="numeric" placeholder="0" onfocus="this.select()" />
+        </label>
+        <label>Pajak (%)
+          <input type="number" id="ads-tax" min="0" max="100" value="11" onfocus="this.select()" />
+        </label>
+        <div class="form-summary">Total biaya termasuk pajak <b id="ads-total-preview-single">Rp 0</b></div>
+      </div>
     </div>
     <div class="la-modal-actions">
       <button class="la-btn" onclick="closeAdsModal()">Batal</button>
@@ -911,12 +931,42 @@
     document.getElementById('la-chart-product').addEventListener('change', renderChartData);
     document.getElementById('la-chart-channel').addEventListener('change', renderChartData);
 
-    // Live total preview in modal
+    // Live total preview in modal (single/fallback mode)
     document.getElementById('ads-budget').addEventListener('input', function() {
       formatBudgetInput(this);
     });
     document.getElementById('ads-tax').addEventListener('input', updateTotalPreview);
     document.getElementById('ads-date').addEventListener('change', updateDateDay);
+
+    // When assignment changes, fetch linked ad accounts
+    document.getElementById('ads-assignment').addEventListener('change', async function() {
+      const val = this.value;
+      const acctWrap = document.getElementById('ads-accounts-wrap');
+      const singleWrap = document.getElementById('ads-single-wrap');
+      if (!val) {
+        acctWrap.style.display = 'none';
+        singleWrap.style.display = '';
+        modalAdAccounts = [];
+        return;
+      }
+      const [product, channel, platform] = val.split('|||');
+      const key = `${product}|||${channel}|||${platform}`;
+      const accounts = await fetchAdAccountsForAssignment(key);
+      modalAdAccounts = accounts;
+      if (accounts.length > 0) {
+        acctWrap.style.display = '';
+        singleWrap.style.display = 'none';
+        // Find existing ads for this date+assignment to pre-fill
+        const dateVal = document.getElementById('ads-date').value;
+        const existingAds = dateVal
+          ? state.ads.filter(a => a.date === dateVal && a.product === product && a.channel === channel && (a.platform || 'Meta') === platform)
+          : [];
+        renderAccountRows(accounts, existingAds);
+      } else {
+        acctWrap.style.display = 'none';
+        singleWrap.style.display = '';
+      }
+    });
 
     await loadData();
 
@@ -948,10 +998,70 @@
     el.value = raw ? Number(raw).toLocaleString('id-ID') : '';
     updateTotalPreview();
   }
+  // Cached ad accounts per assignment key
+  let modalAdAccounts = [];
+
+  async function fetchAdAccountsForAssignment(assignmentKey) {
+    if (!assignmentKey || !sb) return [];
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return [];
+    const { data } = await sb.from('topup_ad_accounts')
+      .select('id, nama_akun, laporan_assignment')
+      .eq('user_id', user.id)
+      .eq('laporan_assignment', assignmentKey);
+    return data || [];
+  }
+
+  function renderAccountRows(accounts, existingAds) {
+    const wrap = document.getElementById('ads-accounts-list');
+    if (!accounts.length) {
+      wrap.innerHTML = '<div style="font-size:11px;color:#587488;padding:10px 0;">Tidak ada akun iklan terpasang untuk penugasan ini.<br>Pasangkan di <b>Top Up → Akun Iklan</b>.</div>';
+      return;
+    }
+    wrap.innerHTML = accounts.map((acc, i) => {
+      const existing = existingAds.find(a => a.ad_account_name === acc.nama_akun);
+      const budgetVal = existing ? Number(existing.budget).toLocaleString('id-ID') : '';
+      const taxVal = existing ? existing.tax : 11;
+      return `<div class="ads-acct-row" data-acct-name="${acc.nama_akun}">
+        <div class="acct-name">${acc.nama_akun}</div>
+        <div class="acct-fields">
+          <label>Budget (Rp)
+            <input type="text" class="acct-budget" inputmode="numeric" placeholder="0" value="${budgetVal}" onfocus="this.select()" />
+          </label>
+          <label>Pajak %
+            <input type="number" class="acct-tax" min="0" max="100" value="${taxVal}" onfocus="this.select()" />
+          </label>
+        </div>
+      </div>`;
+    }).join('');
+    // Attach listeners
+    wrap.querySelectorAll('.acct-budget').forEach(el => {
+      el.addEventListener('input', function() {
+        const raw = this.value.replace(/[^\d]/g, '');
+        this.value = raw ? Number(raw).toLocaleString('id-ID') : '';
+        updateTotalPreviewMulti();
+      });
+    });
+    wrap.querySelectorAll('.acct-tax').forEach(el => {
+      el.addEventListener('input', updateTotalPreviewMulti);
+    });
+    updateTotalPreviewMulti();
+  }
+
+  function updateTotalPreviewMulti() {
+    let total = 0;
+    document.querySelectorAll('#ads-accounts-list .ads-acct-row').forEach(row => {
+      const budget = parseBudget(row.querySelector('.acct-budget').value);
+      const tax = Number(row.querySelector('.acct-tax').value) || 0;
+      total += budget * (1 + tax / 100);
+    });
+    document.getElementById('ads-total-preview').textContent = money(Math.round(total));
+  }
+
   function updateTotalPreview() {
     const budget = parseBudget(document.getElementById('ads-budget').value);
     const tax = Number(document.getElementById('ads-tax').value) || 0;
-    document.getElementById('ads-total-preview').textContent = money(budget * (1 + tax / 100));
+    document.getElementById('ads-total-preview-single').textContent = money(budget * (1 + tax / 100));
   }
 
   const HARI = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
@@ -1320,7 +1430,7 @@
   function renderAds(ads) {
     const tbody = document.getElementById('la-ads-table');
     if (!ads.length) {
-      tbody.innerHTML = '<tr><td colspan="8"><div class="la-empty">Belum ada data biaya iklan di periode ini</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9"><div class="la-empty">Belum ada data biaya iklan di periode ini</div></td></tr>';
       return;
     }
     tbody.innerHTML = ads.map(a => {
@@ -1332,6 +1442,7 @@
         <td><strong style="font-weight:550;">${a.product || '-'}</strong></td>
         <td><span class="la-badge ${a.channel === 'CTWA' ? 'ctwa' : 'web'}">${a.channel || '-'}</span></td>
         <td>${a.platform || 'Meta'}</td>
+        <td style="font-size:10px;color:#587488;">${a.ad_account_name || '-'}</td>
         <td>${money(budget)}</td>
         <td>${tax}%</td>
         <td class="money">${money(Math.round(total))}</td>
@@ -1344,6 +1455,14 @@
   window.openAdsModal = function(editId) {
     const modal = document.getElementById('modal-ads');
     const sel = document.getElementById('ads-assignment');
+    const acctWrap = document.getElementById('ads-accounts-wrap');
+    const singleWrap = document.getElementById('ads-single-wrap');
+
+    // Reset to single mode
+    acctWrap.style.display = 'none';
+    singleWrap.style.display = '';
+    modalAdAccounts = [];
+    document.getElementById('ads-accounts-list').innerHTML = '';
 
     sel.innerHTML = '<option value="">Pilih penugasan...</option>';
     // Deduplicate by product+channel+platform — ad cost is per product+channel+platform, not per CS
@@ -1364,9 +1483,13 @@
         sel.value = `${ad.product}|||${ad.channel}|||${ad.platform||'Meta'}`;
         document.getElementById('ads-budget').value = ad.budget ? Number(ad.budget).toLocaleString('id-ID') : '0';
         document.getElementById('ads-tax').value = ad.tax ?? 11;
+        // Trigger assignment change to load accounts (will pre-fill from existing ads)
+        sel.dispatchEvent(new Event('change'));
       }
     } else {
-      document.getElementById('ads-date').value = new Date().toISOString().split('T')[0];
+      // Default: kemarin
+      const yesterday = new Date(Date.now() - 86400000);
+      document.getElementById('ads-date').value = yesterday.toISOString().split('T')[0];
       document.getElementById('ads-budget').value = '';
       document.getElementById('ads-tax').value = 11;
     }
@@ -1395,8 +1518,6 @@
   window.saveAds = async function() {
     const date = document.getElementById('ads-date').value;
     const assignVal = document.getElementById('ads-assignment').value;
-    const budget = document.getElementById('ads-budget').value;
-    const tax = document.getElementById('ads-tax').value;
 
     if (!date || !assignVal) return showToast('Lengkapi tanggal dan penugasan.', 'warning');
     const [product, channel, platform] = assignVal.split('|||');
@@ -1406,9 +1527,24 @@
     btn.disabled = true; btn.textContent = 'Menyimpan...';
 
     try {
-      await apiFetch('save-ads', {}, 'POST', {
-        ad: { date, product, channel, platform, budget: parseBudget(budget), tax: Number(tax) ?? 11 }
-      });
+      // Multi-account mode
+      if (modalAdAccounts.length > 0) {
+        const adsArr = [];
+        document.querySelectorAll('#ads-accounts-list .ads-acct-row').forEach(row => {
+          const acctName = row.dataset.acctName;
+          const budget = parseBudget(row.querySelector('.acct-budget').value);
+          const tax = Number(row.querySelector('.acct-tax').value) ?? 11;
+          adsArr.push({ date, product, channel, platform, budget, tax, ad_account_name: acctName });
+        });
+        await apiFetch('save-ads', {}, 'POST', { ads: adsArr });
+      } else {
+        // Single/fallback mode
+        const budget = document.getElementById('ads-budget').value;
+        const tax = document.getElementById('ads-tax').value;
+        await apiFetch('save-ads', {}, 'POST', {
+          ad: { date, product, channel, platform, budget: parseBudget(budget), tax: Number(tax) ?? 11 }
+        });
+      }
       showToast('Biaya iklan berhasil disimpan!', 'success');
       window.closeAdsModal();
       await loadData();
