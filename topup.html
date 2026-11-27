@@ -1149,8 +1149,10 @@
       const { data: { session } } = await sb.auth.getSession();
       if (!session) return;
       const yesterdayAds = await checkAdsYesterday(session.access_token);
-      // Check if this specific account name has reported
-      const found = yesterdayAds.some(a => a.ad_account_name === account.nama_akun);
+      // Check if this specific account name has reported (null = data lama sebelum multi-akun, tetap match)
+      const [prod] = (account.laporan_assignment || '').split('|||');
+      const sameAssignment = yesterdayAds.filter(a => a.product === prod);
+      const found = sameAssignment.some(a => a.ad_account_name === account.nama_akun || !a.ad_account_name);
       if (found) {
         hideAdsWarning();
       } else {
